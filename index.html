@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python Playground</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #1a1b26;
+      --surface: #24283b;
+      --border: #414868;
+      --text: #c0caf5;
+      --text-muted: #565f89;
+      --accent: #7aa2f7;
+      --accent-hover: #89b4fa;
+      --stdout: #9ece6a;
+      --stderr: #e0af68;
+      --error: #f7768e;
+      --editor-bg: #1e2030;
+      --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+      --font-ui: system-ui, -apple-system, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    #status {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    #status.ready {
+      color: var(--stdout);
+    }
+
+    #status.loading {
+      color: var(--stderr);
+    }
+
+    #run-btn {
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.45rem 1.25rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #1a1b26;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    #run-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    #run-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 0;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel + .panel {
+      border-left: 1px solid var(--border);
+    }
+
+    .panel-header {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #editor {
+      flex: 1;
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      outline: none;
+      resize: none;
+      background: var(--editor-bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      tab-size: 4;
+    }
+
+    #console {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      background: #0d1117;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    #console:empty::before {
+      content: "La salida aparecerá aquí…";
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .out-stdout {
+      color: var(--stdout);
+    }
+
+    .out-stderr {
+      color: var(--stderr);
+    }
+
+    .out-error {
+      color: var(--error);
+    }
+
+    .out-error::before {
+      content: "✕ ";
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .panel + .panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Python Playground</h1>
+    <div class="header-actions">
+      <span id="status" class="loading">Cargando Python…</span>
+      <button id="run-btn" disabled>Ejecutar</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-header">Editor</div>
+      <textarea id="editor" spellcheck="false">print("Hola, mundo!")
+
+for i in range(3):
+    print(f"  iteración {i}")</textarea>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">Consola</div>
+      <div id="console" role="log" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+  <script>
+    const statusEl = document.getElementById("status");
+    const runBtn = document.getElementById("run-btn");
+    const editor = document.getElementById("editor");
+    const consoleEl = document.getElementById("console");
+
+    let pyodide = null;
+    let isRunning = false;
+
+    function setStatus(text, state) {
+      statusEl.textContent = text;
+      statusEl.className = state;
+    }
+
+    function updateRunButton() {
+      runBtn.disabled = !pyodide || isRunning;
+    }
+
+    function clearConsole() {
+      consoleEl.innerHTML = "";
+    }
+
+    function appendOutput(text, type) {
+      const span = document.createElement("span");
+      span.className = `out-${type}`;
+      span.textContent = text;
+      consoleEl.appendChild(span);
+    }
+
+    async function initPyodide() {
+      try {
+        pyodide = await loadPyodide();
+
+        pyodide.setStdout({ batched: (msg) => appendOutput(msg, "stdout") });
+        pyodide.setStderr({ batched: (msg) => appendOutput(msg, "stderr") });
+
+        setStatus("Listo", "ready");
+      } catch (err) {
+        setStatus("Error al cargar Python", "loading");
+        appendOutput(String(err), "error");
+      } finally {
+        updateRunButton();
+      }
+    }
+
+    async function runCode() {
+      if (!pyodide || isRunning) return;
+
+      isRunning = true;
+      updateRunButton();
+      clearConsole();
+
+      const code = editor.value;
+
+      try {
+        await pyodide.runPythonAsync(code);
+      } catch (err) {
+        appendOutput(err.message || String(err), "error");
+      } finally {
+        isRunning = false;
+        updateRunButton();
+      }
+    }
+
+    runBtn.addEventListener("click", runCode);
+
+    editor.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!runBtn.disabled) runCode();
+      }
+    });
+
+    initPyodide();
+  </script>
+</body>
+</html>
