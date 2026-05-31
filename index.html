@@ -329,6 +329,140 @@
       padding-left: 10px;
     }
 
+    #hilo-panel {
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 300px;
+      max-height: 48%;
+      background: #121622;
+    }
+
+    .hilo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
+      background: var(--surface);
+    }
+
+    #hilo-level {
+      font-family: var(--font-mono);
+      color: var(--accent);
+    }
+
+    .hilo-api-row {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      background: #171b2a;
+    }
+
+    #hilo-api-key {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #0f1320;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.35rem 0.5rem;
+    }
+
+    #hilo-save-key {
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--text);
+      padding: 0.35rem 0.6rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+
+    #hilo-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-family: var(--font-ui);
+    }
+
+    .hilo-msg {
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      max-width: 94%;
+      white-space: pre-wrap;
+      line-height: 1.4;
+      font-size: 0.84rem;
+    }
+
+    .hilo-msg.user {
+      align-self: flex-end;
+      background: rgba(122, 162, 247, 0.2);
+      border: 1px solid rgba(122, 162, 247, 0.45);
+      color: var(--text);
+    }
+
+    .hilo-msg.model {
+      align-self: flex-start;
+      background: #1c2234;
+      border: 1px solid #2b3555;
+      color: var(--text);
+    }
+
+    #hilo-typing {
+      padding: 0 0.7rem 0.45rem;
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      min-height: 1rem;
+      font-style: italic;
+    }
+
+    .hilo-input-row {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.55rem 0.65rem 0.65rem;
+      border-top: 1px solid var(--border);
+      background: #171b2a;
+    }
+
+    #hilo-input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #0f1320;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 0.84rem;
+      padding: 0.45rem 0.6rem;
+    }
+
+    #hilo-send {
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      background: rgba(122, 162, 247, 0.12);
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    #hilo-send:disabled,
+    #hilo-save-key:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
     @media (max-width: 980px) {
       #translations {
         grid-template-columns: 1fr;
@@ -401,6 +535,22 @@ print("Cantidad de nodos: {pila.length}")</textarea>
     <section class="panel">
       <div class="panel-header">Consola</div>
       <div id="console" role="log" aria-live="polite"></div>
+      <section id="hilo-panel" aria-label="Asistente Hilo">
+        <div class="hilo-header">
+          <span>Hilo</span>
+          <span id="hilo-level">Nivel 1</span>
+        </div>
+        <div class="hilo-api-row">
+          <input id="hilo-api-key" type="password" placeholder="Gemini API key">
+          <button id="hilo-save-key" type="button">Guardar</button>
+        </div>
+        <div id="hilo-messages"></div>
+        <div id="hilo-typing"></div>
+        <div class="hilo-input-row">
+          <input id="hilo-input" type="text" placeholder="Pregunta a Hilo...">
+          <button id="hilo-send" type="button">Enviar</button>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -442,12 +592,30 @@ print("Cantidad de nodos: {pila.length}")</textarea>
     const verboseContainer = document.getElementById("verbose-container");
     const btnWoven = document.getElementById("btn-woven");
     const btnVerbose = document.getElementById("btn-verbose");
+    const hiloLevelEl = document.getElementById("hilo-level");
+    const hiloApiKeyEl = document.getElementById("hilo-api-key");
+    const hiloSaveKeyBtn = document.getElementById("hilo-save-key");
+    const hiloMessagesEl = document.getElementById("hilo-messages");
+    const hiloTypingEl = document.getElementById("hilo-typing");
+    const hiloInputEl = document.getElementById("hilo-input");
+    const hiloSendBtn = document.getElementById("hilo-send");
 
     let pyodide = null;
     let runWovenFn = null;
     let translateWovenFn = null;
+    let hiloChatFn = null;
     let modoVerboso = false;
     let isRunning = false;
+    let hiloHistorial = [];
+    let nivelAyuda = 1;
+    let mensajesEnProblemaActual = 0;
+    let contextoEjecucionActual = {
+      codigo: "",
+      output: [],
+      errores: [],
+      tieneError: false,
+      modo: "woven"
+    };
 
     function setStatus(text, state) {
       statusEl.textContent = text;
@@ -491,6 +659,120 @@ print("Cantidad de nodos: {pila.length}")</textarea>
       return value;
     }
 
+    function mostrarIndicadorNivel(nivel) {
+      hiloLevelEl.textContent = `Nivel ${nivel}`;
+    }
+
+    function avanzarNivel() {
+      if (!contextoEjecucionActual.tieneError) return;
+      mensajesEnProblemaActual++;
+      if (mensajesEnProblemaActual >= 3 && nivelAyuda < 4) {
+        nivelAyuda++;
+        mostrarIndicadorNivel(nivelAyuda);
+      }
+    }
+
+    function reiniciarNivel() {
+      nivelAyuda = 1;
+      mensajesEnProblemaActual = 0;
+      mostrarIndicadorNivel(1);
+    }
+
+    function actualizarContextoHilo(codigo, output, errores, tieneError) {
+      contextoEjecucionActual = {
+        codigo,
+        output,
+        errores,
+        tieneError,
+        modo: modoVerboso ? "verboso" : "woven"
+      };
+      if (!tieneError) reiniciarNivel();
+    }
+
+    function appendHiloMessage(role, content) {
+      const msg = document.createElement("div");
+      msg.className = `hilo-msg ${role === "user" ? "user" : "model"}`;
+      msg.textContent = content;
+      hiloMessagesEl.appendChild(msg);
+      hiloMessagesEl.scrollTop = hiloMessagesEl.scrollHeight;
+    }
+
+    function setHiloTyping(isTyping) {
+      hiloTypingEl.textContent = isTyping ? "Hilo está escribiendo..." : "";
+      hiloSendBtn.disabled = isTyping;
+    }
+
+    async function enviarMensajeHilo(mensaje) {
+      if (!pyodide || !hiloChatFn) {
+        return "Hilo aún no está disponible. Espera a que Pyodide termine de cargar.";
+      }
+
+      // Python construye el payload
+      const preparacion = JSON.parse(
+        pyResultToString(
+          hiloChatFn(
+            mensaje,
+            JSON.stringify(hiloHistorial),
+            contextoEjecucionActual.codigo,
+            JSON.stringify(contextoEjecucionActual.output),
+            JSON.stringify(contextoEjecucionActual.errores),
+            contextoEjecucionActual.tieneError,
+            contextoEjecucionActual.modo,
+            nivelAyuda
+          )
+        )
+      );
+
+      if (!preparacion.ok) {
+        return `Error preparando mensaje: ${preparacion.error}`;
+      }
+
+      // JS hace la llamada HTTP
+      const apiKey = localStorage.getItem("gemini_api_key") ?? "";
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: preparacion.payload
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        return `Error de Gemini: ${err}`;
+      }
+
+      const responseJson = await response.json();
+
+      // Python parsea la respuesta
+      const respuesta = pyResultToString(
+        pyodide.globals.get("parsear_respuesta_hilo")(
+          JSON.stringify(responseJson)
+        )
+      );
+
+      hiloHistorial.push({ role: "user", content: mensaje });
+      hiloHistorial.push({ role: "model", content: respuesta });
+      avanzarNivel();
+
+      return respuesta;
+    }
+
+    async function manejarEnvioHilo() {
+      const mensaje = hiloInputEl.value.trim();
+      if (!mensaje) return;
+
+      appendHiloMessage("user", mensaje);
+      hiloInputEl.value = "";
+      setHiloTyping(true);
+      try {
+        const respuesta = await enviarMensajeHilo(mensaje);
+        appendHiloMessage("model", respuesta);
+      } finally {
+        setHiloTyping(false);
+      }
+    }
+
     async function loadWovenModules() {
       const wovenFiles = [
         "WovenLexer.py",
@@ -513,6 +795,8 @@ print("Cantidad de nodos: {pila.length}")</textarea>
       pyodide.FS.writeFile("/home/pyodide/tracing_visitor.py", tracingCode);
       const verboseCode = await fetch("woven/verbose_visitor.py").then((r) => r.text());
       pyodide.FS.writeFile("/home/pyodide/verbose_visitor.py", verboseCode);
+      const hiloCode = await fetch("woven/gemini_agent.py").then((r) => r.text());
+      pyodide.FS.writeFile("/home/pyodide/gemini_agent.py", hiloCode);
     }
 
     async function initPyodide() {
@@ -553,14 +837,17 @@ def run_woven(source: str) -> list:
 from translator_visitor import translate_woven
 from tracing_visitor import trace_woven
 from verbose_visitor import verbose_woven
+from gemini_agent import hilo_chat, parsear_respuesta_hilo
 `);
         runWovenFn = pyodide.globals.get("run_woven");
         translateWovenFn = pyodide.globals.get("translate_woven");
+        hiloChatFn = pyodide.globals.get("hilo_chat");
 
         setStatus("Listo", "ready");
       } catch (err) {
         runWovenFn = null;
         translateWovenFn = null;
+        hiloChatFn = null;
         pyodide = null;
         setStatus("Error al cargar Python", "loading");
         appendOutput(String(err), "error");
@@ -572,6 +859,7 @@ from verbose_visitor import verbose_woven
     function mostrarModoWoven() {
       editorContainer.style.display = "flex";
       verboseContainer.style.display = "none";
+      contextoEjecucionActual.modo = "woven";
     }
 
     function colorPorTipo(tipo) {
@@ -649,6 +937,7 @@ from verbose_visitor import verbose_woven
       renderizarBloques(resultado.bloques);
       editorContainer.style.display = "none";
       verboseContainer.style.display = "block";
+      contextoEjecucionActual.modo = "verboso";
     }
 
     async function runCode() {
@@ -664,7 +953,7 @@ from verbose_visitor import verbose_woven
 
       try {
         const outputProxy = runWovenFn(code);
-        const output = outputProxy.toJs();
+        const output = outputProxy.toJs().map((line) => String(line));
         outputProxy.destroy();
 
         const traza = pyodide.globals.get("trace_woven")(code);
@@ -691,6 +980,10 @@ from verbose_visitor import verbose_woven
           }
         }
 
+        const errores = output.filter((line) => line.startsWith("Error"));
+        const tieneError = errores.length > 0;
+        actualizarContextoHilo(code, output, errores, tieneError);
+
         const pyTrans = pyResultToString(translateWovenFn(code, "python"));
         const javaTrans = pyResultToString(translateWovenFn(code, "java"));
         const cppTrans = pyResultToString(translateWovenFn(code, "cpp"));
@@ -698,7 +991,9 @@ from verbose_visitor import verbose_woven
         showTranslations();
       } catch (err) {
         hideTranslations();
-        appendOutput(err.message || String(err), "error");
+        const mensaje = err.message || String(err);
+        appendOutput(mensaje, "error");
+        actualizarContextoHilo(code, [], [mensaje], true);
       } finally {
         isRunning = false;
         updateRunButton();
@@ -728,6 +1023,24 @@ from verbose_visitor import verbose_woven
       }
     });
 
+    editor.addEventListener("input", () => {
+      contextoEjecucionActual.codigo = editor.value;
+      reiniciarNivel();
+    });
+
+    hiloSaveKeyBtn.addEventListener("click", () => {
+      localStorage.setItem("gemini_api_key", hiloApiKeyEl.value.trim());
+      appendHiloMessage("model", "Clave de Gemini guardada en este navegador.");
+    });
+
+    hiloSendBtn.addEventListener("click", manejarEnvioHilo);
+    hiloInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (!hiloSendBtn.disabled) manejarEnvioHilo();
+      }
+    });
+
     document.querySelectorAll(".copy-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const targetId = btn.getAttribute("data-target");
@@ -747,6 +1060,10 @@ from verbose_visitor import verbose_woven
 
     hideTranslations();
     mostrarModoWoven();
+    mostrarIndicadorNivel(1);
+    hiloApiKeyEl.value = localStorage.getItem("gemini_api_key") ?? "";
+    actualizarContextoHilo(editor.value, [], [], false);
+    appendHiloMessage("model", "Hola, soy Hilo. Cuéntame qué te está costando del programa actual.");
 
     initPyodide();
   </script>
