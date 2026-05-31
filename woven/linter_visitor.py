@@ -18,6 +18,11 @@ class LinterVisitor(WovenVisitor):
         self.scope_stack = [{}]  # pila de scopes
         self.funcion_actual = None
         self.clase_actual = None
+        self.dentro_de_ciclo = 0  # contador para ciclos anidados
+        self.dentro_de_try = 0
+        self.return_type_esperado = None
+        self.tiene_return = False
+        self.scopes_cerrados = []
 
     def _error(self, linea, mensaje):
         self.diagnosticos.append({
@@ -60,17 +65,25 @@ class LinterVisitor(WovenVisitor):
     def _entrar_scope(self):
         self.scope_stack.append({})
 
-    def _emit_unused(self, scope):
+    def _emit_unused(self, scope, es_bloque_control=False):
         for nombre, info in scope.items():
             if not info["usado"] and nombre not in ("_",):
-                self._warning(
-                    info["linea"],
-                    f"Variable '{nombre}' declarada pero nunca usada"
-                )
+                if es_bloque_control:
+                    self._warning(
+                        info["linea"],
+                        f"Variable '{nombre}' declarada dentro del bloque "
+                        f"pero nunca usada"
+                    )
+                else:
+                    self._warning(
+                        info["linea"],
+                        f"Variable '{nombre}' declarada pero nunca usada"
+                    )
 
-    def _salir_scope(self):
+    def _salir_scope(self, es_bloque_control=False):
         scope = self.scope_stack.pop()
-        self._emit_unused(scope)
+        self.scopes_cerrados.append(scope)
+        self._emit_unused(scope, es_bloque_control=es_bloque_control)
 
     def _es_tipo_primitivo(self, t):
         return t in {"int", "float", "string", "bool", "void"}
@@ -163,12 +176,8 @@ class LinterVisitor(WovenVisitor):
         return self.visit(ctx.getChild(0))
 
     def visitBlock(self, ctx: WovenParser.BlockContext):
-        self._entrar_scope()
-        try:
-            for stmt in ctx.statement():
-                self.visit(stmt)
-        finally:
-            self._salir_scope()
+        for stmt in ctx.statement():
+            self.visit(stmt)
         return None
 
     # ---------- classes ----------
@@ -267,11 +276,17 @@ class LinterVisitor(WovenVisitor):
                     )
 
         prev_fn = self.funcion_actual
+        tipo_previo = self.return_type_esperado
+        tiene_return_previo = self.tiene_return
+
         self.funcion_actual = {
             "nombre": mname,
             "retorno": ctx.returnType().getText(),
             "has_return": False,
         }
+        self.return_type_esperado = ctx.returnType().getText()
+        self.tiene_return = False
+
         self._entrar_scope()
         try:
             self._declarar("self", self.clase_actual or "self", ctx.start.line)
@@ -281,6 +296,15 @@ class LinterVisitor(WovenVisitor):
         finally:
             self._salir_scope()
             self.funcion_actual = prev_fn
+
+        if self.return_type_esperado != "void" and not self.tiene_return:
+            self._error(
+                ctx.start.line,
+                f"La función '{mname}' debe retornar {self.return_type_esperado} "
+                f"pero no tiene ningún return"
+            )
+        self.return_type_esperado = tipo_previo
+        self.tiene_return = tiene_return_previo
         return None
 
     # ---------- functions ----------
@@ -291,7 +315,11 @@ class LinterVisitor(WovenVisitor):
 
         ret = ctx.returnType().getText()
         prev_fn = self.funcion_actual
+        tipo_previo = self.return_type_esperado
+        tiene_return_previo = self.tiene_return
         self.funcion_actual = {"nombre": nombre, "retorno": ret, "has_return": False}
+        self.return_type_esperado = ret
+        self.tiene_return = False
 
         self._entrar_scope()
         try:
@@ -301,10 +329,16 @@ class LinterVisitor(WovenVisitor):
         finally:
             self._salir_scope()
 
-        if ret != "void" and not self.funcion_actual["has_return"]:
-            self._error(ctx.start.line, f"La función '{nombre}' debe tener al menos un return")
+        if self.return_type_esperado != "void" and not self.tiene_return:
+            self._error(
+                ctx.start.line,
+                f"La función '{nombre}' debe retornar {self.return_type_esperado} "
+                f"pero no tiene ningún return"
+            )
 
         self.funcion_actual = prev_fn
+        self.return_type_esperado = tipo_previo
+        self.tiene_return = tiene_return_previo
         return None
 
     # ---------- variables ----------
@@ -326,12 +360,35 @@ class LinterVisitor(WovenVisitor):
                     linea,
                     f"Asignación incompatible: '{nombre}' es {tipo}, recibió {expr_tipo}"
                 )
+        else:
+            if tipo in {"int", "float", "bool"}:
+                self._error(
+                    linea,
+                    f"El tipo {tipo} no puede ser null, debe tener valor inicial"
+                )
 
         self._declarar(nombre, tipo, linea)
         return None
 
+    def visitIfStmt(self, ctx: WovenParser.IfStmtContext):
+        if ctx.expr():
+            self.visit(ctx.expr())
+        self._entrar_scope()
+        try:
+            self.visit(ctx.block(0))
+        finally:
+            self._salir_scope(es_bloque_control=True)
+        if len(ctx.block()) > 1:
+            self._entrar_scope()
+            try:
+                self.visit(ctx.block(1))
+            finally:
+                self._salir_scope(es_bloque_control=True)
+        return None
+
     def visitForStmt(self, ctx: WovenParser.ForStmtContext):
         self._entrar_scope()
+        self.dentro_de_ciclo += 1
         try:
             if ctx.forInit():
                 self.visit(ctx.forInit())
@@ -339,9 +396,48 @@ class LinterVisitor(WovenVisitor):
                 self.visit(ctx.expr())
             if ctx.forUpdate():
                 self.visit(ctx.forUpdate())
+            self._entrar_scope()
+            try:
+                self.visit(ctx.block())
+            finally:
+                self._salir_scope(es_bloque_control=True)
+        finally:
+            self.dentro_de_ciclo -= 1
+            self._salir_scope(es_bloque_control=True)
+        return None
+
+    def visitWhileStmt(self, ctx: WovenParser.WhileStmtContext):
+        if ctx.expr():
+            self.visit(ctx.expr())
+        self.dentro_de_ciclo += 1
+        self._entrar_scope()
+        try:
             self.visit(ctx.block())
         finally:
-            self._salir_scope()
+            self.dentro_de_ciclo -= 1
+            self._salir_scope(es_bloque_control=True)
+        return None
+
+    def visitTryStmt(self, ctx: WovenParser.TryStmtContext):
+        if len(ctx.block(0).statement()) == 0:
+            self._warning(ctx.start.line, "El bloque try está vacío")
+
+        self.dentro_de_try += 1
+        self._entrar_scope()
+        try:
+            self.visit(ctx.block(0))
+        finally:
+            self._salir_scope(es_bloque_control=True)
+            self.dentro_de_try -= 1
+
+        nombre_var = ctx.IDENTIFIER().getText()
+        self._entrar_scope()
+        try:
+            self._declarar(nombre_var, "string", ctx.start.line)
+            self._marcar_usado(nombre_var)
+            self.visit(ctx.block(1))
+        finally:
+            self._salir_scope(es_bloque_control=True)
         return None
 
     def visitForInit(self, ctx: WovenParser.ForInitContext):
@@ -368,6 +464,21 @@ class LinterVisitor(WovenVisitor):
             return self.visit(ctx.expr())
         return None
 
+    def visitBreakStmt(self, ctx: WovenParser.BreakStmtContext):
+        if self.dentro_de_ciclo == 0:
+            self._error(ctx.start.line, "break solo puede usarse dentro de un ciclo")
+        return None
+
+    def visitContinueStmt(self, ctx: WovenParser.ContinueStmtContext):
+        if self.dentro_de_ciclo == 0:
+            self._error(ctx.start.line, "continue solo puede usarse dentro de un ciclo")
+        return None
+
+    def visitThrowStmt(self, ctx: WovenParser.ThrowStmtContext):
+        if ctx.expr():
+            self.visit(ctx.expr())
+        return None
+
     def visitAssignment(self, ctx: WovenParser.AssignmentContext):
         nombre = ctx.IDENTIFIER().getText()
         info = self._buscar(nombre)
@@ -384,10 +495,18 @@ class LinterVisitor(WovenVisitor):
         return None
 
     def visitReturnStmt(self, ctx: WovenParser.ReturnStmtContext):
+        self.tiene_return = True
         if self.funcion_actual:
             self.funcion_actual["has_return"] = True
-            if self.funcion_actual["retorno"] == "void" and ctx.expr() is not None:
-                self._warning(ctx.start.line, "Función void no debería retornar un valor")
+        if self.return_type_esperado == "void" and ctx.expr():
+            self._warning(ctx.start.line, "Función void no debería retornar un valor")
+
+        if self.return_type_esperado and self.return_type_esperado != "void" and not ctx.expr():
+            self._error(
+                ctx.start.line,
+                f"Se esperaba retornar {self.return_type_esperado} "
+                f"pero return no tiene valor"
+            )
         if ctx.expr():
             self.visit(ctx.expr())
         return None
@@ -399,6 +518,15 @@ class LinterVisitor(WovenVisitor):
         if found:
             self._marcar_usado(nombre)
             return found["tipo"]
+        for scope_cerrado in reversed(self.scopes_cerrados):
+            if nombre in scope_cerrado:
+                self._error(
+                    ctx.start.line,
+                    f"'{nombre}' fue declarada dentro de un bloque y no es "
+                    f"visible aquí. Declárala fuera del bloque si necesitas "
+                    f"usarla después."
+                )
+                return None
         if nombre in self.funciones:
             return self.funciones[nombre]["retorno"]
         if nombre in self.clases:
@@ -562,8 +690,13 @@ class LinterVisitor(WovenVisitor):
         return "int"
 
     def visitComparison(self, ctx: WovenParser.ComparisonContext):
-        self.visit(ctx.compExpr(0))
-        self.visit(ctx.compExpr(1))
+        left_t = self.visit(ctx.compExpr(0))
+        right_t = self.visit(ctx.compExpr(1))
+        if ctx.op.text in {"==", "!="}:
+            if left_t == "null" and right_t in {"int", "float", "bool"}:
+                self._warning(ctx.start.line, f"El tipo {right_t} nunca puede ser null")
+            elif right_t == "null" and left_t in {"int", "float", "bool"}:
+                self._warning(ctx.start.line, f"El tipo {left_t} nunca puede ser null")
         return "bool"
 
     def visitUnaryOp(self, ctx: WovenParser.UnaryOpContext):
@@ -588,6 +721,8 @@ class LinterVisitor(WovenVisitor):
             return "float"
         if ctx.STRING_LITERAL() or ctx.STRING_INTERP():
             return "string"
+        if ctx.NULL():
+            return "null"
         if ctx.TRUE() or ctx.FALSE():
             return "bool"
         return None
@@ -612,8 +747,6 @@ def lint_woven(source: str) -> str:
     parser.addErrorListener(SilentErrors())
 
     tree = parser.program()
-    if parser.getNumberOfSyntaxErrors() > 0:
-        return json.dumps({"diagnosticos": []}, ensure_ascii=False)
 
     visitor = LinterVisitor()
     try:

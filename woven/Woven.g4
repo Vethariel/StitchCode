@@ -71,6 +71,9 @@ simpleStmt
     | selfAssignment
     | indexAssignment
     | exprStmt
+    | breakStmt
+    | continueStmt
+    | throwStmt
     ;
 
 compoundStmt
@@ -79,6 +82,7 @@ compoundStmt
     | forStmt
     | whileStmt
     | classDecl
+    | tryStmt
     ;
 
 functionDecl
@@ -141,6 +145,11 @@ whileStmt
     : WHILE expr COLON block
     ;
 
+tryStmt
+    : TRY COLON block
+      CATCH LPAREN STRING IDENTIFIER RPAREN COLON block
+    ;
+
 classDecl
     : CLASS IDENTIFIER (EXTENDS IDENTIFIER)? COLON classBody
     ;
@@ -173,6 +182,18 @@ returnStmt
 
 printStmt
     : PRINT LPAREN argList? RPAREN
+    ;
+
+breakStmt
+    : BREAK
+    ;
+
+continueStmt
+    : CONTINUE
+    ;
+
+throwStmt
+    : THROW expr
     ;
 
 assignment
@@ -240,6 +261,7 @@ literal
     | STRING_INTERP
     | TRUE
     | FALSE
+    | NULL
     ;
 
 // STRING_INTERP — traducción por lenguaje destino:
@@ -269,8 +291,14 @@ FOR       : 'for' ;
 WHILE     : 'while' ;
 RETURN    : 'return' ;
 PRINT     : 'print' ;
+BREAK     : 'break' ;
+CONTINUE  : 'continue' ;
+TRY       : 'try' ;
+CATCH     : 'catch' ;
+THROW     : 'throw' ;
 TRUE      : 'true' ;
 FALSE     : 'false' ;
+NULL      : 'null' ;
 
 LPAREN    : '(' { self.opened += 1 } ;
 RPAREN    : ')' { self.opened -= 1 } ;

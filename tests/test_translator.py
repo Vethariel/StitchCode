@@ -205,3 +205,88 @@ def test_translator_new_object_three_languages():
     assert "Punto(5)" in out["python"]        # sin new
     assert "new Punto(5)" in out["java"]
     assert "make_shared<Punto>(5)" in out["cpp"]
+
+
+def test_translator_null_literal_three_languages():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+    ])
+    out = run(code)
+    assert "None" in out["python"]
+    assert "null" in out["java"]
+    assert "nullptr" in out["cpp"]
+
+
+def test_translator_declaration_without_value_three_languages():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a",
+    ])
+    out = run(code)
+    assert "None" in out["python"]
+    assert "null" in out["java"]
+    assert "nullptr" in out["cpp"]
+
+
+def test_translator_break_three_languages():
+    code = "\n".join([
+        "int i = 0",
+        "while i < 5:",
+        "    if i == 3:",
+        "        break",
+        "    i = i + 1",
+    ])
+    out = run(code)
+    assert "break" in out["python"]
+    assert "break;" in out["java"]
+    assert "break;" in out["cpp"]
+
+
+def test_translator_continue_three_languages():
+    code = "\n".join([
+        "int i = 0",
+        "while i < 5:",
+        "    i = i + 1",
+        "    if i == 3:",
+        "        continue",
+    ])
+    out = run(code)
+    assert "continue" in out["python"]
+    assert "continue;" in out["java"]
+    assert "continue;" in out["cpp"]
+
+
+def test_translator_try_catch_three_languages():
+    code = "\n".join([
+        "try:",
+        "    int x = 1 / 0",
+        "catch (string e):",
+        '    print("Error: {e}")',
+    ])
+    out = run(code)
+    assert "try:" in out["python"]
+    assert "except Exception as e:" in out["python"]
+    assert "try {" in out["java"]
+    assert "catch (Exception" in out["java"]
+    assert "try {" in out["cpp"]
+    assert "catch (std::exception&" in out["cpp"]
+
+
+def test_translator_throw_three_languages():
+    code = "\n".join([
+        "try:",
+        '    throw "error de prueba"',
+        "catch (string e):",
+        "    print(e)",
+    ])
+    out = run(code)
+    assert 'raise Exception("error de prueba")' in out["python"]
+    assert 'throw new RuntimeException("error de prueba");' in out["java"]
+    assert 'throw std::runtime_error("error de prueba");' in out["cpp"]

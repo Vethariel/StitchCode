@@ -161,6 +161,15 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#tryStmt.
+    def enterTryStmt(self, ctx:WovenParser.TryStmtContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#tryStmt.
+    def exitTryStmt(self, ctx:WovenParser.TryStmtContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#classDecl.
     def enterClassDecl(self, ctx:WovenParser.ClassDeclContext):
         pass
@@ -230,6 +239,33 @@ class WovenListener(ParseTreeListener):
 
     # Exit a parse tree produced by WovenParser#printStmt.
     def exitPrintStmt(self, ctx:WovenParser.PrintStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#breakStmt.
+    def enterBreakStmt(self, ctx:WovenParser.BreakStmtContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#breakStmt.
+    def exitBreakStmt(self, ctx:WovenParser.BreakStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#continueStmt.
+    def enterContinueStmt(self, ctx:WovenParser.ContinueStmtContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#continueStmt.
+    def exitContinueStmt(self, ctx:WovenParser.ContinueStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#throwStmt.
+    def enterThrowStmt(self, ctx:WovenParser.ThrowStmtContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#throwStmt.
+    def exitThrowStmt(self, ctx:WovenParser.ThrowStmtContext):
         pass
 
 

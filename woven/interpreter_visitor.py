@@ -20,10 +20,41 @@ class WovenObject:
         self.fields = fields  # {nombre: Value}
 
 
+class NullValue:
+    """Representa ausencia de valor en Woven."""
+
+    def __repr__(self):
+        return "null"
+
+    def __str__(self):
+        return "null"
+
+    def __eq__(self, other):
+        return isinstance(other, NullValue)
+
+    def __bool__(self):
+        return False
+
+
 class _ReturnSignal(Exception):
     def __init__(self, value):
         super().__init__()
         self.value = value
+
+
+class BreakSignal(Exception):
+    pass
+
+
+class ContinueSignal(Exception):
+    pass
+
+
+class WovenThrowSignal(Exception):
+    def __init__(self, mensaje: str, linea: int = None):
+        super().__init__(mensaje)
+        self.mensaje = mensaje
+        self.linea = linea
 
 
 class InterpreterVisitor(WovenVisitor):
@@ -34,24 +65,41 @@ class InterpreterVisitor(WovenVisitor):
         self.classes = {}     # nombre -> {fields, methods, parent, constructor}
         self.output = []
         self.current_class_stack = []
+        self.return_type_actual = None
+        self.return_encontrado = False
+        self.scopes_cerrados = []
 
     # ---------- helpers ----------
     def _runtime_error(self, message):
         self.output.append(f"Error: {message}")
 
+    def _es_error_no_capturable(self, exc: Exception):
+        message = str(exc)
+        return (
+            "Variable usada sin declarar" in message
+            or "no es visible aquí" in message
+        )
+
     def _push_scope(self):
         self.scopes.append({})
         self.types.append({})
 
-    def _pop_scope(self):
-        self.scopes.pop()
+    def _pop_scope(self, es_funcion=False):
+        closed_scope = self.scopes.pop()
         self.types.pop()
+        self.scopes_cerrados.append(dict(closed_scope))
 
     def _lookup_var(self, name):
         for i in range(len(self.scopes) - 1, -1, -1):
             if name in self.scopes[i]:
                 return i, self.scopes[i][name], self.types[i][name]
         return None, None, None
+
+    def _in_closed_scopes(self, name):
+        for scope in reversed(self.scopes_cerrados):
+            if name in scope:
+                return True
+        return False
 
     def _declare_var(self, name, type_name, value):
         self.scopes[-1][name] = value
@@ -61,6 +109,8 @@ class InterpreterVisitor(WovenVisitor):
         scope_idx, _, expected = self._lookup_var(name)
         if scope_idx is None:
             raise RuntimeError(f"Variable usada sin declarar: '{name}'")
+        if value.type_name == "null" and not self._is_nullable_type(expected):
+            raise RuntimeError(f"El tipo {expected} no puede ser null")
         if not self._is_compatible(expected, value):
             raise RuntimeError(
                 f"Tipo incompatible en asignacion: '{name}' es {expected}, "
@@ -73,6 +123,13 @@ class InterpreterVisitor(WovenVisitor):
 
     def _is_list_type(self, type_name):
         return type_name.startswith("list<") or type_name == "list"
+
+    def _is_nullable_type(self, type_name):
+        return (
+            type_name == "string"
+            or self._is_list_type(type_name)
+            or type_name in self.classes
+        )
 
     def _get_list_inner_type(self, list_type_name: str) -> str:
         # "list<Nodo>" -> "Nodo"
@@ -92,6 +149,8 @@ class InterpreterVisitor(WovenVisitor):
     def _is_compatible(self, expected_type, value):
         if value is None:
             return expected_type == "void"
+        if value.type_name == "null":
+            return self._is_nullable_type(expected_type)
         if expected_type == value.type_name:
             return True
         if expected_type == "float" and value.type_name == "int":
@@ -106,6 +165,8 @@ class InterpreterVisitor(WovenVisitor):
         return False
 
     def _cast_value(self, expected_type, value):
+        if value.type_name == "null":
+            return Value(expected_type, value.value)
         if expected_type == "float" and value.type_name == "int":
             return Value("float", float(value.value))
         if expected_type in self.classes and isinstance(value.value, WovenObject):
@@ -134,6 +195,8 @@ class InterpreterVisitor(WovenVisitor):
     def _infer_value(self, raw):
         if isinstance(raw, Value):
             return raw
+        if isinstance(raw, NullValue):
+            return Value("null", raw)
         if isinstance(raw, WovenObject):
             return Value(raw.class_name, raw)
         if isinstance(raw, bool):
@@ -235,7 +298,7 @@ class InterpreterVisitor(WovenVisitor):
                 pass
         finally:
             self.current_class_stack.pop()
-            self._pop_scope()
+            self._pop_scope(es_funcion=True)
 
     def _instantiate_class(self, class_name, args):
         if class_name not in self.classes:
@@ -261,6 +324,11 @@ class InterpreterVisitor(WovenVisitor):
                 f"esperados {len(params)}, recibidos {len(args)}"
             )
 
+        prev_return_type = self.return_type_actual
+        prev_return_found = self.return_encontrado
+        self.return_type_actual = ret_type
+        self.return_encontrado = False
+
         self._push_scope()
         self.current_class_stack.append(owner_class)
         try:
@@ -281,17 +349,18 @@ class InterpreterVisitor(WovenVisitor):
 
             if ret_type == "void":
                 return Value("void", None)
-            if returned is None:
-                raise RuntimeError(f"Metodo '{method_name}' debe retornar un valor de tipo {ret_type}")
-            if not self._is_compatible(ret_type, returned):
-                raise RuntimeError(
-                    f"Tipo de retorno incompatible en metodo '{method_name}': "
-                    f"esperado {ret_type}, recibido {returned.type_name}"
+            if not self.return_encontrado:
+                self.output.append(
+                    f"Error: la función '{method_name}' debe retornar un valor de tipo "
+                    f"{ret_type} pero no tiene return"
                 )
+                return Value("void", None)
             return self._cast_value(ret_type, returned)
         finally:
+            self.return_type_actual = prev_return_type
+            self.return_encontrado = prev_return_found
             self.current_class_stack.pop()
-            self._pop_scope()
+            self._pop_scope(es_funcion=True)
 
     # ---------- top-level ----------
     def visitProgram(self, ctx: WovenParser.ProgramContext):
@@ -386,6 +455,8 @@ class InterpreterVisitor(WovenVisitor):
         name = ctx.IDENTIFIER().getText()
         if ctx.expr():
             value = self.visit(ctx.expr())
+            if value.type_name == "null" and not self._is_nullable_type(var_type):
+                raise RuntimeError(f"El tipo {var_type} no puede ser null")
             if not self._is_compatible(var_type, value):
                 raise RuntimeError(
                     f"Tipo incompatible en declaracion: '{name}' es {var_type}, "
@@ -393,7 +464,10 @@ class InterpreterVisitor(WovenVisitor):
                 )
             casted = self._cast_value(var_type, value)
         else:
-            casted = self._default_for_type(var_type)
+            if self._is_nullable_type(var_type):
+                casted = Value(var_type, NullValue())
+            else:
+                raise RuntimeError(f"El tipo {var_type} no puede ser null")
         self._declare_var(name, var_type, casted)
         return None
 
@@ -449,22 +523,45 @@ class InterpreterVisitor(WovenVisitor):
     # ---------- control ----------
     def visitIfStmt(self, ctx: WovenParser.IfStmtContext):
         if self._truthy(self.visit(ctx.expr())):
-            self.visit(ctx.block(0))
+            self._push_scope()
+            try:
+                self.visit(ctx.block(0))
+            finally:
+                self._pop_scope()
         elif len(ctx.block()) > 1:
-            self.visit(ctx.block(1))
+            self._push_scope()
+            try:
+                self.visit(ctx.block(1))
+            finally:
+                self._pop_scope()
         return None
 
     def visitForStmt(self, ctx: WovenParser.ForStmtContext):
-        if ctx.forInit():
-            self.visit(ctx.forInit())
-        while True:
-            if ctx.expr() and not self._truthy(self.visit(ctx.expr())):
-                break
-            self.visit(ctx.block())
-            if ctx.forUpdate():
-                self.visit(ctx.forUpdate())
-            elif not ctx.expr():
-                break
+        self._push_scope()
+        try:
+            if ctx.forInit():
+                self.visit(ctx.forInit())
+            while True:
+                if ctx.expr() and not self._truthy(self.visit(ctx.expr())):
+                    break
+                self._push_scope()
+                should_break = False
+                try:
+                    self.visit(ctx.block())
+                except BreakSignal:
+                    should_break = True
+                except ContinueSignal:
+                    pass
+                finally:
+                    self._pop_scope()
+                if should_break:
+                    break
+                if ctx.forUpdate():
+                    self.visit(ctx.forUpdate())
+                if not ctx.expr() and not ctx.forUpdate():
+                    break
+        finally:
+            self._pop_scope()
         return None
 
     def visitForInit(self, ctx: WovenParser.ForInitContext):
@@ -487,12 +584,79 @@ class InterpreterVisitor(WovenVisitor):
 
     def visitWhileStmt(self, ctx: WovenParser.WhileStmtContext):
         while self._truthy(self.visit(ctx.expr())):
-            self.visit(ctx.block())
+            self._push_scope()
+            try:
+                self.visit(ctx.block())
+            except BreakSignal:
+                self._pop_scope()
+                break
+            except ContinueSignal:
+                self._pop_scope()
+                continue
+            self._pop_scope()
         return None
+
+    def _ejecutar_catch(self, ctx: WovenParser.TryStmtContext, mensaje: str):
+        nombre_var = ctx.IDENTIFIER().getText()
+        self._push_scope()
+        try:
+            self._declare_var(nombre_var, "string", Value("string", mensaje))
+            self.visit(ctx.block(1))
+        finally:
+            self._pop_scope()
+        return None
+
+    def visitTryStmt(self, ctx: WovenParser.TryStmtContext):
+        self._push_scope()
+        try:
+            self.visit(ctx.block(0))
+        except WovenThrowSignal as exc:
+            self._pop_scope()
+            return self._ejecutar_catch(ctx, exc.mensaje)
+        except Exception as exc:
+            self._pop_scope()
+            if self._es_error_no_capturable(exc):
+                raise
+            return self._ejecutar_catch(ctx, str(exc))
+        self._pop_scope()
+        return None
+
+    def visitBreakStmt(self, ctx: WovenParser.BreakStmtContext):
+        raise BreakSignal()
+
+    def visitContinueStmt(self, ctx: WovenParser.ContinueStmtContext):
+        raise ContinueSignal()
+
+    def visitThrowStmt(self, ctx: WovenParser.ThrowStmtContext):
+        valor = self.visit(ctx.expr())
+        mensaje = str(valor.value) if valor.value is not None else "error"
+        raise WovenThrowSignal(mensaje, ctx.start.line)
 
     # ---------- io / returns ----------
     def visitReturnStmt(self, ctx: WovenParser.ReturnStmtContext):
-        raise _ReturnSignal(self.visit(ctx.expr()) if ctx.expr() else None)
+        self.return_encontrado = True
+
+        if ctx.expr() is None:
+            if self.return_type_actual and self.return_type_actual != "void":
+                self.output.append(
+                    f"Error: se esperaba retornar {self.return_type_actual} "
+                    f"pero return no tiene valor"
+                )
+            raise _ReturnSignal(Value("void", None))
+
+        valor = self.visit(ctx.expr())
+
+        if self.return_type_actual == "void":
+            self.output.append("Error: función void no debe retornar un valor")
+            raise _ReturnSignal(valor)
+
+        if self.return_type_actual and not self._is_compatible(self.return_type_actual, valor):
+            self.output.append(
+                f"Error: se esperaba retornar {self.return_type_actual} "
+                f"pero se retornó {valor.type_name}"
+            )
+
+        raise _ReturnSignal(valor)
 
     def visitPrintStmt(self, ctx: WovenParser.PrintStmtContext):
         if not ctx.argList():
@@ -550,14 +714,14 @@ class InterpreterVisitor(WovenVisitor):
                 res = lv * rv
             elif op == "/":
                 if rv == 0:
-                    raise RuntimeError("Division por cero")
+                    raise WovenThrowSignal("Division por cero", ctx.start.line)
                 if left.type_name == "int" and right.type_name == "int":
                     res = int(left.value) // int(right.value)
                 else:
                     res = lv / rv
             else:
                 if rv == 0:
-                    raise RuntimeError("Division por cero")
+                    raise WovenThrowSignal("Division por cero", ctx.start.line)
                 res = lv % rv
 
             if isinstance(res, float):
@@ -606,6 +770,11 @@ class InterpreterVisitor(WovenVisitor):
         _, value, _ = self._lookup_var(name)
         if value is not None:
             return value
+        if self._in_closed_scopes(name):
+            raise RuntimeError(
+                f"Variable '{name}' fue declarada dentro de un bloque "
+                f"y no es visible aquí"
+            )
         if name in self.classes:
             return ("class_ref", name)
         if name in self.functions:
@@ -631,6 +800,11 @@ class InterpreterVisitor(WovenVisitor):
                 f"esperados {len(params)}, recibidos {len(args)}"
             )
 
+        prev_return_type = self.return_type_actual
+        prev_return_found = self.return_encontrado
+        self.return_type_actual = fn_meta["return_type"]
+        self.return_encontrado = False
+
         self._push_scope()
         try:
             for (p_name, p_type), arg in zip(params, args):
@@ -650,16 +824,17 @@ class InterpreterVisitor(WovenVisitor):
             ret_type = fn_meta["return_type"]
             if ret_type == "void":
                 return Value("void", None)
-            if returned is None:
-                raise RuntimeError(f"Funcion '{fn_name}' debe retornar un valor de tipo {ret_type}")
-            if not self._is_compatible(ret_type, returned):
-                raise RuntimeError(
-                    f"Tipo de retorno incompatible en '{fn_name}': "
-                    f"esperado {ret_type}, recibido {returned.type_name}"
+            if not self.return_encontrado:
+                self.output.append(
+                    f"Error: la función '{fn_name}' debe retornar un valor de tipo "
+                    f"{ret_type} pero no tiene return"
                 )
+                return Value("void", None)
             return self._cast_value(ret_type, returned)
         finally:
-            self._pop_scope()
+            self.return_type_actual = prev_return_type
+            self.return_encontrado = prev_return_found
+            self._pop_scope(es_funcion=True)
 
     def visitNewAtom(self, ctx: WovenParser.NewAtomContext):
         class_name = ctx.IDENTIFIER().getText()
@@ -688,6 +863,9 @@ class InterpreterVisitor(WovenVisitor):
         base = self.visit(ctx.atom())
         member = ctx.IDENTIFIER().getText()
 
+        if isinstance(base.value, NullValue):
+            raise WovenThrowSignal("No se puede acceder a un objeto null", ctx.start.line)
+
         if self._is_list_type(base.type_name):
             if member == "length":
                 return Value("int", len(base.value))
@@ -708,6 +886,9 @@ class InterpreterVisitor(WovenVisitor):
         base = self.visit(ctx.atom())
         name = ctx.IDENTIFIER().getText()
         args = [self.visit(e) for e in (ctx.argList().expr() if ctx.argList() else [])]
+
+        if isinstance(base.value, NullValue):
+            raise WovenThrowSignal("No se puede acceder a un objeto null", ctx.start.line)
 
         if self._is_list_type(base.type_name):
             if name == "append":
@@ -793,4 +974,6 @@ class InterpreterVisitor(WovenVisitor):
             return Value("bool", True)
         if ctx.FALSE():
             return Value("bool", False)
+        if ctx.NULL():
+            return Value("null", NullValue())
         raise RuntimeError(f"Literal no soportado: {text}")

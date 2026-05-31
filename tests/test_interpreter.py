@@ -380,3 +380,393 @@ def test_interpreter_append_accepts_subtype():
     output, _, _ = run(code)
     assert not any("Error" in line for line in output)
     assert output[-1] == "1"
+
+
+def test_interpreter_null_literal():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+        "print(a)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["null"]
+
+
+def test_interpreter_null_check():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+        "if a == null:",
+        '    print("es null")',
+        "else:",
+        '    print("no es null")',
+    ])
+    output, _, _ = run(code)
+    assert output == ["es null"]
+
+
+def test_interpreter_null_access_error():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+        "print(a.nombre)",
+    ])
+    output, _, _ = run(code)
+    assert any("null" in line.lower() for line in output)
+
+
+def test_interpreter_null_reassign():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        'Animal a = new Animal("Rex")',
+        "a = null",
+        "print(a)",
+    ])
+    output, _, _ = run(code)
+    assert output == ["null"]
+
+
+def test_interpreter_primitive_cannot_be_null():
+    output, _, _ = run("int x\n")
+    assert any("null" in line.lower() or "valor inicial" in line.lower()
+               for line in output)
+
+
+def test_interpreter_string_can_be_null():
+    code = "string s\nprint(s)\n"
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["null"]
+
+
+def test_interpreter_list_can_be_null():
+    code = "\n".join([
+        "list<int> nums",
+        "print(nums)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["null"]
+
+
+def test_interpreter_break_exits_while():
+    code = "\n".join([
+        "int i = 0",
+        "while i < 10:",
+        "    if i == 3:",
+        "        break",
+        "    i = i + 1",
+        "print(i)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["3"]
+
+
+def test_interpreter_continue_skips_iteration():
+    code = "\n".join([
+        "int total = 0",
+        "int i = 0",
+        "while i < 5:",
+        "    i = i + 1",
+        "    if i == 3:",
+        "        continue",
+        "    total = total + i",
+        "print(total)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["12"]
+
+
+def test_interpreter_break_in_for():
+    code = "\n".join([
+        "int resultado = 0",
+        "for (int i = 0; i < 10; i = i + 1):",
+        "    if i == 5:",
+        "        break",
+        "    resultado = resultado + i",
+        "print(resultado)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["10"]
+
+
+def test_interpreter_continue_in_for():
+    code = "\n".join([
+        "int total = 0",
+        "for (int i = 0; i < 5; i = i + 1):",
+        "    if i == 2:",
+        "        continue",
+        "    total = total + i",
+        "print(total)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["8"]
+
+
+def test_interpreter_nested_break():
+    code = "\n".join([
+        "int cuenta = 0",
+        "int i = 0",
+        "while i < 3:",
+        "    int j = 0",
+        "    while j < 3:",
+        "        if j == 1:",
+        "            break",
+        "        cuenta = cuenta + 1",
+        "        j = j + 1",
+        "    i = i + 1",
+        "print(cuenta)",
+    ])
+    output, _, _ = run(code)
+    assert output == ["3"]
+
+
+def test_interpreter_return_type_correct():
+    code = "\n".join([
+        "function int doble(int n):",
+        "    return n * 2",
+        "print(doble(5))",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["10"]
+
+
+def test_interpreter_return_type_incompatible():
+    code = "\n".join([
+        "function int doble(int n):",
+        '    return "hola"',
+        "print(doble(5))",
+    ])
+    output, _, _ = run(code)
+    assert any("int" in line.lower() or "tipo" in line.lower()
+               for line in output)
+
+
+def test_interpreter_void_with_return_value():
+    code = "\n".join([
+        "function void saludar():",
+        "    return 5",
+        "saludar()",
+    ])
+    output, _, _ = run(code)
+    assert any("void" in line.lower() for line in output)
+
+
+def test_interpreter_non_void_without_return():
+    code = "\n".join([
+        "function int doble(int n):",
+        "    int x = n * 2",
+        "print(doble(5))",
+    ])
+    output, _, _ = run(code)
+    assert any("return" in line.lower() for line in output)
+
+
+def test_interpreter_return_in_conditional_branch():
+    code = "\n".join([
+        "function int absoluto(int n):",
+        "    if n >= 0:",
+        "        return n",
+        "    else:",
+        "        return n * -1",
+        "print(absoluto(-3))",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["3"]
+
+
+def test_interpreter_block_scope_variable_not_visible_outside_if():
+    code = "\n".join([
+        "if true:",
+        "    int x = 5",
+        "print(x)",
+    ])
+    output, _, _ = run(code)
+    assert any("declarada" in line.lower() or
+               "no está definido" in line.lower() or
+               "visible" in line.lower()
+               for line in output)
+
+
+def test_interpreter_block_scope_variable_visible_inside_if():
+    code = "\n".join([
+        "if true:",
+        "    int x = 5",
+        "    print(x)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["5"]
+
+
+def test_interpreter_block_scope_for_variable_not_visible_outside():
+    code = "\n".join([
+        "for (int i = 0; i < 3; i = i + 1):",
+        "    print(i)",
+        "print(i)",
+    ])
+    output, _, _ = run(code)
+    assert any("definido" in line.lower() or
+               "visible" in line.lower()
+               for line in output)
+
+
+def test_interpreter_block_scope_while_variable_not_visible_outside():
+    code = "\n".join([
+        "int contador = 0",
+        "while contador < 3:",
+        "    int temp = contador * 2",
+        "    contador = contador + 1",
+        "print(temp)",
+    ])
+    output, _, _ = run(code)
+    assert any("definido" in line.lower() or
+               "visible" in line.lower()
+               for line in output)
+
+
+def test_interpreter_outer_variable_visible_inside_block():
+    code = "\n".join([
+        "int total = 0",
+        "for (int i = 0; i < 3; i = i + 1):",
+        "    total = total + i",
+        "print(total)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["3"]
+
+
+def test_interpreter_nested_blocks_scope():
+    code = "\n".join([
+        "int resultado = 0",
+        "if true:",
+        "    int x = 10",
+        "    if true:",
+        "        int y = 5",
+        "        resultado = x + y",
+        "print(resultado)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["15"]
+
+
+def test_interpreter_try_catch_division_by_zero():
+    code = "\n".join([
+        "try:",
+        "    print(1 / 0)",
+        "catch (string e):",
+        '    print("Error capturado: {e}")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("capturado" in line.lower() for line in output)
+
+
+def test_interpreter_try_catch_null_access():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+        "try:",
+        "    print(a.nombre)",
+        "catch (string e):",
+        '    print("Error: {e}")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("error" in line.lower() for line in output)
+
+
+def test_interpreter_try_no_error_executes_normally():
+    code = "\n".join([
+        "try:",
+        "    int x = 10",
+        "    print(x)",
+        "catch (string e):",
+        '    print("Error: {e}")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["10"]
+
+
+def test_interpreter_throw_caught_by_catch():
+    code = "\n".join([
+        "try:",
+        '    throw "algo salio mal"',
+        "catch (string e):",
+        "    print(e)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["algo salio mal"]
+
+
+def test_interpreter_throw_with_expression():
+    code = "\n".join([
+        "int x = 5",
+        "try:",
+        '    throw "valor invalido: {x}"',
+        "catch (string e):",
+        "    print(e)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["valor invalido: 5"]
+
+
+def test_interpreter_nested_try_catch():
+    code = "\n".join([
+        "try:",
+        "    try:",
+        '        throw "error interno"',
+        "    catch (string e1):",
+        '        print("interno: {e1}")',
+        '        throw "error externo"',
+        "catch (string e2):",
+        '    print("externo: {e2}")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["interno: error interno", "externo: error externo"]

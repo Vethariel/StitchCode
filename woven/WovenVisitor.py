@@ -94,6 +94,11 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#tryStmt.
+    def visitTryStmt(self, ctx:WovenParser.TryStmtContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#classDecl.
     def visitClassDecl(self, ctx:WovenParser.ClassDeclContext):
         return self.visitChildren(ctx)
@@ -131,6 +136,21 @@ class WovenVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by WovenParser#printStmt.
     def visitPrintStmt(self, ctx:WovenParser.PrintStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#breakStmt.
+    def visitBreakStmt(self, ctx:WovenParser.BreakStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#continueStmt.
+    def visitContinueStmt(self, ctx:WovenParser.ContinueStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#throwStmt.
+    def visitThrowStmt(self, ctx:WovenParser.ThrowStmtContext):
         return self.visitChildren(ctx)
 
 

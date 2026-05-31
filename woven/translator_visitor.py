@@ -47,6 +47,15 @@ class LanguageStrategy:
     def string_interp(self, template: str, exprs: list) -> str:
         raise NotImplementedError
 
+    def break_stmt(self) -> str:
+        raise NotImplementedError
+
+    def continue_stmt(self) -> str:
+        raise NotImplementedError
+
+    def throw_stmt(self, expr_code: str) -> str:
+        raise NotImplementedError
+
 
 class PythonStrategy(LanguageStrategy):
     def _map_primitive(self, t):
@@ -98,6 +107,15 @@ class PythonStrategy(LanguageStrategy):
         for original, code, _ in exprs:
             rendered = rendered.replace("{" + original + "}", "{" + code + "}")
         return f'f"{rendered}"'
+
+    def break_stmt(self) -> str:
+        return "break"
+
+    def continue_stmt(self) -> str:
+        return "continue"
+
+    def throw_stmt(self, expr_code: str) -> str:
+        return f"raise Exception({expr_code})"
 
 
 class JavaStrategy(LanguageStrategy):
@@ -157,6 +175,15 @@ class JavaStrategy(LanguageStrategy):
         fmt = re.sub(r"\{[^}]*\}", "%s", template)
         args = [code for _, code, _ in exprs]
         return f'String.format("{fmt}", {", ".join(args)})' if args else f'"{template}"'
+
+    def break_stmt(self) -> str:
+        return "break;"
+
+    def continue_stmt(self) -> str:
+        return "continue;"
+
+    def throw_stmt(self, expr_code: str) -> str:
+        return f"throw new RuntimeException({expr_code});"
 
 
 class CppStrategy(LanguageStrategy):
@@ -228,6 +255,15 @@ class CppStrategy(LanguageStrategy):
         # Encode args with code+type so return statements can format correctly.
         encoded = [f"{code}\x1f{t}" for _, code, t in exprs]
         return f"__CPP_INTERP__|{fmt}|{chr(30).join(encoded)}"
+
+    def break_stmt(self) -> str:
+        return "break;"
+
+    def continue_stmt(self) -> str:
+        return "continue;"
+
+    def throw_stmt(self, expr_code: str) -> str:
+        return f"throw std::runtime_error({expr_code});"
 
 
 class TranslatorVisitor(WovenVisitor):
@@ -358,6 +394,7 @@ class TranslatorVisitor(WovenVisitor):
                 "#include <string>",
                 "#include <vector>",
                 "#include <memory>",
+                "#include <stdexcept>",
                 "",
                 "using namespace std;",
                 "",
@@ -585,7 +622,14 @@ class TranslatorVisitor(WovenVisitor):
             return
 
         defaults = {"int": "0", "float": "0.0", "string": '""', "bool": "False" if isinstance(self.strategy, PythonStrategy) else "false"}
-        dv = defaults.get(t, "None" if isinstance(self.strategy, PythonStrategy) else "nullptr")
+        if t in defaults:
+            dv = defaults[t]
+        elif isinstance(self.strategy, PythonStrategy):
+            dv = "None"
+        elif isinstance(self.strategy, JavaStrategy):
+            dv = "null"
+        else:
+            dv = "nullptr"
         if isinstance(self.strategy, PythonStrategy):
             self._emit(f"{n} = {dv}")
         else:
@@ -718,6 +762,39 @@ class TranslatorVisitor(WovenVisitor):
         self._emit(f"while ({cond}) {{")
         self.indent_level += 1
         self.visit(ctx.block())
+        self.indent_level -= 1
+        self._emit("}")
+
+    def visitTryStmt(self, ctx):
+        catch_var = ctx.IDENTIFIER().getText()
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit("try:")
+            self.indent_level += 1
+            self.visit(ctx.block(0))
+            self.indent_level -= 1
+            self._emit(f"except Exception as {catch_var}:")
+            self.indent_level += 1
+            self.visit(ctx.block(1))
+            self.indent_level -= 1
+            return
+
+        self._emit("try {")
+        self.indent_level += 1
+        self.visit(ctx.block(0))
+        self.indent_level -= 1
+        if isinstance(self.strategy, JavaStrategy):
+            self._emit("} catch (Exception __woven_e) {")
+            self.indent_level += 1
+            self._emit(f"String {catch_var} = __woven_e.getMessage();")
+            self.visit(ctx.block(1))
+            self.indent_level -= 1
+            self._emit("}")
+            return
+
+        self._emit("} catch (std::exception& __woven_e) {")
+        self.indent_level += 1
+        self._emit(f"std::string {catch_var} = __woven_e.what();")
+        self.visit(ctx.block(1))
         self.indent_level -= 1
         self._emit("}")
 
@@ -921,6 +998,12 @@ class TranslatorVisitor(WovenVisitor):
             return ExprResult(ctx.INT_LITERAL().getText(), "int")
         if ctx.FLOAT_LITERAL():
             return ExprResult(ctx.FLOAT_LITERAL().getText(), "float")
+        if ctx.NULL():
+            if isinstance(self.strategy, PythonStrategy):
+                return ExprResult("None", "null")
+            if isinstance(self.strategy, JavaStrategy):
+                return ExprResult("null", "null")
+            return ExprResult("nullptr", "null")
         if ctx.TRUE():
             return ExprResult("True" if isinstance(self.strategy, PythonStrategy) else "true", "bool")
         if ctx.FALSE():
@@ -947,6 +1030,16 @@ class TranslatorVisitor(WovenVisitor):
             self._emit(e)
         else:
             self._emit(f"{e};")
+
+    def visitBreakStmt(self, ctx):
+        self._emit(self.strategy.break_stmt())
+
+    def visitContinueStmt(self, ctx):
+        self._emit(self.strategy.continue_stmt())
+
+    def visitThrowStmt(self, ctx):
+        expr = self.visit(ctx.expr()).code
+        self._emit(self.strategy.throw_stmt(expr))
 
 
 def translate_woven(source: str, language: str) -> str:
