@@ -109,3 +109,99 @@ def test_translator_logical_and_or_java_and_c():
     out = run(code)
     assert "a && b || a" in java_main_block(out["java"])
     assert "a && b || a" in out["cpp"]
+
+
+def test_translator_simple_class_three_languages():
+    code = "\n".join(
+        [
+            "class Counter:",
+            "    int value",
+            "    init(int v):",
+            "        self.value = v",
+        ]
+    )
+    out = run(code)
+    assert "class Counter:" in out["python"]
+    assert "static class Counter" in out["java"]
+    assert "class Counter" in out["cpp"]
+
+
+def test_translator_inheritance_three_languages():
+    code = "\n".join(
+        [
+            "class Base:",
+            "    init():",
+            "        return",
+            "class Child extends Base:",
+            "    init():",
+            "        super()",
+        ]
+    )
+    out = run(code)
+    assert "class Child(Base):" in out["python"]
+    assert "class Child extends Base" in out["java"]
+    assert "class Child : public Base" in out["cpp"]
+
+
+def test_translator_virtual_method_cpp_vs_python_java():
+    code = "\n".join(
+        [
+            "class A:",
+            "    virtual function int value():",
+            "        return 1",
+        ]
+    )
+    out = run(code)
+    assert "def value(self) -> int:" in out["python"]
+    assert "public int value()" in out["java"]
+    assert "virtual int value()" in out["cpp"]
+
+
+def test_translator_list_primitives_three_languages():
+    code = "\n".join(
+        [
+            "list<int> nums = [1, 2]",
+            "nums.append(3)",
+            "print(nums.length)",
+            "nums.remove(0)",
+        ]
+    )
+    out = run(code)
+    assert "nums: list[int] = [1, 2]" in out["python"] or "nums = [1, 2]" in out["python"]
+    assert "ArrayList<Integer>" in out["java"]
+    assert "std::vector<int>" in out["cpp"]
+    assert ".add(" in out["java"]
+    assert ".push_back(" in out["cpp"]
+
+
+def test_translator_list_objects_three_languages():
+    code = "\n".join(
+        [
+            "class Item:",
+            "    int v",
+            "    init(int x):",
+            "        self.v = x",
+            "list<Item> items = []",
+            "items.append(new Item(1))",
+        ]
+    )
+    out = run(code)
+    assert "list[Item]" in out["python"] or "items = []" in out["python"]
+    assert "ArrayList<Item>" in out["java"]
+    assert "std::vector<std::shared_ptr<Item>>" in out["cpp"] or "std::vector<Item*>" in out["cpp"] or "std::vector<Item>" in out["cpp"]
+
+
+def test_translator_new_object_three_languages():
+    code = "\n".join(
+        [
+            "class Punto:",
+            "    int x",
+            "    init(int x):",
+            "        self.x = x",
+            "Punto p = new Punto(5)",
+        ]
+    )
+    out = run(code)
+    assert "Punto(5)" in out["python"]        # sin new
+    assert "new Punto(5)" in out["java"]
+    assert "make_shared<Punto>(5)" in out["cpp"]

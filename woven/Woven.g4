@@ -68,6 +68,8 @@ simpleStmt
     | assignment
     | returnStmt
     | printStmt
+    | selfAssignment
+    | indexAssignment
     | exprStmt
     ;
 
@@ -76,6 +78,7 @@ compoundStmt
     | ifStmt
     | forStmt
     | whileStmt
+    | classDecl
     ;
 
 functionDecl
@@ -104,6 +107,12 @@ typeName
     | FLOAT
     | STRING
     | BOOL
+    | IDENTIFIER
+    | listType
+    ;
+
+listType
+    : LIST LT typeName GT
     ;
 
 block
@@ -132,6 +141,32 @@ whileStmt
     : WHILE expr COLON block
     ;
 
+classDecl
+    : CLASS IDENTIFIER (EXTENDS IDENTIFIER)? COLON classBody
+    ;
+
+classBody
+    : NEWLINE INDENT (NEWLINE | classMember)+ DEDENT
+    ;
+
+classMember
+    : fieldDecl
+    | constructorDecl
+    | methodDecl
+    ;
+
+fieldDecl
+    : typeName IDENTIFIER
+    ;
+
+constructorDecl
+    : INIT LPAREN paramList? RPAREN COLON block
+    ;
+
+methodDecl
+    : VIRTUAL? FUNCTION returnType IDENTIFIER LPAREN paramList? RPAREN COLON block
+    ;
+
 returnStmt
     : RETURN expr?
     ;
@@ -142,6 +177,15 @@ printStmt
 
 assignment
     : IDENTIFIER ASSIGN expr
+    ;
+
+selfAssignment
+    : SELF DOT IDENTIFIER ASSIGN expr
+    ;
+
+indexAssignment
+    : IDENTIFIER LBRACK expr RBRACK ASSIGN expr
+    | SELF DOT IDENTIFIER LBRACK expr RBRACK ASSIGN expr
     ;
 
 exprStmt
@@ -172,9 +216,17 @@ compExpr
 
 atom
     : literal                              # literalAtom
+    | SELF DOT IDENTIFIER                  # selfFieldAtom
+    | SELF DOT IDENTIFIER LPAREN argList? RPAREN # selfCallAtom
+    | NEW IDENTIFIER LPAREN argList? RPAREN # newAtom
+    | IDENTIFIER LPAREN argList? RPAREN    # callAtom
     | IDENTIFIER                           # idAtom
     | LPAREN expr RPAREN                   # parenAtom
-    | atom LPAREN argList? RPAREN          # callAtom
+    | atom LBRACK expr RBRACK              # indexAtom
+    | atom DOT IDENTIFIER LPAREN argList? RPAREN # memberCallAtom
+    | atom DOT IDENTIFIER                  # memberAccessAtom
+    | LBRACK argList? RBRACK               # listLiteralAtom
+    | SUPER LPAREN argList? RPAREN         # superCallAtom
     ;
 
 argList
@@ -198,6 +250,14 @@ literal
 // --- Lexer -----------------------------------------------------------------
 
 FUNCTION  : 'function' ;
+CLASS     : 'class' ;
+EXTENDS   : 'extends' ;
+INIT      : 'init' ;
+SELF      : 'self' ;
+SUPER     : 'super' ;
+VIRTUAL   : 'virtual' ;
+NEW       : 'new' ;
+LIST      : 'list' ;
 INT       : 'int' ;
 FLOAT     : 'float' ;
 STRING    : 'string' ;
@@ -223,6 +283,7 @@ COLON     : ':' ;
 SEMI      : ';' ;
 COMMA     : ',' ;
 ASSIGN    : '=' ;
+DOT       : '.' ;
 
 ADD       : '+' ;
 SUB       : '-' ;

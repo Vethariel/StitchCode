@@ -17,16 +17,19 @@ class ExprResult:
 class LanguageStrategy:
     """Reglas de emision especificas por lenguaje."""
 
-    def type_name(self, woven_type: str) -> str:
+    def type_name(self, woven_type: str, known_classes: set) -> str:
         raise NotImplementedError
 
-    def function_signature(self, name, return_type, params) -> str:
+    def function_signature(self, name, return_type, params, known_classes: set) -> str:
         raise NotImplementedError
 
-    def block_open(self) -> str:
+    def class_signature(self, name, parent):
         raise NotImplementedError
 
-    def block_close(self) -> str:
+    def constructor_signature(self, class_name, params, known_classes: set) -> str:
+        raise NotImplementedError
+
+    def method_signature(self, name, return_type, params, is_virtual, known_classes: set) -> str:
         raise NotImplementedError
 
     def print_stmt(self, args: list, types: list) -> str:
@@ -38,31 +41,45 @@ class LanguageStrategy:
     def or_op(self) -> str:
         raise NotImplementedError
 
-    def string_interp(self, template: str, exprs: dict) -> str:
+    def not_op(self) -> str:
+        raise NotImplementedError
+
+    def string_interp(self, template: str, exprs: list) -> str:
         raise NotImplementedError
 
 
 class PythonStrategy(LanguageStrategy):
-    _types = {
-        "int": "int",
-        "float": "float",
-        "string": "str",
-        "bool": "bool",
-        "void": "None",
-    }
+    def _map_primitive(self, t):
+        return {
+            "int": "int",
+            "float": "float",
+            "string": "str",
+            "bool": "bool",
+            "void": "None",
+        }.get(t, t)
 
-    def type_name(self, woven_type: str) -> str:
-        return self._types[woven_type]
+    def type_name(self, woven_type: str, known_classes: set) -> str:
+        if woven_type.startswith("list<") and woven_type.endswith(">"):
+            inner = woven_type[5:-1]
+            return f"list[{self.type_name(inner, known_classes)}]"
+        return self._map_primitive(woven_type)
 
-    def function_signature(self, name, return_type, params) -> str:
-        param_names = ", ".join(p_name for p_name, _ in params)
-        return f"def {name}({param_names}) -> {self.type_name(return_type)}:"
+    def function_signature(self, name, return_type, params, known_classes: set) -> str:
+        names = ", ".join(p_name for p_name, _ in params)
+        return f"def {name}({names}) -> {self.type_name(return_type, known_classes)}:"
 
-    def block_open(self) -> str:
-        return ""
+    def class_signature(self, name, parent):
+        return f"class {name}({parent})" if parent else f"class {name}"
 
-    def block_close(self) -> str:
-        return ""
+    def constructor_signature(self, class_name, params, known_classes: set) -> str:
+        names = ", ".join(p_name for p_name, _ in params)
+        sig = "self" + (", " + names if names else "")
+        return f"def __init__({sig}):"
+
+    def method_signature(self, name, return_type, params, is_virtual, known_classes: set) -> str:
+        names = ", ".join(p_name for p_name, _ in params)
+        sig = "self" + (", " + names if names else "")
+        return f"def {name}({sig}) -> {self.type_name(return_type, known_classes)}:"
 
     def print_stmt(self, args: list, types: list) -> str:
         return f"print({', '.join(args)})"
@@ -73,34 +90,55 @@ class PythonStrategy(LanguageStrategy):
     def or_op(self) -> str:
         return "or"
 
-    def string_interp(self, template: str, exprs: dict) -> str:
+    def not_op(self) -> str:
+        return "not"
+
+    def string_interp(self, template: str, exprs: list) -> str:
         rendered = template
-        for original, expr_result in exprs.items():
-            rendered = rendered.replace("{" + original + "}", "{" + expr_result.code + "}")
+        for original, code, _ in exprs:
+            rendered = rendered.replace("{" + original + "}", "{" + code + "}")
         return f'f"{rendered}"'
 
 
 class JavaStrategy(LanguageStrategy):
-    _types = {
-        "int": "int",
-        "float": "double",
-        "string": "String",
-        "bool": "boolean",
-        "void": "void",
-    }
+    def _map_primitive(self, t):
+        return {
+            "int": "int",
+            "float": "double",
+            "string": "String",
+            "bool": "boolean",
+            "void": "void",
+        }.get(t, t)
 
-    def type_name(self, woven_type: str) -> str:
-        return self._types[woven_type]
+    def _boxed(self, t):
+        return {
+            "int": "Integer",
+            "double": "Double",
+            "boolean": "Boolean",
+            "String": "String",
+        }.get(t, t)
 
-    def function_signature(self, name, return_type, params) -> str:
-        params_txt = ", ".join(f"{self.type_name(p_type)} {p_name}" for p_name, p_type in params)
-        return f"public static {self.type_name(return_type)} {name}({params_txt})"
+    def type_name(self, woven_type: str, known_classes: set) -> str:
+        if woven_type.startswith("list<") and woven_type.endswith(">"):
+            inner = woven_type[5:-1]
+            inner_java = self.type_name(inner, known_classes)
+            return f"ArrayList<{self._boxed(inner_java)}>"
+        return self._map_primitive(woven_type)
 
-    def block_open(self) -> str:
-        return "{"
+    def function_signature(self, name, return_type, params, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        return f"public static {self.type_name(return_type, known_classes)} {name}({p})"
 
-    def block_close(self) -> str:
-        return "}"
+    def class_signature(self, name, parent):
+        return f"static class {name} extends {parent}" if parent else f"static class {name}"
+
+    def constructor_signature(self, class_name, params, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        return f"public {class_name}({p})"
+
+    def method_signature(self, name, return_type, params, is_virtual, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        return f"public {self.type_name(return_type, known_classes)} {name}({p})"
 
     def print_stmt(self, args: list, types: list) -> str:
         payload = args[0] if len(args) == 1 else " + \" \" + ".join(args)
@@ -112,62 +150,68 @@ class JavaStrategy(LanguageStrategy):
     def or_op(self) -> str:
         return "||"
 
-    def string_interp(self, template: str, exprs: dict) -> str:
+    def not_op(self) -> str:
+        return "!"
+
+    def string_interp(self, template: str, exprs: list) -> str:
         fmt = re.sub(r"\{[^}]*\}", "%s", template)
-        args = []
-        for original, expr_result in exprs.items():
-            if "{" + original + "}" in template:
-                args.append(expr_result.code)
-        args_txt = ", ".join(args)
-        if args_txt:
-            return f'String.format("{fmt}", {args_txt})'
-        return f'"{template}"'
+        args = [code for _, code, _ in exprs]
+        return f'String.format("{fmt}", {", ".join(args)})' if args else f'"{template}"'
 
 
 class CppStrategy(LanguageStrategy):
-    _types = {
-        "int": "int",
-        "float": "double",
-        "string": "std::string",
-        "bool": "bool",
-        "void": "void",
-    }
+    def _map_primitive(self, t):
+        return {
+            "int": "int",
+            "float": "double",
+            "string": "std::string",
+            "bool": "bool",
+            "void": "void",
+        }.get(t, t)
 
-    def type_name(self, woven_type: str) -> str:
-        return self._types[woven_type]
+    def type_name(self, woven_type: str, known_classes: set) -> str:
+        if woven_type.startswith("list<") and woven_type.endswith(">"):
+            inner = woven_type[5:-1]
+            return f"std::vector<{self.type_name(inner, known_classes)}>"
+        if woven_type in known_classes:
+            return f"std::shared_ptr<{woven_type}>"
+        return self._map_primitive(woven_type)
 
-    def function_signature(self, name, return_type, params) -> str:
-        params_txt = ", ".join(f"{self.type_name(p_type)} {p_name}" for p_name, p_type in params)
-        return f"{self.type_name(return_type)} {name}({params_txt})"
+    def function_signature(self, name, return_type, params, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        return f"{self.type_name(return_type, known_classes)} {name}({p})"
 
-    def block_open(self) -> str:
-        return "{"
+    def class_signature(self, name, parent):
+        return f"class {name} : public {parent}" if parent else f"class {name}"
 
-    def block_close(self) -> str:
-        return "}"
+    def constructor_signature(self, class_name, params, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        return f"{class_name}({p})"
+
+    def method_signature(self, name, return_type, params, is_virtual, known_classes: set) -> str:
+        p = ", ".join(f"{self.type_name(t, known_classes)} {n}" for n, t in params)
+        prefix = "virtual " if is_virtual else ""
+        return f"{prefix}{self.type_name(return_type, known_classes)} {name}({p})"
 
     def print_stmt(self, args: list, types: list) -> str:
-        # Interpolacion especial codificada por string_interp para C++.
         if len(args) == 1 and args[0].startswith("__CPP_INTERP__|"):
-            _, fmt, arg_blob = args[0].split("|", 2)
+            _, tmpl, expr_blob = args[0].split("|", 2)
+            segs = tmpl.split("%s")
+            encoded = expr_blob.split(chr(30)) if expr_blob else []
+            exprs = [x.split("\x1f", 1)[0] for x in encoded]
             parts = []
-            segments = fmt.split("%s")
-            exprs = [e.strip() for e in arg_blob.split(",")] if arg_blob else []
-            for i, seg in enumerate(segments):
+            for i, seg in enumerate(segs):
                 if seg:
-                    escaped = seg.replace("\\", "\\\\").replace('"', '\\"')
-                    parts.append(f'"{escaped}"')
+                    esc = seg.replace("\\", "\\\\").replace('"', '\\"')
+                    parts.append(f'"{esc}"')
                 if i < len(exprs):
                     parts.append(exprs[i])
             chain = " << ".join(parts) if parts else '""'
             return f"std::cout << {chain} << std::endl;"
 
         if len(args) == 1:
-            arg = args[0]
-            if "&&" in arg or "||" in arg:
-                return f"std::cout << ({arg}) << std::endl;"
-            return f"std::cout << {arg} << std::endl;"
-
+            payload = f"({args[0]})" if ("&&" in args[0] or "||" in args[0]) else args[0]
+            return f"std::cout << {payload} << std::endl;"
         return f'std::cout << {" << \" \" << ".join(args)} << std::endl;'
 
     def and_op(self) -> str:
@@ -176,31 +220,41 @@ class CppStrategy(LanguageStrategy):
     def or_op(self) -> str:
         return "||"
 
-    def string_interp(self, template: str, exprs: dict) -> str:
-        fmt = template
-        args = []
-        for original, expr_result in exprs.items():
-            place = "{" + original + "}"
-            if place in fmt:
-                fmt = fmt.replace(place, "%s", 1)
-                args.append(expr_result.code)
-        return f"__CPP_INTERP__|{fmt}|{', '.join(args)}"
+    def not_op(self) -> str:
+        return "!"
+
+    def string_interp(self, template: str, exprs: list) -> str:
+        fmt = re.sub(r"\{[^}]*\}", "%s", template)
+        # Encode args with code+type so return statements can format correctly.
+        encoded = [f"{code}\x1f{t}" for _, code, t in exprs]
+        return f"__CPP_INTERP__|{fmt}|{chr(30).join(encoded)}"
 
 
 class TranslatorVisitor(WovenVisitor):
     def __init__(self, strategy: LanguageStrategy, type_table: dict):
         self.strategy = strategy
         self.type_table = dict(type_table or {})
-        self.indent_level = 0
         self.lines = []
+        self.indent_level = 0
+
         self.functions = {}
+        self.class_defs = {}  # name -> parent
+        self.class_fields = {}  # name -> set(fields)
+        self.class_methods = {}  # name -> set(methods)
+        self.current_class_name = None
+        self.current_class_parent = None
+        self._inside_cpp_ctor = False
+        self._cpp_ctor_super = None
+
         self.scope_types = [dict(self.type_table)]
+
         self.top_level_functions = []
+        self.top_level_classes = []
         self.top_level_stmts = []
         self.top_level_order = []
 
     # ---------- helpers ----------
-    def _emit(self, line: str = ""):
+    def _emit(self, line=""):
         self.lines.append(("    " * self.indent_level) + line if line else "")
 
     def _push_scope(self):
@@ -209,34 +263,60 @@ class TranslatorVisitor(WovenVisitor):
     def _pop_scope(self):
         self.scope_types.pop()
 
-    def _declare_type(self, name: str, type_name: str):
-        self.scope_types[-1][name] = type_name
+    def _declare_type(self, name, t):
+        self.scope_types[-1][name] = t
 
-    def _lookup_type(self, name: str):
+    def _lookup_type(self, name):
         for i in range(len(self.scope_types) - 1, -1, -1):
             if name in self.scope_types[i]:
                 return self.scope_types[i][name]
-        if name in self.type_table:
-            return self.type_table[name]
-        return "int"
+        return self.type_table.get(name, "int")
 
-    def _woven_not_op(self):
-        return "not" if isinstance(self.strategy, PythonStrategy) else "!"
+    def _is_list_type(self, t):
+        return t.startswith("list<") or t == "list"
 
-    def _translate_expr_text(self, expr_text: str) -> ExprResult:
-        parser = WovenParser(CommonTokenStream(WovenLexer(InputStream(expr_text))))
-        return self.visit(parser.expr())
+    def _is_class_type(self, t):
+        if t.startswith("std::shared_ptr<") and t.endswith(">"):
+            raw = t[len("std::shared_ptr<") : -1]
+            return raw in self.class_defs
+        raw = t[:-1] if t.endswith("*") else t
+        return raw in self.class_defs
+
+    def _cpp_interp_to_string_expr(self, marker):
+        # marker: __CPP_INTERP__|fmt%s...|code<US>type<RS>...
+        _, tmpl, payload = marker.split("|", 2)
+        segments = tmpl.split("%s")
+        entries = payload.split(chr(30)) if payload else []
+        parts = []
+        for i, seg in enumerate(segments):
+            if seg:
+                esc = seg.replace("\\", "\\\\").replace('"', '\\"')
+                parts.append(f'std::string("{esc}")')
+            if i < len(entries):
+                code, typ = entries[i].split("\x1f", 1)
+                if typ == "string":
+                    parts.append(f"std::string({code})")
+                elif typ == "bool":
+                    parts.append(f"std::string(({code}) ? \"true\" : \"false\")")
+                else:
+                    parts.append(f"std::to_string({code})")
+        if not parts:
+            return 'std::string("")'
+        return " + ".join(parts)
+
+    def _translated_type(self, woven_type):
+        return self.strategy.type_name(woven_type, set(self.class_defs.keys()))
 
     def _capture_visit(self, node):
-        previous_lines = self.lines
-        previous_indent = self.indent_level
+        prev_lines = self.lines
+        prev_indent = self.indent_level
         self.lines = []
         self.indent_level = 0
         self.visit(node)
-        captured = self.lines
-        self.lines = previous_lines
-        self.indent_level = previous_indent
-        return captured
+        out = self.lines
+        self.lines = prev_lines
+        self.indent_level = prev_indent
+        return out
 
     @staticmethod
     def _append_lines(target, lines, prefix=""):
@@ -247,107 +327,91 @@ class TranslatorVisitor(WovenVisitor):
         if isinstance(self.strategy, PythonStrategy):
             out = []
             for kind, idx in self.top_level_order:
-                lines = self.top_level_functions[idx] if kind == "function" else self.top_level_stmts[idx]
-                self._append_lines(out, lines)
+                if kind == "class":
+                    self._append_lines(out, self.top_level_classes[idx])
+                elif kind == "function":
+                    self._append_lines(out, self.top_level_functions[idx])
+                else:
+                    self._append_lines(out, self.top_level_stmts[idx])
             self.lines = out
             return
 
         if isinstance(self.strategy, JavaStrategy):
-            out = ["public class Main {", ""]
-            for fn_lines in self.top_level_functions:
-                self._append_lines(out, fn_lines, "    ")
+            out = ["import java.util.ArrayList;", "import java.util.Arrays;", "", "public class Main {", ""]
+            for cls in self.top_level_classes:
+                self._append_lines(out, cls, "    ")
+                out.append("")
+            for fn in self.top_level_functions:
+                self._append_lines(out, fn, "    ")
                 out.append("")
             out.append("    public static void main(String[] args) {")
-            for stmt_lines in self.top_level_stmts:
-                self._append_lines(out, stmt_lines, "        ")
+            for st in self.top_level_stmts:
+                self._append_lines(out, st, "        ")
             out.append("    }")
             out.append("}")
             self.lines = out
             return
 
         if isinstance(self.strategy, CppStrategy):
-            out = ["#include <iostream>", "#include <string>", ""]
-            for fn_lines in self.top_level_functions:
-                self._append_lines(out, fn_lines)
+            out = [
+                "#include <iostream>",
+                "#include <string>",
+                "#include <vector>",
+                "#include <memory>",
+                "",
+                "using namespace std;",
+                "",
+            ]
+            for cls in self.top_level_classes:
+                self._append_lines(out, cls)
+                out.append("")
+            for fn in self.top_level_functions:
+                self._append_lines(out, fn)
                 out.append("")
             out.append("int main() {")
-            for stmt_lines in self.top_level_stmts:
-                self._append_lines(out, stmt_lines, "    ")
+            for st in self.top_level_stmts:
+                self._append_lines(out, st, "    ")
             out.append("    return 0;")
             out.append("}")
             self.lines = out
             return
 
-        # Fallback lineal por seguridad.
-        self.lines = [line for group in (self.top_level_functions + self.top_level_stmts) for line in group]
+    def _parse_params(self, param_list_ctx):
+        params = []
+        if not param_list_ctx:
+            return params
+        for p in param_list_ctx.param():
+            params.append((p.IDENTIFIER().getText(), p.typeName().getText()))
+        return params
 
-    def _for_init_parts(self, ctx: WovenParser.ForStmtContext):
-        if not ctx.forInit():
-            return "", "", ""
-        init_ctx = ctx.forInit()
-        if init_ctx.typeName():
-            var_type = init_ctx.typeName().getText()
-            var_name = init_ctx.IDENTIFIER().getText()
-            init_expr = self.visit(init_ctx.expr()).code
-            self._declare_type(var_name, var_type)
-            if isinstance(self.strategy, PythonStrategy):
-                return f"{var_name} = {init_expr}", var_name, init_expr
-            typed = f"{self.strategy.type_name(var_type)} {var_name} = {init_expr}"
-            return typed, var_name, init_expr
-
-        assign_ctx = init_ctx.assignment()
-        name = assign_ctx.IDENTIFIER().getText()
-        value = self.visit(assign_ctx.expr()).code
-        return f"{name} = {value}", name, value
-
-    def _python_range_from_for(self, ctx: WovenParser.ForStmtContext):
-        init_txt, var_name, start = self._for_init_parts(ctx)
-        if not var_name or not ctx.expr() or not ctx.forUpdate():
-            return None, init_txt
-
-        cond = self.visit(ctx.expr()).code
-        upd_ctx = ctx.forUpdate()
-        if not upd_ctx.assignment():
-            return None, init_txt
-
-        upd = upd_ctx.assignment()
-        if upd.IDENTIFIER().getText() != var_name:
-            return None, init_txt
-
-        upd_expr = self.visit(upd.expr()).code
-        m_step = re.match(rf"{re.escape(var_name)}\s*([\+\-])\s*(\d+)$", upd_expr)
-        if not m_step:
-            return None, init_txt
-        sign, step_num = m_step.groups()
-        step = int(step_num) if sign == "+" else -int(step_num)
-
-        m_cond = re.match(rf"{re.escape(var_name)}\s*(<=|<|>=|>)\s*(.+)$", cond)
-        if not m_cond:
-            return None, init_txt
-        op, end = m_cond.groups()
-
-        if step > 0 and op in ("<", "<="):
-            stop = end if op == "<" else f"({end}) + 1"
-        elif step < 0 and op in (">", ">="):
-            stop = end if op == ">" else f"({end}) - 1"
-        else:
-            return None, init_txt
-
-        if step == 1:
-            return f"for {var_name} in range({start}, {stop}):", init_txt
-        return f"for {var_name} in range({start}, {stop}, {step}):", init_txt
-
-    # ---------- top-level ----------
+    # ---------- top ----------
     def visitProgram(self, ctx: WovenParser.ProgramContext):
         self.top_level_functions = []
+        self.top_level_classes = []
         self.top_level_stmts = []
         self.top_level_order = []
 
         for stmt in ctx.statement():
             comp = stmt.compoundStmt()
-            if comp and comp.functionDecl():
+            if not comp:
+                continue
+            if comp.functionDecl():
                 fn = comp.functionDecl()
                 self.functions[fn.IDENTIFIER().getText()] = fn
+            elif comp.classDecl():
+                ids = comp.classDecl().IDENTIFIER()
+                name = ids[0].getText()
+                parent = ids[1].getText() if len(ids) > 1 else None
+                self.class_defs[name] = parent
+                fields = set()
+                methods = set()
+                for m in comp.classDecl().classBody().classMember():
+                    if m.fieldDecl():
+                        fields.add(m.fieldDecl().IDENTIFIER().getText())
+                    elif m.methodDecl():
+                        methods.add(m.methodDecl().IDENTIFIER().getText())
+                self.class_fields[name] = fields
+                self.class_methods[name] = methods
 
         for stmt in ctx.statement():
             comp = stmt.compoundStmt()
@@ -355,6 +419,10 @@ class TranslatorVisitor(WovenVisitor):
                 lines = self._capture_visit(comp.functionDecl())
                 self.top_level_functions.append(lines)
                 self.top_level_order.append(("function", len(self.top_level_functions) - 1))
+            elif comp and comp.classDecl():
+                lines = self._capture_visit(comp.classDecl())
+                self.top_level_classes.append(lines)
+                self.top_level_order.append(("class", len(self.top_level_classes) - 1))
             else:
                 lines = self._capture_visit(stmt)
                 self.top_level_stmts.append(lines)
@@ -363,43 +431,28 @@ class TranslatorVisitor(WovenVisitor):
         self._assemble_program()
         return "\n".join(self.lines)
 
-    def visitStatement(self, ctx: WovenParser.StatementContext):
+    def visitStatement(self, ctx):
         if ctx.compoundStmt():
             return self.visit(ctx.compoundStmt())
         return self.visit(ctx.simpleStmt())
 
-    def visitSimpleStmt(self, ctx: WovenParser.SimpleStmtContext):
+    def visitSimpleStmt(self, ctx):
         return self.visit(ctx.getChild(0))
 
-    def visitCompoundStmt(self, ctx: WovenParser.CompoundStmtContext):
+    def visitCompoundStmt(self, ctx):
         return self.visit(ctx.getChild(0))
 
-    def visitBlock(self, ctx: WovenParser.BlockContext):
-        for stmt in ctx.statement():
-            self.visit(stmt)
+    def visitBlock(self, ctx):
+        for s in ctx.statement():
+            self.visit(s)
 
-    # ---------- statements ----------
-    def visitFunctionDecl(self, ctx: WovenParser.FunctionDeclContext):
+    # ---------- class/function ----------
+    def visitFunctionDecl(self, ctx):
         name = ctx.IDENTIFIER().getText()
-        ret_type = ctx.returnType().getText()
-        params = []
-        if ctx.paramList():
-            for p in ctx.paramList().param():
-                params.append((p.IDENTIFIER().getText(), p.typeName().getText()))
-
-        sig = self.strategy.function_signature(name, ret_type, params)
-        if isinstance(self.strategy, PythonStrategy):
-            self._emit(sig)
-            self.indent_level += 1
-            self._push_scope()
-            for p_name, p_type in params:
-                self._declare_type(p_name, p_type)
-            self.visit(ctx.block())
-            self._pop_scope()
-            self.indent_level -= 1
-            return
-
-        self._emit(f"{sig} {self.strategy.block_open()}")
+        ret = ctx.returnType().getText()
+        params = self._parse_params(ctx.paramList())
+        sig = self.strategy.function_signature(name, ret, params, set(self.class_defs.keys()))
+        self._emit(sig if isinstance(self.strategy, PythonStrategy) else f"{sig} {{")
         self.indent_level += 1
         self._push_scope()
         for p_name, p_type in params:
@@ -407,37 +460,177 @@ class TranslatorVisitor(WovenVisitor):
         self.visit(ctx.block())
         self._pop_scope()
         self.indent_level -= 1
-        self._emit(self.strategy.block_close())
+        if not isinstance(self.strategy, PythonStrategy):
+            self._emit("}")
 
-    def visitVarDecl(self, ctx: WovenParser.VarDeclContext):
-        woven_type = ctx.typeName().getText()
-        name = ctx.IDENTIFIER().getText()
-        self._declare_type(name, woven_type)
-        if ctx.expr():
-            expr = self.visit(ctx.expr())
-            if isinstance(self.strategy, PythonStrategy):
-                self._emit(f"{name} = {expr.code}")
-            else:
-                self._emit(f"{self.strategy.type_name(woven_type)} {name} = {expr.code};")
-        else:
-            defaults = {"int": "0", "float": "0.0", "string": '""', "bool": "false"}
-            default_val = defaults[woven_type]
-            if isinstance(self.strategy, PythonStrategy):
-                if woven_type == "bool":
-                    default_val = "False"
-                self._emit(f"{name} = {default_val}")
-            else:
-                self._emit(f"{self.strategy.type_name(woven_type)} {name} = {default_val};")
+    def visitClassDecl(self, ctx):
+        ids = ctx.IDENTIFIER()
+        name = ids[0].getText()
+        parent = ids[1].getText() if len(ids) > 1 else None
+        self.current_class_name = name
+        self.current_class_parent = parent
 
-    def visitAssignment(self, ctx: WovenParser.AssignmentContext):
-        name = ctx.IDENTIFIER().getText()
-        expr = self.visit(ctx.expr())
+        sig = self.strategy.class_signature(name, parent)
+        self._emit(sig + (":" if isinstance(self.strategy, PythonStrategy) else " {"))
+        self.indent_level += 1
+        if isinstance(self.strategy, CppStrategy):
+            self._emit("public:")
+        self._push_scope()
+        for member in ctx.classBody().classMember():
+            self.visit(member)
+        self._pop_scope()
+        self.indent_level -= 1
+        if isinstance(self.strategy, CppStrategy):
+            self._emit("};")
+        elif not isinstance(self.strategy, PythonStrategy):
+            self._emit("}")
+
+        self.current_class_name = None
+        self.current_class_parent = None
+
+    def visitClassMember(self, ctx):
+        return self.visit(ctx.getChild(0))
+
+    def visitFieldDecl(self, ctx):
+        t = ctx.typeName().getText()
+        n = ctx.IDENTIFIER().getText()
+        self._declare_type(n, t)
         if isinstance(self.strategy, PythonStrategy):
-            self._emit(f"{name} = {expr.code}")
+            self._emit(f"{n} = None")
         else:
-            self._emit(f"{name} = {expr.code};")
+            self._emit(f"{self._translated_type(t)} {n};")
 
-    def visitIfStmt(self, ctx: WovenParser.IfStmtContext):
+    def visitConstructorDecl(self, ctx):
+        params = self._parse_params(ctx.paramList())
+        sig = self.strategy.constructor_signature(self.current_class_name, params, set(self.class_defs.keys()))
+
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(sig)
+            self.indent_level += 1
+            self._push_scope()
+            self._declare_type("self", self.current_class_name)
+            for p_name, p_type in params:
+                self._declare_type(p_name, p_type)
+            self.visit(ctx.block())
+            self._pop_scope()
+            self.indent_level -= 1
+            return
+
+        if isinstance(self.strategy, CppStrategy):
+            self._inside_cpp_ctor = True
+            self._cpp_ctor_super = None
+            lines = self._capture_visit(ctx.block())
+            self._inside_cpp_ctor = False
+            init = f" : {self.current_class_parent}({self._cpp_ctor_super})" if self._cpp_ctor_super else ""
+            self._emit(f"{sig}{init} {{")
+            self.indent_level += 1
+            self._append_lines(self.lines, lines, "    " * self.indent_level)
+            self.indent_level -= 1
+            self._emit("}")
+            return
+
+        self._emit(f"{sig} {{")
+        self.indent_level += 1
+        self._push_scope()
+        self._declare_type("self", self.current_class_name)
+        for p_name, p_type in params:
+            self._declare_type(p_name, p_type)
+        self.visit(ctx.block())
+        self._pop_scope()
+        self.indent_level -= 1
+        self._emit("}")
+
+    def visitMethodDecl(self, ctx):
+        name = ctx.IDENTIFIER().getText()
+        ret = ctx.returnType().getText()
+        params = self._parse_params(ctx.paramList())
+        is_virtual = ctx.VIRTUAL() is not None
+        sig = self.strategy.method_signature(name, ret, params, is_virtual, set(self.class_defs.keys()))
+
+        self._emit(sig if isinstance(self.strategy, PythonStrategy) else f"{sig} {{")
+        self.indent_level += 1
+        self._push_scope()
+        self._declare_type("self", self.current_class_name)
+        for p_name, p_type in params:
+            self._declare_type(p_name, p_type)
+        self.visit(ctx.block())
+        self._pop_scope()
+        self.indent_level -= 1
+        if not isinstance(self.strategy, PythonStrategy):
+            self._emit("}")
+
+    # ---------- stmts ----------
+    def visitVarDecl(self, ctx):
+        t = ctx.typeName().getText()
+        n = ctx.IDENTIFIER().getText()
+        self._declare_type(n, t)
+        if ctx.expr():
+            expr = self.visit(ctx.expr()).code
+            if isinstance(self.strategy, PythonStrategy):
+                if self._is_list_type(t):
+                    self._emit(f"{n}: {self._translated_type(t)} = {expr}")
+                else:
+                    self._emit(f"{n} = {expr}")
+            else:
+                self._emit(f"{self._translated_type(t)} {n} = {expr};")
+            return
+
+        if self._is_list_type(t):
+            if isinstance(self.strategy, PythonStrategy):
+                self._emit(f"{n}: {self._translated_type(t)} = []")
+            elif isinstance(self.strategy, JavaStrategy):
+                self._emit(f"{self._translated_type(t)} {n} = new {self._translated_type(t)}();")
+            else:
+                self._emit(f"{self._translated_type(t)} {n};")
+            return
+
+        defaults = {"int": "0", "float": "0.0", "string": '""', "bool": "False" if isinstance(self.strategy, PythonStrategy) else "false"}
+        dv = defaults.get(t, "None" if isinstance(self.strategy, PythonStrategy) else "nullptr")
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(f"{n} = {dv}")
+        else:
+            self._emit(f"{self._translated_type(t)} {n} = {dv};")
+
+    def visitAssignment(self, ctx):
+        n = ctx.IDENTIFIER().getText()
+        e = self.visit(ctx.expr()).code
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(f"{n} = {e}")
+        else:
+            self._emit(f"{n} = {e};")
+
+    def visitSelfAssignment(self, ctx):
+        f = ctx.IDENTIFIER().getText()
+        e = self.visit(ctx.expr()).code
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(f"self.{f} = {e}")
+        elif isinstance(self.strategy, JavaStrategy):
+            self._emit(f"this.{f} = {e};")
+        else:
+            self._emit(f"this->{f} = {e};")
+
+    def visitIndexAssignment(self, ctx):
+        idx = self.visit(ctx.expr(0)).code
+        val = self.visit(ctx.expr(1)).code
+        if ctx.SELF():
+            arr = ctx.IDENTIFIER().getText()
+            if isinstance(self.strategy, PythonStrategy):
+                self._emit(f"self.{arr}[{idx}] = {val}")
+            elif isinstance(self.strategy, JavaStrategy):
+                self._emit(f"this.{arr}.set({idx}, {val});")
+            else:
+                self._emit(f"this->{arr}[{idx}] = {val};")
+            return
+
+        arr = ctx.IDENTIFIER().getText()
+        arr_t = self._lookup_type(arr)
+        if isinstance(self.strategy, JavaStrategy) and self._is_list_type(arr_t):
+            self._emit(f"{arr}.set({idx}, {val});")
+        else:
+            suffix = "" if isinstance(self.strategy, PythonStrategy) else ";"
+            self._emit(f"{arr}[{idx}] = {val}{suffix}")
+
+    def visitIfStmt(self, ctx):
         cond = self.visit(ctx.expr()).code
         if isinstance(self.strategy, PythonStrategy):
             self._emit(f"if {cond}:")
@@ -450,60 +643,71 @@ class TranslatorVisitor(WovenVisitor):
                 self.visit(ctx.block(1))
                 self.indent_level -= 1
             return
-
-        self._emit(f"if ({cond}) {self.strategy.block_open()}")
+        self._emit(f"if ({cond}) {{")
         self.indent_level += 1
         self.visit(ctx.block(0))
         self.indent_level -= 1
-        self._emit(self.strategy.block_close())
+        self._emit("}")
         if len(ctx.block()) > 1:
-            self._emit(f"else {self.strategy.block_open()}")
+            self._emit("else {")
             self.indent_level += 1
             self.visit(ctx.block(1))
             self.indent_level -= 1
-            self._emit(self.strategy.block_close())
+            self._emit("}")
 
-    def visitForStmt(self, ctx: WovenParser.ForStmtContext):
+    def visitForStmt(self, ctx):
+        # Reusar estilo anterior.
         if isinstance(self.strategy, PythonStrategy):
-            loop_header, init_txt = self._python_range_from_for(ctx)
-            if loop_header is None:
-                if init_txt:
-                    self._emit(init_txt)
-                cond = self.visit(ctx.expr()).code if ctx.expr() else "True"
-                self._emit(f"while {cond}:")
-                self.indent_level += 1
-                self.visit(ctx.block())
-                if ctx.forUpdate():
-                    if ctx.forUpdate().assignment():
-                        a = ctx.forUpdate().assignment()
-                        self._emit(f"{a.IDENTIFIER().getText()} = {self.visit(a.expr()).code}")
-                    else:
-                        self._emit(self.visit(ctx.forUpdate().expr()).code)
-                self.indent_level -= 1
-                return
-
-            self._emit(loop_header)
+            if ctx.forInit() and ctx.forInit().typeName() and ctx.expr() and ctx.forUpdate() and ctx.forUpdate().assignment():
+                i_name = ctx.forInit().IDENTIFIER().getText()
+                start = self.visit(ctx.forInit().expr()).code
+                cond = self.visit(ctx.expr()).code
+                up_assign = ctx.forUpdate().assignment()
+                up_expr = self.visit(up_assign.expr()).code
+                m1 = re.match(rf"{re.escape(i_name)}\s*<\s*(.+)$", cond)
+                m2 = re.match(rf"{re.escape(i_name)}\s*\+\s*1$", up_expr)
+                if m1 and m2:
+                    self._emit(f"for {i_name} in range({start}, {m1.group(1)}):")
+                    self.indent_level += 1
+                    self.visit(ctx.block())
+                    self.indent_level -= 1
+                    return
+            if ctx.forInit():
+                self.visit(ctx.forInit())
+            cond = self.visit(ctx.expr()).code if ctx.expr() else "True"
+            self._emit(f"while {cond}:")
             self.indent_level += 1
             self.visit(ctx.block())
+            if ctx.forUpdate():
+                self.visit(ctx.forUpdate())
             self.indent_level -= 1
             return
 
-        init_txt, _, _ = self._for_init_parts(ctx)
+        init = ""
+        if ctx.forInit():
+            if ctx.forInit().typeName():
+                t = ctx.forInit().typeName().getText()
+                n = ctx.forInit().IDENTIFIER().getText()
+                init = f"{self._translated_type(t)} {n} = {self.visit(ctx.forInit().expr()).code}"
+                self._declare_type(n, t)
+            else:
+                a = ctx.forInit().assignment()
+                init = f"{a.IDENTIFIER().getText()} = {self.visit(a.expr()).code}"
         cond = self.visit(ctx.expr()).code if ctx.expr() else ""
-        update = ""
+        upd = ""
         if ctx.forUpdate():
             if ctx.forUpdate().assignment():
                 a = ctx.forUpdate().assignment()
-                update = f"{a.IDENTIFIER().getText()} = {self.visit(a.expr()).code}"
+                upd = f"{a.IDENTIFIER().getText()} = {self.visit(a.expr()).code}"
             else:
-                update = self.visit(ctx.forUpdate().expr()).code
-        self._emit(f"for ({init_txt}; {cond}; {update}) {self.strategy.block_open()}")
+                upd = self.visit(ctx.forUpdate().expr()).code
+        self._emit(f"for ({init}; {cond}; {upd}) {{")
         self.indent_level += 1
         self.visit(ctx.block())
         self.indent_level -= 1
-        self._emit(self.strategy.block_close())
+        self._emit("}")
 
-    def visitWhileStmt(self, ctx: WovenParser.WhileStmtContext):
+    def visitWhileStmt(self, ctx):
         cond = self.visit(ctx.expr()).code
         if isinstance(self.strategy, PythonStrategy):
             self._emit(f"while {cond}:")
@@ -511,138 +715,238 @@ class TranslatorVisitor(WovenVisitor):
             self.visit(ctx.block())
             self.indent_level -= 1
             return
-        self._emit(f"while ({cond}) {self.strategy.block_open()}")
+        self._emit(f"while ({cond}) {{")
         self.indent_level += 1
         self.visit(ctx.block())
         self.indent_level -= 1
-        self._emit(self.strategy.block_close())
+        self._emit("}")
 
-    def visitReturnStmt(self, ctx: WovenParser.ReturnStmtContext):
-        if ctx.expr():
-            code = self.visit(ctx.expr()).code
-            if isinstance(self.strategy, PythonStrategy):
-                self._emit(f"return {code}")
-            else:
-                self._emit(f"return {code};")
-        else:
-            self._emit("return;" if not isinstance(self.strategy, PythonStrategy) else "return")
-
-    def visitPrintStmt(self, ctx: WovenParser.PrintStmtContext):
-        if not ctx.argList():
-            payload = self.strategy.print_stmt(['""'], ["string"])
-            self._emit(payload)
+    def visitReturnStmt(self, ctx):
+        if not ctx.expr():
+            self._emit("return" if isinstance(self.strategy, PythonStrategy) else "return;")
             return
+        e_res = self.visit(ctx.expr())
+        e = e_res.code
+        if isinstance(self.strategy, CppStrategy) and e.startswith("__CPP_INTERP__|"):
+            e = self._cpp_interp_to_string_expr(e)
+        self._emit(f"return {e}" if isinstance(self.strategy, PythonStrategy) else f"return {e};")
 
-        args = []
-        types = []
-        for expr in ctx.argList().expr():
-            result = self.visit(expr)
-            args.append(result.code)
-            types.append(result.type_name)
-
+    def visitPrintStmt(self, ctx):
+        if not ctx.argList():
+            self._emit(self.strategy.print_stmt(['""'], ["string"]))
+            return
+        args, types = [], []
+        for e in ctx.argList().expr():
+            r = self.visit(e)
+            args.append(r.code)
+            types.append(r.type_name)
         self._emit(self.strategy.print_stmt(args, types))
 
-    def visitExprStmt(self, ctx: WovenParser.ExprStmtContext):
-        expr = self.visit(ctx.expr()).code
+    def visitExprStmt(self, ctx):
+        e = self.visit(ctx.expr()).code
         if isinstance(self.strategy, PythonStrategy):
-            self._emit(expr)
+            self._emit(e)
         else:
-            self._emit(f"{expr};")
+            self._emit(f"{e};")
 
-    # ---------- expressions ----------
-    def visitExpr(self, ctx: WovenParser.ExprContext):
+    # ---------- expr ----------
+    def visitExpr(self, ctx):
         return self.visit(ctx.orExpr())
 
-    def visitLogicalOr(self, ctx: WovenParser.LogicalOrContext):
-        left = self.visit(ctx.orExpr())
-        right = self.visit(ctx.andExpr())
-        return ExprResult(f"{left.code} {self.strategy.or_op()} {right.code}", "bool")
+    def visitLogicalOr(self, ctx):
+        l = self.visit(ctx.orExpr())
+        r = self.visit(ctx.andExpr())
+        return ExprResult(f"{l.code} {self.strategy.or_op()} {r.code}", "bool")
 
-    def visitAndExprAlt(self, ctx: WovenParser.AndExprAltContext):
+    def visitAndExprAlt(self, ctx):
         return self.visit(ctx.andExpr())
 
-    def visitLogicalAnd(self, ctx: WovenParser.LogicalAndContext):
-        left = self.visit(ctx.andExpr())
-        right = self.visit(ctx.compExpr())
-        return ExprResult(f"{left.code} {self.strategy.and_op()} {right.code}", "bool")
+    def visitLogicalAnd(self, ctx):
+        l = self.visit(ctx.andExpr())
+        r = self.visit(ctx.compExpr())
+        return ExprResult(f"{l.code} {self.strategy.and_op()} {r.code}", "bool")
 
-    def visitCompExprAlt(self, ctx: WovenParser.CompExprAltContext):
+    def visitCompExprAlt(self, ctx):
         return self.visit(ctx.compExpr())
 
-    def visitBinaryOp(self, ctx: WovenParser.BinaryOpContext):
-        left = self.visit(ctx.compExpr(0))
-        right = self.visit(ctx.compExpr(1))
-        op = ctx.op.text
-        out_type = "float" if "float" in (left.type_name, right.type_name) else left.type_name
-        if op in {"<", "<=", ">", ">=", "==", "!="}:
-            out_type = "bool"
-        return ExprResult(f"{left.code} {op} {right.code}", out_type)
+    def visitBinaryOp(self, ctx):
+        l = self.visit(ctx.compExpr(0))
+        r = self.visit(ctx.compExpr(1))
+        t = "bool" if ctx.op.text in {"<", "<=", ">", ">=", "==", "!="} else ("float" if "float" in (l.type_name, r.type_name) else l.type_name)
+        return ExprResult(f"{l.code} {ctx.op.text} {r.code}", t)
 
-    def visitComparison(self, ctx: WovenParser.ComparisonContext):
-        left = self.visit(ctx.compExpr(0))
-        right = self.visit(ctx.compExpr(1))
-        return ExprResult(f"{left.code} {ctx.op.text} {right.code}", "bool")
+    def visitComparison(self, ctx):
+        l = self.visit(ctx.compExpr(0))
+        r = self.visit(ctx.compExpr(1))
+        return ExprResult(f"{l.code} {ctx.op.text} {r.code}", "bool")
 
-    def visitUnaryOp(self, ctx: WovenParser.UnaryOpContext):
-        value = self.visit(ctx.compExpr())
-        op = ctx.op.text
-        if op == "!":
-            return ExprResult(f"{self._woven_not_op()} {value.code}", "bool")
-        return ExprResult(f"-{value.code}", value.type_name)
+    def visitUnaryOp(self, ctx):
+        v = self.visit(ctx.compExpr())
+        if ctx.op.text == "!":
+            return ExprResult(f"{self.strategy.not_op()} {v.code}", "bool")
+        return ExprResult(f"-{v.code}", v.type_name)
 
-    def visitAtomExpr(self, ctx: WovenParser.AtomExprContext):
+    def visitAtomExpr(self, ctx):
         return self.visit(ctx.atom())
 
-    def visitLiteralAtom(self, ctx: WovenParser.LiteralAtomContext):
+    # ---------- atom ----------
+    def visitLiteralAtom(self, ctx):
         return self.visit(ctx.literal())
 
-    def visitIdAtom(self, ctx: WovenParser.IdAtomContext):
-        name = ctx.IDENTIFIER().getText()
-        return ExprResult(name, self._lookup_type(name))
+    def visitIdAtom(self, ctx):
+        n = ctx.IDENTIFIER().getText()
+        return ExprResult(n, self._lookup_type(n))
 
-    def visitParenAtom(self, ctx: WovenParser.ParenAtomContext):
+    def visitParenAtom(self, ctx):
         inner = self.visit(ctx.expr())
         return ExprResult(f"({inner.code})", inner.type_name)
 
-    def visitCallAtom(self, ctx: WovenParser.CallAtomContext):
-        callee = self.visit(ctx.atom())
-        args = []
-        if ctx.argList():
-            args = [self.visit(e) for e in ctx.argList().expr()]
-        args_code = ", ".join(a.code for a in args)
-        fn_name = callee.code
-        ret = "void"
-        if fn_name in self.functions:
-            ret = self.functions[fn_name].returnType().getText()
-        return ExprResult(f"{fn_name}({args_code})", ret)
+    def visitCallAtom(self, ctx):
+        args = [self.visit(e) for e in (ctx.argList().expr() if ctx.argList() else [])]
+        name = ctx.IDENTIFIER().getText()
+        ret = self.functions[name].returnType().getText() if name in self.functions else "void"
+        return ExprResult(f"{name}({', '.join(a.code for a in args)})", ret)
 
-    def visitLiteral(self, ctx: WovenParser.LiteralContext):
+    def visitSelfFieldAtom(self, ctx):
+        f = ctx.IDENTIFIER().getText()
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"self.{f}", self._lookup_type(f))
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"this.{f}", self._lookup_type(f))
+        return ExprResult(f"this->{f}", self._lookup_type(f))
+
+    def visitSelfCallAtom(self, ctx):
+        m = ctx.IDENTIFIER().getText()
+        args = [self.visit(e).code for e in (ctx.argList().expr() if ctx.argList() else [])]
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"self.{m}({', '.join(args)})", "void")
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"this.{m}({', '.join(args)})", "void")
+        return ExprResult(f"this->{m}({', '.join(args)})", "void")
+
+    def visitMemberAccessAtom(self, ctx):
+        base = self.visit(ctx.atom())
+        member = ctx.IDENTIFIER().getText()
+        if self._is_list_type(base.type_name) and member == "length":
+            if isinstance(self.strategy, PythonStrategy):
+                return ExprResult(f"len({base.code})", "int")
+            return ExprResult(f"{base.code}.size()", "int")
+        if self._is_list_type(base.type_name) and member in {"append", "remove"}:
+            return ExprResult(f"{base.code}\x1f{member}", "__list_method_ref__")
+
+        base_raw = base.type_name[:-1] if base.type_name.endswith("*") else base.type_name
+        if base_raw in self.class_defs and member in self.class_methods.get(base_raw, set()):
+            return ExprResult(f"{base.code}\x1f{member}\x1f{base.type_name}", "__object_method_ref__")
+
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"{base.code}.{member}", self._lookup_type(member))
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"{base.code}.{member}", self._lookup_type(member))
+
+        op = "->" if self._is_class_type(base.type_name) else "."
+        return ExprResult(f"{base.code}{op}{member}", self._lookup_type(member))
+
+    def visitMemberCallAtom(self, ctx):
+        base = self.visit(ctx.atom())
+        name = ctx.IDENTIFIER().getText()
+        args = [self.visit(e).code for e in (ctx.argList().expr() if ctx.argList() else [])]
+
+        if self._is_list_type(base.type_name):
+            if isinstance(self.strategy, PythonStrategy):
+                if name == "append":
+                    return ExprResult(f"{base.code}.append({args[0]})", "void")
+                if name == "remove":
+                    return ExprResult(f"{base.code}.pop({args[0]})", "void")
+            if isinstance(self.strategy, JavaStrategy):
+                if name == "append":
+                    return ExprResult(f"{base.code}.add({args[0]})", "void")
+                if name == "remove":
+                    return ExprResult(f"{base.code}.remove({args[0]})", "void")
+            if isinstance(self.strategy, CppStrategy):
+                if name == "append":
+                    return ExprResult(f"{base.code}.push_back({args[0]})", "void")
+                if name == "remove":
+                    return ExprResult(f"{base.code}.erase({base.code}.begin() + {args[0]})", "void")
+
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"{base.code}.{name}({', '.join(args)})", "void")
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"{base.code}.{name}({', '.join(args)})", "void")
+        op = "->" if self._is_class_type(base.type_name) else "."
+        return ExprResult(f"{base.code}{op}{name}({', '.join(args)})", "void")
+
+    def visitIndexAtom(self, ctx):
+        base = self.visit(ctx.atom())
+        idx = self.visit(ctx.expr()).code
+        inner_type = "int"
+        if self._is_list_type(base.type_name) and base.type_name.startswith("list<") and base.type_name.endswith(">"):
+            inner_type = base.type_name[5:-1]
+            if isinstance(self.strategy, CppStrategy) and inner_type in self.class_defs:
+                inner_type = f"std::shared_ptr<{inner_type}>"
+        if isinstance(self.strategy, JavaStrategy) and self._is_list_type(base.type_name):
+            return ExprResult(f"{base.code}.get({idx})", inner_type)
+        return ExprResult(f"{base.code}[{idx}]", inner_type)
+
+    def visitListLiteralAtom(self, ctx):
+        elems = [self.visit(e) for e in (ctx.argList().expr() if ctx.argList() else [])]
+        inner = elems[0].type_name if elems else "any"
+        t = f"list<{inner}>"
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"[{', '.join(e.code for e in elems)}]", t)
+        if isinstance(self.strategy, JavaStrategy):
+            if elems:
+                return ExprResult(f"new ArrayList<>(Arrays.asList({', '.join(e.code for e in elems)}))", t)
+            return ExprResult("new ArrayList<>()", t)
+        return ExprResult(f"{{{', '.join(e.code for e in elems)}}}", t)
+
+    def visitNewAtom(self, ctx):
+        cls = ctx.IDENTIFIER().getText()
+        args = [self.visit(e).code for e in (ctx.argList().expr() if ctx.argList() else [])]
+        if isinstance(self.strategy, CppStrategy):
+            return ExprResult(f"std::make_shared<{cls}>({', '.join(args)})", f"std::shared_ptr<{cls}>")
+        return ExprResult(f"{cls}({', '.join(args)})" if isinstance(self.strategy, PythonStrategy) else f"new {cls}({', '.join(args)})", cls)
+
+    def visitSuperCallAtom(self, ctx):
+        args = [self.visit(e).code for e in (ctx.argList().expr() if ctx.argList() else [])]
+        joined = ", ".join(args)
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"super().__init__({joined})", "void")
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"super({joined})", "void")
+        return ExprResult(f"__CPP_SUPER__:{joined}", "void")
+
+    # ---------- literals ----------
+    def visitLiteral(self, ctx):
         if ctx.INT_LITERAL():
             return ExprResult(ctx.INT_LITERAL().getText(), "int")
         if ctx.FLOAT_LITERAL():
             return ExprResult(ctx.FLOAT_LITERAL().getText(), "float")
         if ctx.TRUE():
-            if isinstance(self.strategy, PythonStrategy):
-                return ExprResult("True", "bool")
-            if isinstance(self.strategy, (JavaStrategy, CppStrategy)):
-                return ExprResult("true", "bool")
-            return ExprResult("true", "bool")
+            return ExprResult("True" if isinstance(self.strategy, PythonStrategy) else "true", "bool")
         if ctx.FALSE():
-            if isinstance(self.strategy, PythonStrategy):
-                return ExprResult("False", "bool")
-            if isinstance(self.strategy, (JavaStrategy, CppStrategy)):
-                return ExprResult("false", "bool")
-            return ExprResult("false", "bool")
+            return ExprResult("False" if isinstance(self.strategy, PythonStrategy) else "false", "bool")
         if ctx.STRING_LITERAL():
             return ExprResult(ctx.STRING_LITERAL().getText(), "string")
         if ctx.STRING_INTERP():
             raw = ctx.STRING_INTERP().getText()[1:-1]
-            expr_map = {}
+            parts = []
             for m in re.finditer(r"\{([^}]*)\}", raw):
-                original = m.group(1)
-                expr_map[original] = self._translate_expr_text(original)
-            return ExprResult(self.strategy.string_interp(raw, expr_map), "string")
+                expr_text = m.group(1).strip()
+                expr_res = self.visit(WovenParser(CommonTokenStream(WovenLexer(InputStream(expr_text)))).expr())
+                parts.append((m.group(1), expr_res.code, expr_res.type_name))
+            return ExprResult(self.strategy.string_interp(raw, parts), "string")
         return ExprResult(ctx.getText(), "string")
+
+    # ---------- specials ----------
+    def visitExprStmt(self, ctx):
+        e = self.visit(ctx.expr()).code
+        if isinstance(self.strategy, CppStrategy) and self._inside_cpp_ctor and e.startswith("__CPP_SUPER__:"):
+            self._cpp_ctor_super = e.split(":", 1)[1]
+            return
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(e)
+        else:
+            self._emit(f"{e};")
 
 
 def translate_woven(source: str, language: str) -> str:
@@ -653,7 +957,6 @@ def translate_woven(source: str, language: str) -> str:
     parser = WovenParser(stream)
     tree = parser.program()
 
-    # Obtener tabla de tipos del interprete
     interpreter = InterpreterVisitor()
     interpreter.visit(tree)
     type_table = interpreter.types[0]

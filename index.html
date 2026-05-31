@@ -276,24 +276,47 @@
   <main>
     <section class="panel">
       <div class="panel-header">Editor</div>
-      <textarea id="editor" spellcheck="false">// Calcula el factorial de un número
-function int factorial(int n):
-    if n <= 1:
-        return 1
-    else:
-        return n * factorial(n - 1)
+      <textarea id="editor" spellcheck="false">// Estructura de datos: pila con objetos
 
-// Suma acumulada con ciclo
+class Nodo:
+    int valor
+    
+    init(int valor):
+        self.valor = valor
+    
+    virtual function string describir():
+        return "Nodo con valor {self.valor}"
+
+
+class NodoEspecial extends Nodo:
+    string etiqueta
+    
+    init(int valor, string etiqueta):
+        super(valor)
+        self.etiqueta = etiqueta
+    
+    virtual function string describir():
+        return "Nodo especial {self.etiqueta}: {self.valor}"
+
+
+// Construccion de la pila
+list<Nodo> pila = []
+
+int i = 0
+while i < 3:
+    pila.append(new Nodo(i * 10))
+    i = i + 1
+
+pila.append(new NodoEspecial(99, "tope"))
+
+// Recorrer e imprimir
 int total = 0
-for (int i = 1; i < 6; i = i + 1):
-    total = total + i
+for (int j = 0; j < pila.length; j = j + 1):
+    print(pila[j].describir())
+    total = total + pila[j].valor
 
-bool esPositivo = total > 0
-int resultado = factorial(5)
-
-print("Suma del 1 al 5: {total}")
-print("Factorial de 5: {resultado}")
-print("Es positivo: {esPositivo}")</textarea>
+print("Total acumulado: {total}")
+print("Cantidad de nodos: {pila.length}")</textarea>
     </section>
 
     <section class="panel">

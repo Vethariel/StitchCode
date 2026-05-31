@@ -1,4 +1,4 @@
-# Generated from /home/vethariel/Documents/StitchCode/woven/Woven.g4 by ANTLR 4.13.2
+# Generated from woven/Woven.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .WovenParser import WovenParser
@@ -98,6 +98,15 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#listType.
+    def enterListType(self, ctx:WovenParser.ListTypeContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#listType.
+    def exitListType(self, ctx:WovenParser.ListTypeContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#block.
     def enterBlock(self, ctx:WovenParser.BlockContext):
         pass
@@ -152,6 +161,60 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#classDecl.
+    def enterClassDecl(self, ctx:WovenParser.ClassDeclContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#classDecl.
+    def exitClassDecl(self, ctx:WovenParser.ClassDeclContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#classBody.
+    def enterClassBody(self, ctx:WovenParser.ClassBodyContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#classBody.
+    def exitClassBody(self, ctx:WovenParser.ClassBodyContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#classMember.
+    def enterClassMember(self, ctx:WovenParser.ClassMemberContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#classMember.
+    def exitClassMember(self, ctx:WovenParser.ClassMemberContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#fieldDecl.
+    def enterFieldDecl(self, ctx:WovenParser.FieldDeclContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#fieldDecl.
+    def exitFieldDecl(self, ctx:WovenParser.FieldDeclContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#constructorDecl.
+    def enterConstructorDecl(self, ctx:WovenParser.ConstructorDeclContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#constructorDecl.
+    def exitConstructorDecl(self, ctx:WovenParser.ConstructorDeclContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#methodDecl.
+    def enterMethodDecl(self, ctx:WovenParser.MethodDeclContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#methodDecl.
+    def exitMethodDecl(self, ctx:WovenParser.MethodDeclContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#returnStmt.
     def enterReturnStmt(self, ctx:WovenParser.ReturnStmtContext):
         pass
@@ -176,6 +239,24 @@ class WovenListener(ParseTreeListener):
 
     # Exit a parse tree produced by WovenParser#assignment.
     def exitAssignment(self, ctx:WovenParser.AssignmentContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#selfAssignment.
+    def enterSelfAssignment(self, ctx:WovenParser.SelfAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#selfAssignment.
+    def exitSelfAssignment(self, ctx:WovenParser.SelfAssignmentContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#indexAssignment.
+    def enterIndexAssignment(self, ctx:WovenParser.IndexAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#indexAssignment.
+    def exitIndexAssignment(self, ctx:WovenParser.IndexAssignmentContext):
         pass
 
 
@@ -287,6 +368,15 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#newAtom.
+    def enterNewAtom(self, ctx:WovenParser.NewAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#newAtom.
+    def exitNewAtom(self, ctx:WovenParser.NewAtomContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#callAtom.
     def enterCallAtom(self, ctx:WovenParser.CallAtomContext):
         pass
@@ -296,12 +386,75 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#memberCallAtom.
+    def enterMemberCallAtom(self, ctx:WovenParser.MemberCallAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#memberCallAtom.
+    def exitMemberCallAtom(self, ctx:WovenParser.MemberCallAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#selfCallAtom.
+    def enterSelfCallAtom(self, ctx:WovenParser.SelfCallAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#selfCallAtom.
+    def exitSelfCallAtom(self, ctx:WovenParser.SelfCallAtomContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#parenAtom.
     def enterParenAtom(self, ctx:WovenParser.ParenAtomContext):
         pass
 
     # Exit a parse tree produced by WovenParser#parenAtom.
     def exitParenAtom(self, ctx:WovenParser.ParenAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#indexAtom.
+    def enterIndexAtom(self, ctx:WovenParser.IndexAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#indexAtom.
+    def exitIndexAtom(self, ctx:WovenParser.IndexAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#memberAccessAtom.
+    def enterMemberAccessAtom(self, ctx:WovenParser.MemberAccessAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#memberAccessAtom.
+    def exitMemberAccessAtom(self, ctx:WovenParser.MemberAccessAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#selfFieldAtom.
+    def enterSelfFieldAtom(self, ctx:WovenParser.SelfFieldAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#selfFieldAtom.
+    def exitSelfFieldAtom(self, ctx:WovenParser.SelfFieldAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#listLiteralAtom.
+    def enterListLiteralAtom(self, ctx:WovenParser.ListLiteralAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#listLiteralAtom.
+    def exitListLiteralAtom(self, ctx:WovenParser.ListLiteralAtomContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#superCallAtom.
+    def enterSuperCallAtom(self, ctx:WovenParser.SuperCallAtomContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#superCallAtom.
+    def exitSuperCallAtom(self, ctx:WovenParser.SuperCallAtomContext):
         pass
 
 

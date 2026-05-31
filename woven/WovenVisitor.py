@@ -1,4 +1,4 @@
-# Generated from /home/vethariel/Documents/StitchCode/woven/Woven.g4 by ANTLR 4.13.2
+# Generated from woven/Woven.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .WovenParser import WovenParser
@@ -59,6 +59,11 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#listType.
+    def visitListType(self, ctx:WovenParser.ListTypeContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#block.
     def visitBlock(self, ctx:WovenParser.BlockContext):
         return self.visitChildren(ctx)
@@ -89,6 +94,36 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#classDecl.
+    def visitClassDecl(self, ctx:WovenParser.ClassDeclContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#classBody.
+    def visitClassBody(self, ctx:WovenParser.ClassBodyContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#classMember.
+    def visitClassMember(self, ctx:WovenParser.ClassMemberContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#fieldDecl.
+    def visitFieldDecl(self, ctx:WovenParser.FieldDeclContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#constructorDecl.
+    def visitConstructorDecl(self, ctx:WovenParser.ConstructorDeclContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#methodDecl.
+    def visitMethodDecl(self, ctx:WovenParser.MethodDeclContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#returnStmt.
     def visitReturnStmt(self, ctx:WovenParser.ReturnStmtContext):
         return self.visitChildren(ctx)
@@ -101,6 +136,16 @@ class WovenVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by WovenParser#assignment.
     def visitAssignment(self, ctx:WovenParser.AssignmentContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#selfAssignment.
+    def visitSelfAssignment(self, ctx:WovenParser.SelfAssignmentContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#indexAssignment.
+    def visitIndexAssignment(self, ctx:WovenParser.IndexAssignmentContext):
         return self.visitChildren(ctx)
 
 
@@ -164,13 +209,53 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#newAtom.
+    def visitNewAtom(self, ctx:WovenParser.NewAtomContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#callAtom.
     def visitCallAtom(self, ctx:WovenParser.CallAtomContext):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#memberCallAtom.
+    def visitMemberCallAtom(self, ctx:WovenParser.MemberCallAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#selfCallAtom.
+    def visitSelfCallAtom(self, ctx:WovenParser.SelfCallAtomContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#parenAtom.
     def visitParenAtom(self, ctx:WovenParser.ParenAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#indexAtom.
+    def visitIndexAtom(self, ctx:WovenParser.IndexAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#memberAccessAtom.
+    def visitMemberAccessAtom(self, ctx:WovenParser.MemberAccessAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#selfFieldAtom.
+    def visitSelfFieldAtom(self, ctx:WovenParser.SelfFieldAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#listLiteralAtom.
+    def visitListLiteralAtom(self, ctx:WovenParser.ListLiteralAtomContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#superCallAtom.
+    def visitSuperCallAtom(self, ctx:WovenParser.SuperCallAtomContext):
         return self.visitChildren(ctx)
 
 

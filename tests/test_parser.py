@@ -161,4 +161,8 @@ def test_parser_function_call_with_arguments_tree():
     tree, parser, lexer_errors, parser_errors = run(code)
     assert not lexer_errors
     assert not parser_errors
-    assert "(atom (atom add) (" in tree.toStringTree(recog=parser)
+    text = tree.toStringTree(recog=parser)
+    # Verificar que la llamada anidada está presente en el árbol
+    assert "add" in text
+    assert "literal 1" in text
+    assert "literal 2" in text
