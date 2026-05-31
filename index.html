@@ -187,6 +187,81 @@
         border-top: 1px solid var(--border);
       }
     }
+
+    #translations {
+      display: none;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+      padding: 0.75rem 1rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #translations.visible {
+      display: grid;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .translation-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 180px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d1117;
+    }
+
+    .translation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .copy-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      background: rgba(122, 162, 247, 0.15);
+    }
+
+    .translation-code {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.5;
+      white-space: pre;
+      color: var(--text);
+      background: #0d1117;
+    }
+
+    @media (max-width: 980px) {
+      #translations {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -201,9 +276,24 @@
   <main>
     <section class="panel">
       <div class="panel-header">Editor</div>
-      <textarea id="editor" spellcheck="false">int x = 10
-int y = 20
-print(x + y)</textarea>
+      <textarea id="editor" spellcheck="false">// Calcula el factorial de un número
+function int factorial(int n):
+    if n <= 1:
+        return 1
+    else:
+        return n * factorial(n - 1)
+
+// Suma acumulada con ciclo
+int total = 0
+for (int i = 1; i < 6; i = i + 1):
+    total = total + i
+
+bool esPositivo = total > 0
+int resultado = factorial(5)
+
+print("Suma del 1 al 5: {total}")
+print("Factorial de 5: {resultado}")
+print("Es positivo: {esPositivo}")</textarea>
     </section>
 
     <section class="panel">
@@ -212,15 +302,44 @@ print(x + y)</textarea>
     </section>
   </main>
 
+  <section id="translations" aria-label="Traducciones generadas">
+    <article class="translation-panel">
+      <div class="translation-header">
+        <span>Python</span>
+        <button class="copy-btn" data-target="python-code" type="button">Copiar</button>
+      </div>
+      <pre id="python-code" class="translation-code"></pre>
+    </article>
+    <article class="translation-panel">
+      <div class="translation-header">
+        <span>Java</span>
+        <button class="copy-btn" data-target="java-code" type="button">Copiar</button>
+      </div>
+      <pre id="java-code" class="translation-code"></pre>
+    </article>
+    <article class="translation-panel">
+      <div class="translation-header">
+        <span>C++</span>
+        <button class="copy-btn" data-target="cpp-code" type="button">Copiar</button>
+      </div>
+      <pre id="cpp-code" class="translation-code"></pre>
+    </article>
+  </section>
+
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
   <script>
     const statusEl = document.getElementById("status");
     const runBtn = document.getElementById("run-btn");
     const editor = document.getElementById("editor");
     const consoleEl = document.getElementById("console");
+    const translationsEl = document.getElementById("translations");
+    const pythonCodeEl = document.getElementById("python-code");
+    const javaCodeEl = document.getElementById("java-code");
+    const cppCodeEl = document.getElementById("cpp-code");
 
     let pyodide = null;
     let runWovenFn = null;
+    let translateWovenFn = null;
     let isRunning = false;
 
     function setStatus(text, state) {
@@ -229,7 +348,7 @@ print(x + y)</textarea>
     }
 
     function updateRunButton() {
-      runBtn.disabled = !pyodide || !runWovenFn || isRunning;
+      runBtn.disabled = !pyodide || !runWovenFn || !translateWovenFn || isRunning;
     }
 
     function clearConsole() {
@@ -243,12 +362,35 @@ print(x + y)</textarea>
       consoleEl.appendChild(span);
     }
 
+    function hideTranslations() {
+      translationsEl.classList.remove("visible");
+    }
+
+    function showTranslations() {
+      translationsEl.classList.add("visible");
+    }
+
+    function setTranslations(python, java, cpp) {
+      pythonCodeEl.textContent = python;
+      javaCodeEl.textContent = java;
+      cppCodeEl.textContent = cpp;
+    }
+
+    function pyResultToString(pyResult) {
+      const value = pyResult.toString();
+      if (typeof pyResult.destroy === "function") {
+        pyResult.destroy();
+      }
+      return value;
+    }
+
     async function loadWovenModules() {
       const wovenFiles = [
         "WovenLexer.py",
         "WovenParser.py",
         "WovenVisitor.py",
         "interpreter_visitor.py",
+        "translator_visitor.py",
       ];
 
       for (const fileName of wovenFiles) {
@@ -295,12 +437,16 @@ def run_woven(source: str) -> list:
     tree = parser.program()
     visitor = InterpreterVisitor()
     return visitor.visit(tree)
+
+from translator_visitor import translate_woven
 `);
         runWovenFn = pyodide.globals.get("run_woven");
+        translateWovenFn = pyodide.globals.get("translate_woven");
 
         setStatus("Listo", "ready");
       } catch (err) {
         runWovenFn = null;
+        translateWovenFn = null;
         pyodide = null;
         setStatus("Error al cargar Python", "loading");
         appendOutput(String(err), "error");
@@ -315,6 +461,8 @@ def run_woven(source: str) -> list:
       isRunning = true;
       updateRunButton();
       clearConsole();
+      hideTranslations();
+      appendOutput("Ejecutando...\n", "stdout");
 
       const code = editor.value;
 
@@ -330,7 +478,14 @@ def run_woven(source: str) -> list:
             appendOutput(`${line}\n`, "stdout");
           }
         }
+
+        const pyTrans = pyResultToString(translateWovenFn(code, "python"));
+        const javaTrans = pyResultToString(translateWovenFn(code, "java"));
+        const cppTrans = pyResultToString(translateWovenFn(code, "cpp"));
+        setTranslations(pyTrans, javaTrans, cppTrans);
+        showTranslations();
       } catch (err) {
+        hideTranslations();
         appendOutput(err.message || String(err), "error");
       } finally {
         isRunning = false;
@@ -346,6 +501,25 @@ def run_woven(source: str) -> list:
         if (!runBtn.disabled) runCode();
       }
     });
+
+    document.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const targetId = btn.getAttribute("data-target");
+        const text = document.getElementById(targetId).textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = btn.textContent;
+          btn.textContent = "Copiado";
+          setTimeout(() => {
+            btn.textContent = original;
+          }, 900);
+        } catch {
+          appendOutput("No se pudo copiar al portapapeles.\n", "stderr");
+        }
+      });
+    });
+
+    hideTranslations();
 
     initPyodide();
   </script>

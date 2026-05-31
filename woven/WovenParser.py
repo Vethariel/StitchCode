@@ -1,4 +1,4 @@
-# Generated from Woven.g4 by ANTLR 4.13.2
+# Generated from /home/vethariel/Documents/StitchCode/woven/Woven.g4 by ANTLR 4.13.2
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
@@ -118,7 +118,7 @@ class WovenParser ( Parser ):
                      "'return'", "'print'", "'true'", "'false'", "'('", 
                      "')'", "'['", "']'", "'{'", "'}'", "':'", "';'", "','", 
                      "'='", "'+'", "'-'", "'*'", "'/'", "'%'", "'<'", "'<='", 
-                     "'>'", "'>='", "'=='", "'!='", "'&&'", "'||'", "'!'" ]
+                     "'>'", "'>='", "'=='", "'!='", "'and'", "'or'", "'!'" ]
 
     symbolicNames = [ "<INVALID>", "FUNCTION", "INT", "FLOAT", "STRING", 
                       "BOOL", "VOID", "IF", "ELSE", "FOR", "WHILE", "RETURN", 

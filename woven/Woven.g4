@@ -237,8 +237,8 @@ GE        : '>=' ;
 EQ        : '==' ;
 NE        : '!=' ;
 
-AND       : '&&' ;
-OR        : '||' ;
+AND       : 'and' ;
+OR        : 'or' ;
 NOT       : '!' ;
 
 BLOCK_COMMENT
