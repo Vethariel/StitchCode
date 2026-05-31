@@ -329,6 +329,38 @@
       padding-left: 10px;
     }
 
+    #linter-container {
+      padding: 6px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      min-height: 24px;
+      border-top: 1px solid var(--border);
+      background: #171b2a;
+    }
+
+    .linter-item {
+      display: flex;
+      gap: 12px;
+      padding: 2px 0;
+    }
+
+    .linter-error {
+      color: #f87171;
+    }
+
+    .linter-warning {
+      color: #fbbf24;
+    }
+
+    .linter-ok {
+      color: #4ade80;
+    }
+
+    .linter-linea {
+      min-width: 60px;
+      color: #666;
+    }
+
     #hilo-panel {
       border-top: 1px solid var(--border);
       display: flex;
@@ -530,6 +562,7 @@ print("Total acumulado: {total}")
 print("Cantidad de nodos: {pila.length}")</textarea>
       </div>
       <div id="verbose-container" style="display:none"></div>
+      <div id="linter-container"></div>
     </section>
 
     <section class="panel">
@@ -599,13 +632,17 @@ print("Cantidad de nodos: {pila.length}")</textarea>
     const hiloTypingEl = document.getElementById("hilo-typing");
     const hiloInputEl = document.getElementById("hilo-input");
     const hiloSendBtn = document.getElementById("hilo-send");
+    const linterContainerEl = document.getElementById("linter-container");
 
     let pyodide = null;
+    let pyodideReady = false;
     let runWovenFn = null;
     let translateWovenFn = null;
     let hiloChatFn = null;
+    let lintWovenFn = null;
     let modoVerboso = false;
     let isRunning = false;
+    let linterTimeout = null;
     let hiloHistorial = [];
     let nivelAyuda = 1;
     let mensajesEnProblemaActual = 0;
@@ -657,6 +694,58 @@ print("Cantidad de nodos: {pila.length}")</textarea>
         pyResult.destroy();
       }
       return value;
+    }
+
+    function obtenerCodigoEditor() {
+      return editor.value;
+    }
+
+    function limpiarDiagnosticos() {
+      linterContainerEl.innerHTML = "";
+    }
+
+    function mostrarDiagnosticos(diagnosticos) {
+      linterContainerEl.innerHTML = "";
+
+      if (diagnosticos.length === 0) {
+        linterContainerEl.innerHTML = `
+            <span class="linter-ok">✓ Sin problemas detectados</span>`;
+        return;
+      }
+
+      diagnosticos.forEach((d) => {
+        const item = document.createElement("div");
+        item.className = `linter-item linter-${d.nivel}`;
+        item.innerHTML = `
+            <span class="linter-linea">Línea ${d.linea}</span>
+            <span class="linter-mensaje">${d.mensaje}</span>
+        `;
+        linterContainerEl.appendChild(item);
+      });
+    }
+
+    function correrLinter() {
+      if (!pyodideReady || !lintWovenFn) return;
+      const code = obtenerCodigoEditor();
+      if (!code.trim()) {
+        limpiarDiagnosticos();
+        return;
+      }
+      try {
+        const resultado = JSON.parse(
+          pyResultToString(lintWovenFn(code))
+        );
+        mostrarDiagnosticos(resultado.diagnosticos || []);
+      } catch {
+        // linter no debe interrumpir al estudiante
+      }
+    }
+
+    function onCodigoChange() {
+      clearTimeout(linterTimeout);
+      linterTimeout = setTimeout(() => {
+        correrLinter();
+      }, 800);
     }
 
     function mostrarIndicadorNivel(nivel) {
@@ -797,6 +886,8 @@ print("Cantidad de nodos: {pila.length}")</textarea>
       pyodide.FS.writeFile("/home/pyodide/verbose_visitor.py", verboseCode);
       const hiloCode = await fetch("woven/gemini_agent.py").then((r) => r.text());
       pyodide.FS.writeFile("/home/pyodide/gemini_agent.py", hiloCode);
+      const linterCode = await fetch("woven/linter_visitor.py").then((r) => r.text());
+      pyodide.FS.writeFile("/home/pyodide/linter_visitor.py", linterCode);
     }
 
     async function initPyodide() {
@@ -838,16 +929,22 @@ from translator_visitor import translate_woven
 from tracing_visitor import trace_woven
 from verbose_visitor import verbose_woven
 from gemini_agent import hilo_chat, parsear_respuesta_hilo
+from linter_visitor import lint_woven
 `);
         runWovenFn = pyodide.globals.get("run_woven");
         translateWovenFn = pyodide.globals.get("translate_woven");
         hiloChatFn = pyodide.globals.get("hilo_chat");
+        lintWovenFn = pyodide.globals.get("lint_woven");
+        pyodideReady = true;
+        correrLinter();
 
         setStatus("Listo", "ready");
       } catch (err) {
         runWovenFn = null;
         translateWovenFn = null;
         hiloChatFn = null;
+        lintWovenFn = null;
+        pyodideReady = false;
         pyodide = null;
         setStatus("Error al cargar Python", "loading");
         appendOutput(String(err), "error");
@@ -1026,6 +1123,7 @@ from gemini_agent import hilo_chat, parsear_respuesta_hilo
     editor.addEventListener("input", () => {
       contextoEjecucionActual.codigo = editor.value;
       reiniciarNivel();
+      onCodigoChange();
     });
 
     hiloSaveKeyBtn.addEventListener("click", () => {
