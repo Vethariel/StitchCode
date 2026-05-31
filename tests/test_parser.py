@@ -166,3 +166,183 @@ def test_parser_function_call_with_arguments_tree():
     assert "add" in text
     assert "literal 1" in text
     assert "literal 2" in text
+
+
+def test_parser_try_catch_tree():
+    code = "\n".join(
+        [
+            "try:",
+            "    print(1)",
+            "catch (string e):",
+            "    print(e)",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(tryStmt" in text
+    assert "catch" in text
+
+
+def test_parser_throw_stmt_tree():
+    code = "\n".join(
+        [
+            "try:",
+            '    throw "boom"',
+            "catch (string e):",
+            "    print(e)",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(throwStmt" in text
+
+
+def test_parser_break_continue_tree():
+    code = "\n".join(
+        [
+            "int i = 0",
+            "while i < 5:",
+            "    i = i + 1",
+            "    if i == 2:",
+            "        continue",
+            "    if i == 4:",
+            "        break",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(continueStmt" in text
+    assert "(breakStmt" in text
+
+
+def test_parser_class_constructor_method_tree():
+    code = "\n".join(
+        [
+            "class Counter:",
+            "    int value",
+            "    init(int v):",
+            "        self.value = v",
+            "    function int get():",
+            "        return self.value",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(classDecl" in text
+    assert "(constructorDecl" in text
+    assert "(methodDecl" in text
+    assert "(fieldDecl" in text
+
+
+def test_parser_class_extends_and_super_call_tree():
+    code = "\n".join(
+        [
+            "class A:",
+            "    init(int v):",
+            "        return",
+            "class B extends A:",
+            "    init(int v):",
+            "        super(v)",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(classDecl class B extends A" in text or "extends A" in text
+    assert "(atom super (" in text
+
+
+def test_parser_self_assignment_and_index_assignment_tree():
+    code = "\n".join(
+        [
+            "class Box:",
+            "    list<int> nums",
+            "    init():",
+            "        self.nums = [1, 2]",
+            "        self.nums[0] = 3",
+            "list<int> xs = [4, 5]",
+            "xs[1] = 9",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(selfAssignment" in text
+    assert text.count("(indexAssignment") >= 2
+
+
+def test_parser_new_and_member_call_tree():
+    code = "\n".join(
+        [
+            "class A:",
+            "    init():",
+            "        return",
+            "A a = new A()",
+            "print(a.toString())",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(atom new A (" in text
+    assert "(atom (atom a) . toString ( ))" in text or ". toString (" in text
+
+
+def test_parser_logical_and_or_not_tree():
+    code = "\n".join(
+        [
+            "bool a = true",
+            "bool b = false",
+            "print(!a or b and a)",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(orExpr" in text
+    assert "(andExpr" in text
+    assert "!" in text
+
+
+def test_parser_for_with_assignment_init_and_expr_update_tree():
+    code = "\n".join(
+        [
+            "int i = 0",
+            "for (i = 0; i < 3; i + 1):",
+            "    print(i)",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(forStmt" in text
+    assert "(forInit (assignment" in text
+    assert "(forUpdate (expr" in text
+
+
+def test_parser_for_with_optional_parts_tree():
+    code = "\n".join(
+        [
+            "for (;;):",
+            "    break",
+        ]
+    )
+    tree, parser, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "(forStmt for (" in text or "(forStmt" in text
+    assert "(breakStmt" in text

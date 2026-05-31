@@ -770,3 +770,141 @@ def test_interpreter_nested_try_catch():
     assert not lexer_errors
     assert not parser_errors
     assert output == ["interno: error interno", "externo: error externo"]
+
+
+def test_interpreter_logical_and_not():
+    code = "\n".join([
+        "bool a = true",
+        "bool b = false",
+        "if !b and a:",
+        '    print("ok")',
+        "else:",
+        '    print("no")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["ok"]
+
+
+def test_interpreter_mod_operator():
+    output, lexer_errors, parser_errors = run("print(7 % 4)\n")
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["3"]
+
+
+def test_interpreter_float_literal_and_operations():
+    code = "\n".join([
+        "float x = 1.5",
+        "print(x + 0.5)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["2.0"]
+
+
+def test_interpreter_list_remove():
+    code = "\n".join([
+        "list<int> nums = [10, 20, 30]",
+        "print(nums.remove(1))",
+        "print(nums.length)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["20", "2"]
+
+
+def test_interpreter_self_method_call_current_behavior():
+    code = "\n".join([
+        "class Calc:",
+        "    function int doble(int n):",
+        "        return n * 2",
+        "    function int resolver():",
+        "        return self.doble(3)",
+        "Calc c = new Calc()",
+        "print(c.resolver())",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("campo no declarado" in line.lower() for line in output)
+
+
+def test_interpreter_self_index_assignment():
+    code = "\n".join([
+        "class Caja:",
+        "    list<int> nums",
+        "    init():",
+        "        self.nums = [1, 2]",
+        "        self.nums[1] = 7",
+        "    function int segundo():",
+        "        return self.nums[1]",
+        "Caja c = new Caja()",
+        "print(c.segundo())",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["7"]
+
+
+def test_interpreter_for_with_assignment_init():
+    code = "\n".join([
+        "int i = 0",
+        "for (i = 0; i < 3; i = i + 1):",
+        "    print(i)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["0", "1", "2"]
+
+
+def test_interpreter_for_with_expr_update():
+    code = "\n".join([
+        "int i = 0",
+        "function void bump():",
+        "    i = i + 1",
+        "for (; i < 3; bump()):",
+        "    print(i)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["0", "1", "2"]
+
+
+def test_interpreter_for_with_all_optional_parts():
+    code = "\n".join([
+        "for (;;):",
+        '    print("once")',
+        "    break",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["once"]
+
+
+def test_interpreter_throw_outside_try_produces_error():
+    output, lexer_errors, parser_errors = run('throw "fatal"\n')
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("fatal" in line.lower() for line in output)
+
+
+def test_interpreter_try_does_not_catch_undeclared_variable_error():
+    code = "\n".join([
+        "try:",
+        "    print(y)",
+        "catch (string e):",
+        '    print("capturado: {e}")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("variable usada sin declarar" in line.lower() for line in output)
+    assert not any("capturado" in line.lower() for line in output)

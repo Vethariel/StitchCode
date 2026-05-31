@@ -108,3 +108,111 @@ def test_lexer_ignores_comments_styles():
     assert "BLOCK_COMMENT" not in tokens
     assert "HASH_COMMENT" not in tokens
     assert "PRINT" in tokens
+
+
+def test_lexer_try_catch_throw_tokens():
+    code = "\n".join(
+        [
+            "try:",
+            '    throw "boom"',
+            "catch (string e):",
+            "    print(e)",
+        ]
+    )
+    tokens = run(code)
+    for expected in ("TRY", "CATCH", "THROW", "STRING", "IDENTIFIER"):
+        assert expected in tokens
+
+
+def test_lexer_class_related_tokens():
+    code = "\n".join(
+        [
+            "class Child extends Base:",
+            "    int value",
+            "    init(int x):",
+            "        self.value = x",
+            "    virtual function int get():",
+            "        return self.value",
+        ]
+    )
+    tokens = run(code)
+    for expected in ("CLASS", "EXTENDS", "INIT", "SELF", "VIRTUAL", "FUNCTION", "DOT"):
+        assert expected in tokens
+
+
+def test_lexer_list_new_super_and_brackets_tokens():
+    code = "\n".join(
+        [
+            "class A:",
+            "    init():",
+            "        return",
+            "class B extends A:",
+            "    init():",
+            "        super()",
+            "list<int> xs = [1, 2]",
+            "xs.append(new B())",
+            "print(xs[0])",
+        ]
+    )
+    tokens = run(code)
+    for expected in (
+        "LIST",
+        "NEW",
+        "SUPER",
+        "LBRACK",
+        "RBRACK",
+        "LPAREN",
+        "RPAREN",
+        "COMMA",
+    ):
+        assert expected in tokens
+
+
+def test_lexer_bool_null_and_logical_tokens():
+    code = "\n".join(
+        [
+            "bool a = true",
+            "bool b = false",
+            "if !a or b and (a == false):",
+            "    print(null)",
+        ]
+    )
+    tokens = run(code)
+    for expected in ("TRUE", "FALSE", "NULL", "NOT", "OR", "AND"):
+        assert expected in tokens
+
+
+def test_lexer_break_continue_and_semi_tokens():
+    code = "\n".join(
+        [
+            "for (int i = 0; i < 3; i = i + 1):",
+            "    if i == 1:",
+            "        continue",
+            "    if i == 2:",
+            "        break",
+        ]
+    )
+    tokens = run(code)
+    for expected in ("BREAK", "CONTINUE", "SEMI"):
+        assert expected in tokens
+
+
+def test_lexer_float_literal_and_void_tokens():
+    code = "\n".join(
+        [
+            "function void f():",
+            "    float x = 1.25",
+            "    print(x)",
+        ]
+    )
+    tokens = run(code)
+    assert "VOID" in tokens
+    assert "FLOAT_LITERAL" in tokens
+
+
+def test_lexer_skips_newline_inside_parentheses():
+    code = "print((1 +\n2))\n"
+    tokens = run(code)
+    assert tokens.count("NEWLINE") == 1
+    assert "INDENT" not in tokens
+    assert "DEDENT" not in tokens
