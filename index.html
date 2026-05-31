@@ -424,6 +424,9 @@ print("Cantidad de nodos: {pila.length}")</textarea>
         const content = await response.text();
         pyodide.FS.writeFile(fileName, content);
       }
+
+      const tracingCode = await fetch("woven/tracing_visitor.py").then((r) => r.text());
+      pyodide.FS.writeFile("/home/pyodide/tracing_visitor.py", tracingCode);
     }
 
     async function initPyodide() {
@@ -462,6 +465,7 @@ def run_woven(source: str) -> list:
     return visitor.visit(tree)
 
 from translator_visitor import translate_woven
+from tracing_visitor import trace_woven
 `);
         runWovenFn = pyodide.globals.get("run_woven");
         translateWovenFn = pyodide.globals.get("translate_woven");
@@ -493,6 +497,22 @@ from translator_visitor import translate_woven
         const outputProxy = runWovenFn(code);
         const output = outputProxy.toJs();
         outputProxy.destroy();
+
+        const traza = pyodide.globals.get("trace_woven")(code);
+        const trazaObj = JSON.parse(traza);
+        console.log("=== TRAZA WOVEN ===");
+        console.log("Total pasos:", trazaObj.total_pasos);
+        console.log("Éxito:", trazaObj.exito);
+        console.log("Eventos:", trazaObj.eventos);
+        console.table(
+          trazaObj.eventos.map((e) => ({
+            paso: e.paso,
+            tipo: e.tipo,
+            linea: e.linea ?? "-",
+            detalle: e.nombre ?? e.mensaje ?? "-",
+            call_stack: (e.call_stack ?? []).join(" → ") || "-",
+          }))
+        );
 
         if (!output || output.length === 0) {
           appendOutput("Ejecución completada sin salida.\n", "stdout");
