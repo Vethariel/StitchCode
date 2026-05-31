@@ -257,6 +257,78 @@
       background: #0d1117;
     }
 
+    #mode-switch {
+      display: flex;
+      gap: 8px;
+      margin: 8px 8px 0;
+    }
+
+    #mode-switch button {
+      padding: 4px 16px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background: transparent;
+      color: #ccc;
+      cursor: pointer;
+    }
+
+    #mode-switch button.active {
+      background: #4a9eff;
+      color: white;
+      border-color: #4a9eff;
+    }
+
+    #editor-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    #verbose-container {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0.5rem 0.75rem 0.75rem;
+      background: var(--editor-bg);
+    }
+
+    .bloque-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 12px;
+      margin: 4px 0;
+      border-radius: 6px;
+      border-left: 3px solid #4a9eff;
+      background: #1e1e2e;
+      font-family: monospace;
+    }
+
+    .bloque-texto {
+      color: #ccc;
+    }
+
+    .placeholder {
+      color: #4a9eff;
+      font-weight: bold;
+      background: #1a2a3a;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .bloque-else-label {
+      color: #f0a500;
+      border-left-color: #f0a500;
+      font-style: italic;
+    }
+
+    .bloque-hijos {
+      margin-top: 2px;
+      margin-bottom: 4px;
+      padding-left: 10px;
+    }
+
     @media (max-width: 980px) {
       #translations {
         grid-template-columns: 1fr;
@@ -276,7 +348,12 @@
   <main>
     <section class="panel">
       <div class="panel-header">Editor</div>
-      <textarea id="editor" spellcheck="false">// Estructura de datos: pila con objetos
+      <div id="mode-switch">
+        <button id="btn-woven" class="active" type="button">Woven</button>
+        <button id="btn-verbose" type="button">Verboso</button>
+      </div>
+      <div id="editor-container">
+        <textarea id="editor" spellcheck="false">// Estructura de datos: pila con objetos
 
 class Nodo:
     int valor
@@ -317,6 +394,8 @@ for (int j = 0; j < pila.length; j = j + 1):
 
 print("Total acumulado: {total}")
 print("Cantidad de nodos: {pila.length}")</textarea>
+      </div>
+      <div id="verbose-container" style="display:none"></div>
     </section>
 
     <section class="panel">
@@ -359,10 +438,15 @@ print("Cantidad de nodos: {pila.length}")</textarea>
     const pythonCodeEl = document.getElementById("python-code");
     const javaCodeEl = document.getElementById("java-code");
     const cppCodeEl = document.getElementById("cpp-code");
+    const editorContainer = document.getElementById("editor-container");
+    const verboseContainer = document.getElementById("verbose-container");
+    const btnWoven = document.getElementById("btn-woven");
+    const btnVerbose = document.getElementById("btn-verbose");
 
     let pyodide = null;
     let runWovenFn = null;
     let translateWovenFn = null;
+    let modoVerboso = false;
     let isRunning = false;
 
     function setStatus(text, state) {
@@ -427,6 +511,8 @@ print("Cantidad de nodos: {pila.length}")</textarea>
 
       const tracingCode = await fetch("woven/tracing_visitor.py").then((r) => r.text());
       pyodide.FS.writeFile("/home/pyodide/tracing_visitor.py", tracingCode);
+      const verboseCode = await fetch("woven/verbose_visitor.py").then((r) => r.text());
+      pyodide.FS.writeFile("/home/pyodide/verbose_visitor.py", verboseCode);
     }
 
     async function initPyodide() {
@@ -466,6 +552,7 @@ def run_woven(source: str) -> list:
 
 from translator_visitor import translate_woven
 from tracing_visitor import trace_woven
+from verbose_visitor import verbose_woven
 `);
         runWovenFn = pyodide.globals.get("run_woven");
         translateWovenFn = pyodide.globals.get("translate_woven");
@@ -480,6 +567,88 @@ from tracing_visitor import trace_woven
       } finally {
         updateRunButton();
       }
+    }
+
+    function mostrarModoWoven() {
+      editorContainer.style.display = "flex";
+      verboseContainer.style.display = "none";
+    }
+
+    function colorPorTipo(tipo) {
+      const colores = {
+        class_decl: "#a855f7",
+        function_decl: "#f59e0b",
+        method_decl: "#f59e0b",
+        constructor_decl: "#f59e0b",
+        if_stmt: "#10b981",
+        while_stmt: "#10b981",
+        for_stmt: "#10b981",
+        var_decl: "#4a9eff",
+        field_decl: "#4a9eff",
+        list_decl: "#4a9eff",
+        assignment: "#64748b",
+        print_stmt: "#06b6d4",
+        return_stmt: "#f43f5e",
+        method_call: "#64748b",
+      };
+      return colores[tipo] ?? "#555";
+    }
+
+    function renderizarBloques(bloques, container, nivel = 0) {
+      if (!container) {
+        container = verboseContainer;
+        container.innerHTML = "";
+      }
+
+      bloques.forEach((bloque) => {
+        const card = document.createElement("div");
+        card.className = `bloque-card nivel-${nivel}`;
+        card.style.marginLeft = `${nivel * 28}px`;
+        card.style.borderLeftColor = colorPorTipo(bloque.tipo);
+
+        const texto = bloque.texto.replace(
+          /\{(\w+)\}/g,
+          (_, key) => `<span class="placeholder">${bloque.placeholders[key] ?? key}</span>`
+        );
+
+        card.innerHTML = `<span class="bloque-texto">${texto}</span>`;
+        container.appendChild(card);
+
+        if (bloque.hijos?.length > 0) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "bloque-hijos";
+          wrapper.style.borderLeft = `2px solid ${colorPorTipo(bloque.tipo)}33`;
+          wrapper.style.marginLeft = `${nivel * 28 + 14}px`;
+          container.appendChild(wrapper);
+          renderizarBloques(bloque.hijos, wrapper, 0);
+        }
+
+        if (bloque.hijos_else?.length > 0) {
+          const elseCard = document.createElement("div");
+          elseCard.className = "bloque-card bloque-else";
+          elseCard.style.marginLeft = `${nivel * 28}px`;
+          elseCard.innerHTML = `<span class="bloque-texto">sino</span>`;
+          container.appendChild(elseCard);
+
+          const wrapperElse = document.createElement("div");
+          wrapperElse.className = "bloque-hijos";
+          wrapperElse.style.borderLeft = "2px solid #f0a50033";
+          wrapperElse.style.marginLeft = `${nivel * 28 + 14}px`;
+          container.appendChild(wrapperElse);
+          renderizarBloques(bloque.hijos_else, wrapperElse, 0);
+        }
+      });
+    }
+
+    function mostrarModoVerboso() {
+      if (!pyodide) return;
+      const code = editor.value;
+      const resultado = JSON.parse(
+        pyodide.globals.get("verbose_woven")(code)
+      );
+      renderizarBloques(resultado.bloques);
+      editorContainer.style.display = "none";
+      verboseContainer.style.display = "block";
     }
 
     async function runCode() {
@@ -538,6 +707,20 @@ from tracing_visitor import trace_woven
 
     runBtn.addEventListener("click", runCode);
 
+    btnWoven.addEventListener("click", () => {
+      modoVerboso = false;
+      btnWoven.classList.add("active");
+      btnVerbose.classList.remove("active");
+      mostrarModoWoven();
+    });
+
+    btnVerbose.addEventListener("click", () => {
+      modoVerboso = true;
+      btnVerbose.classList.add("active");
+      btnWoven.classList.remove("active");
+      mostrarModoVerboso();
+    });
+
     editor.addEventListener("keydown", (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
@@ -563,6 +746,7 @@ from tracing_visitor import trace_woven
     });
 
     hideTranslations();
+    mostrarModoWoven();
 
     initPyodide();
   </script>
