@@ -193,7 +193,7 @@
   <header>
     <h1>Python Playground</h1>
     <div class="header-actions">
-      <span id="status" class="loading">Cargando Python…</span>
+      <span id="status" class="loading">Iniciando Pyodide...</span>
       <button id="run-btn" disabled>Ejecutar</button>
     </div>
   </header>
@@ -201,10 +201,9 @@
   <main>
     <section class="panel">
       <div class="panel-header">Editor</div>
-      <textarea id="editor" spellcheck="false">print("Hola, mundo!")
-
-for i in range(3):
-    print(f"  iteración {i}")</textarea>
+      <textarea id="editor" spellcheck="false">int x = 10
+int y = 20
+print(x + y)</textarea>
     </section>
 
     <section class="panel">
@@ -221,6 +220,7 @@ for i in range(3):
     const consoleEl = document.getElementById("console");
 
     let pyodide = null;
+    let runWovenFn = null;
     let isRunning = false;
 
     function setStatus(text, state) {
@@ -229,7 +229,7 @@ for i in range(3):
     }
 
     function updateRunButton() {
-      runBtn.disabled = !pyodide || isRunning;
+      runBtn.disabled = !pyodide || !runWovenFn || isRunning;
     }
 
     function clearConsole() {
@@ -243,15 +243,65 @@ for i in range(3):
       consoleEl.appendChild(span);
     }
 
+    async function loadWovenModules() {
+      const wovenFiles = [
+        "WovenLexer.py",
+        "WovenParser.py",
+        "WovenVisitor.py",
+        "interpreter_visitor.py",
+      ];
+
+      for (const fileName of wovenFiles) {
+        const response = await fetch(`woven/${fileName}`);
+        if (!response.ok) {
+          throw new Error(`No se pudo cargar ${fileName}`);
+        }
+        const content = await response.text();
+        pyodide.FS.writeFile(fileName, content);
+      }
+    }
+
     async function initPyodide() {
       try {
+        setStatus("Iniciando Pyodide...", "loading");
         pyodide = await loadPyodide();
 
         pyodide.setStdout({ batched: (msg) => appendOutput(msg, "stdout") });
         pyodide.setStderr({ batched: (msg) => appendOutput(msg, "stderr") });
 
+        setStatus("Instalando runtime de ANTLR...", "loading");
+        await pyodide.loadPackage("micropip");
+        await pyodide.runPythonAsync(`
+import micropip
+await micropip.install("antlr4-python3-runtime==4.13.2")
+`);
+
+        setStatus("Cargando Woven...", "loading");
+        await loadWovenModules();
+        await pyodide.runPythonAsync(`
+import sys
+if "." not in sys.path:
+    sys.path.append(".")
+
+def run_woven(source: str) -> list:
+    from antlr4 import CommonTokenStream, InputStream
+    from WovenLexer import WovenLexer
+    from WovenParser import WovenParser
+    from interpreter_visitor import InterpreterVisitor
+
+    lexer = WovenLexer(InputStream(source))
+    stream = CommonTokenStream(lexer)
+    parser = WovenParser(stream)
+    tree = parser.program()
+    visitor = InterpreterVisitor()
+    return visitor.visit(tree)
+`);
+        runWovenFn = pyodide.globals.get("run_woven");
+
         setStatus("Listo", "ready");
       } catch (err) {
+        runWovenFn = null;
+        pyodide = null;
         setStatus("Error al cargar Python", "loading");
         appendOutput(String(err), "error");
       } finally {
@@ -269,7 +319,17 @@ for i in range(3):
       const code = editor.value;
 
       try {
-        await pyodide.runPythonAsync(code);
+        const outputProxy = runWovenFn(code);
+        const output = outputProxy.toJs();
+        outputProxy.destroy();
+
+        if (!output || output.length === 0) {
+          appendOutput("Ejecución completada sin salida.\n", "stdout");
+        } else {
+          for (const line of output) {
+            appendOutput(`${line}\n`, "stdout");
+          }
+        }
       } catch (err) {
         appendOutput(err.message || String(err), "error");
       } finally {

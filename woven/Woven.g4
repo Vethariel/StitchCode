@@ -267,7 +267,7 @@ FLOAT_LITERAL
     ;
 
 STRING_INTERP
-    : '"' ( ESC | ~["\\{] | '{' ~[}]* '}' )* '"'
+    : '"' ( ESC | ~["\\{] )* ('{' ~[}]* '}' ( ESC | ~["\\{] )*)+ '"'
     ;
 
 STRING_LITERAL
@@ -322,5 +322,5 @@ NEWLINE
     ;
 
 WS
-    : [ \t]+ { self.opened > 0 }? -> skip
+    : [ \t]+ -> skip
     ;
