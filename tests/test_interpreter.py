@@ -814,23 +814,8 @@ def test_interpreter_list_remove():
     output, lexer_errors, parser_errors = run(code)
     assert not lexer_errors
     assert not parser_errors
-    assert output == ["20", "2"]
-
-
-def test_interpreter_self_method_call_current_behavior():
-    code = "\n".join([
-        "class Calc:",
-        "    function int doble(int n):",
-        "        return n * 2",
-        "    function int resolver():",
-        "        return self.doble(3)",
-        "Calc c = new Calc()",
-        "print(c.resolver())",
-    ])
-    output, lexer_errors, parser_errors = run(code)
-    assert not lexer_errors
-    assert not parser_errors
-    assert any("campo no declarado" in line.lower() for line in output)
+    # remove(i) elimina y retorna el elemento en el índice i
+    assert output == ["20", "2"]  # remove retorna el elemento, length disminuye
 
 
 def test_interpreter_self_index_assignment():
@@ -871,6 +856,8 @@ def test_interpreter_for_with_expr_update():
         "for (; i < 3; bump()):",
         "    print(i)",
     ])
+    # bump() accede y modifica 'i' del scope externo
+    # verifica que funciones pueden leer y escribir variables del scope que las llama
     output, lexer_errors, parser_errors = run(code)
     assert not lexer_errors
     assert not parser_errors
@@ -903,8 +890,76 @@ def test_interpreter_try_does_not_catch_undeclared_variable_error():
         "catch (string e):",
         '    print("capturado: {e}")',
     ])
+    # Decisión de diseño: errores de compilación/análisis estático como
+    # "variable no declarada" no son capturables por try/catch.
+    # Solo errores de ejecución (división por cero, null access, throw) son capturables.
     output, lexer_errors, parser_errors = run(code)
     assert not lexer_errors
     assert not parser_errors
     assert any("variable usada sin declarar" in line.lower() for line in output)
     assert not any("capturado" in line.lower() for line in output)
+
+
+def test_interpreter_self_method_call_in_return():
+    code = "\n".join([
+        "class Calc:",
+        "    int valor",
+        "    init(int valor):",
+        "        self.valor = valor",
+        "    function int doble():",
+        "        return self.valor * 2",
+        "    function int resultado():",
+        "        return self.doble()",
+        "Calc c = new Calc(5)",
+        "print(c.resultado())",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["10"]
+
+
+def test_interpreter_self_method_call_with_args():
+    code = "\n".join([
+        "class Calc:",
+        "    int base",
+        "    init(int base):",
+        "        self.base = base",
+        "    function int multiplicar(int n):",
+        "        return self.base * n",
+        "    function int triple():",
+        "        return self.multiplicar(3)",
+        "Calc c = new Calc(4)",
+        "print(c.triple())",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["12"]
+
+
+def test_interpreter_try_catch_index_out_of_range():
+    code = "\n".join([
+        "list<int> nums = [1, 2, 3]",
+        "try:",
+        "    print(nums[10])",
+        "catch (string e):",
+        '    print("Error capturado")',
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert any("capturado" in line.lower() for line in output)
+
+
+def test_interpreter_method_return_type_mismatch():
+    code = "\n".join([
+        "class Calc:",
+        "    function int valor():",
+        '        return "no soy un int"',
+        "Calc c = new Calc()",
+        "print(c.valor())",
+    ])
+    output, _, _ = run(code)
+    assert any("int" in line.lower() or "tipo" in line.lower()
+               for line in output)

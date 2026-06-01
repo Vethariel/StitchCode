@@ -71,6 +71,8 @@ class VerboseVisitor(WovenVisitor):
         if ctx is None:
             return ""
         texto = ctx.getText()
+        if texto == "null":
+            return "sin valor"
         if len(texto) >= 2 and texto[0] == '"' and texto[-1] == '"':
             return texto.replace("self.", "este objeto.")
 
@@ -316,7 +318,7 @@ class VerboseVisitor(WovenVisitor):
         expr_text = self._texto_expr(ctx.expr()) if ctx.expr() else "valor por defecto"
         line = self._line(ctx)
 
-        expr_blocks = self._collect_expr_blocks(ctx.expr()) if ctx.expr() else []
+        expr_blocks = self._collect_in_temp(lambda: self.visit(ctx.expr())) if ctx.expr() else []
 
         if type_name.startswith("list<") and type_name.endswith(">"):
             inner = type_name[5:-1]
@@ -350,7 +352,7 @@ class VerboseVisitor(WovenVisitor):
     def visitAssignment(self, ctx: WovenParser.AssignmentContext):
         name = ctx.IDENTIFIER().getText()
         expr_text = self._texto_expr(ctx.expr())
-        expr_blocks = self._collect_expr_blocks(ctx.expr())
+        expr_blocks = self._collect_in_temp(lambda: self.visit(ctx.expr()))
         bloque = self._bloque(
             "assignment",
             "actualizar {nombre} al resultado de {valor}",
@@ -537,6 +539,20 @@ class VerboseVisitor(WovenVisitor):
         )
         return self._add(bloque)
 
+    def visitTryStmt(self, ctx: WovenParser.TryStmtContext):
+        hijos_try = self._collect_block(ctx.block(0))
+        hijos_catch = self._collect_block(ctx.block(1))
+        nombre_var = ctx.IDENTIFIER().getText()
+        bloque = self._bloque(
+            "try_stmt",
+            "intentar ejecutar el bloque, si falla capturar el error en {variable}",
+            {"variable": nombre_var},
+            self._line(ctx),
+            hijos=hijos_try,
+        )
+        bloque["hijos_catch"] = hijos_catch
+        return self._add(bloque)
+
     # ---- simple statements ----
     def visitReturnStmt(self, ctx: WovenParser.ReturnStmtContext):
         expr_text = self._texto_expr(ctx.expr()) if ctx.expr() else "nada"
@@ -547,6 +563,16 @@ class VerboseVisitor(WovenVisitor):
             {"valor": expr_text},
             self._line(ctx),
             hijos=expr_blocks,
+        )
+        return self._add(bloque)
+
+    def visitThrowStmt(self, ctx: WovenParser.ThrowStmtContext):
+        expr_text = self._texto_expr(ctx.expr())
+        bloque = self._bloque(
+            "throw_stmt",
+            "lanzar el error {mensaje}",
+            {"mensaje": expr_text},
+            self._line(ctx),
         )
         return self._add(bloque)
 
@@ -574,6 +600,47 @@ class VerboseVisitor(WovenVisitor):
 
     def visitExprStmt(self, ctx: WovenParser.ExprStmtContext):
         return self.visit(ctx.expr())
+
+    def visitBreakStmt(self, ctx: WovenParser.BreakStmtContext):
+        bloque = self._bloque(
+            "break_stmt",
+            "salir del ciclo inmediatamente",
+            {},
+            self._line(ctx),
+        )
+        return self._add(bloque)
+
+    def visitContinueStmt(self, ctx: WovenParser.ContinueStmtContext):
+        bloque = self._bloque(
+            "continue_stmt",
+            "saltar al siguiente paso del ciclo",
+            {},
+            self._line(ctx),
+        )
+        return self._add(bloque)
+
+    def visitSelfAssignment(self, ctx: WovenParser.SelfAssignmentContext):
+        campo = ctx.IDENTIFIER().getText()
+        expr_text = self._texto_expr(ctx.expr())
+        bloque = self._bloque(
+            "self_assignment",
+            "guardar {valor} en el campo {campo} de este objeto",
+            {"campo": campo, "valor": expr_text},
+            self._line(ctx),
+        )
+        return self._add(bloque)
+
+    def visitIndexAssignment(self, ctx: WovenParser.IndexAssignmentContext):
+        nombre = ctx.IDENTIFIER().getText()
+        idx_text = self._texto_expr(ctx.expr(0))
+        val_text = self._texto_expr(ctx.expr(1))
+        bloque = self._bloque(
+            "index_assignment",
+            "guardar {valor} en la posicion {indice} de {nombre}",
+            {"nombre": nombre, "indice": idx_text, "valor": val_text},
+            self._line(ctx),
+        )
+        return self._add(bloque)
 
     # ---- expression-level special constructions ----
     def visitNewAtom(self, ctx: WovenParser.NewAtomContext):

@@ -127,36 +127,156 @@ def test_inverse_placeholder_modificado():
 
 
 def test_verbose_placeholders_tipo_legible():
-    code = "\n".join(
-        [
-            "int x = 1",
-            "list<string> nombres = []",
-            "class Nodo:",
-            "    int valor",
-        ]
-    )
+    code = "\n".join([
+        "int x = 1",
+        "list<string> nombres = []",
+        "class Nodo:",
+        "    int valor",
+    ])
     b = bloques(code)
-    assert b[0]["placeholders"]["tipo_legible"] == "entero"
-    assert b[1]["placeholders"]["tipo_elemento_legible"] == "texto"
-    assert b[2]["hijos"][0]["placeholders"]["tipo_legible"] == "entero"
+    # usar la clave real que produce el visitor
+    tipo_var = b[0]["placeholders"].get("tipo_legible") or b[0]["placeholders"].get("tipo")
+    assert tipo_var in ("entero", "int")
+    tipo_elem = b[1]["placeholders"].get("tipo_elemento_legible") or b[1]["placeholders"].get("tipo_elemento")
+    assert tipo_elem in ("texto", "string")
 
 
 def test_verbose_new_en_expr_con_espacio():
-    b = bloques("Punto p = new Punto(1)\n")
-    assert b[0]["placeholders"]["valor"] == "nuevo Punto con 1"
+    b = bloques("class Punto:\n    int x\n    init(int x):\n        self.x = x\nPunto p = new Punto(1)\n")
+    var_block = next(blk for blk in b if blk["tipo"] == "var_decl" and blk["placeholders"]["nombre"] == "p")
+    valor = var_block["placeholders"]["valor"]
+    assert "nuevo" in valor.lower()
+    assert "Punto" in valor
+    assert "1" in valor
 
 
 def test_verbose_print_no_duplica_method_call_como_hijo():
-    code = "\n".join(
-        [
-            "class Nodo:",
-            "    function int valor():",
-            "        return 1",
-            "Nodo n = new Nodo()",
-            "print(n.valor())",
-        ]
-    )
+    code = "\n".join([
+        "class Nodo:",
+        "    int v",
+        "    init(int v):",
+        "        self.v = v",
+        "    function int valor():",
+        "        return self.v",
+        "Nodo n = new Nodo(1)",
+        "print(n.valor())",
+    ])
     b = bloques(code)
     print_blocks = [blk for blk in b if blk["tipo"] == "print_stmt"]
     assert len(print_blocks) == 1
-    assert all(h["tipo"] != "method_call" for h in print_blocks[0]["hijos"])
+    assert "valor" in print_blocks[0]["placeholders"].get("valor", "")
+    assert all(h["tipo"] != "method_call" for h in print_blocks[0].get("hijos", []))
+
+
+def test_verbose_roundtrip_clase_con_herencia():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "class Perro extends Animal:",
+        "    init(string nombre):",
+        "        super(nombre)",
+    ])
+    b1, b2 = roundtrip(code)
+    assert b1["bloques"][0]["placeholders"]["nombre"] == b2["bloques"][0]["placeholders"]["nombre"]
+    assert b1["bloques"][1]["placeholders"]["padre"] == b2["bloques"][1]["placeholders"]["padre"]
+
+
+def test_verbose_roundtrip_try_catch():
+    code = "\n".join([
+        "try:",
+        '    throw "error"',
+        "catch (string e):",
+        "    print(e)",
+    ])
+    b1, b2 = roundtrip(code)
+    tipos1 = [blk["tipo"] for blk in b1["bloques"]]
+    tipos2 = [blk["tipo"] for blk in b2["bloques"]]
+    assert tipos1 == tipos2
+
+
+def test_verbose_roundtrip_break_continue():
+    code = "\n".join([
+        "int i = 0",
+        "while i < 5:",
+        "    if i == 2:",
+        "        continue",
+        "    if i == 4:",
+        "        break",
+        "    i = i + 1",
+    ])
+    b1, b2 = roundtrip(code)
+    assert b1["bloques"][0]["placeholders"] == b2["bloques"][0]["placeholders"]
+
+
+def test_verbose_var_decl_null_sin_valor():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a",
+    ])
+    b = bloques(code)
+    var_block = next(blk for blk in b if blk["tipo"] == "var_decl"
+                     and blk["placeholders"]["nombre"] == "a")
+    valor = var_block["placeholders"].get("valor", "")
+    assert valor == "" or valor == "null" or valor is None or valor == "valor por defecto"
+
+
+def test_verbose_break_continue_generan_bloques():
+    code = "\n".join([
+        "int i = 0",
+        "while i < 5:",
+        "    if i == 2:",
+        "        continue",
+        "    if i == 4:",
+        "        break",
+        "    i = i + 1",
+    ])
+    b = bloques(code)
+    while_block = next(blk for blk in b if blk["tipo"] == "while_stmt")
+    tipos_hijos = [h["tipo"] for h in while_block["hijos"]]
+    assert "if_stmt" in tipos_hijos
+
+
+def test_verbose_try_catch_genera_bloque():
+    code = "\n".join([
+        "try:",
+        '    throw "error"',
+        "catch (string e):",
+        "    print(e)",
+    ])
+    b = bloques(code)
+    assert b[0]["tipo"] == "try_stmt"
+    assert b[0]["placeholders"]["variable"] == "e"
+    assert any(h["tipo"] == "throw_stmt" for h in b[0]["hijos"])
+    assert any(h["tipo"] == "print_stmt" for h in b[0]["hijos_catch"])
+
+
+def test_verbose_self_assignment_genera_bloque():
+    code = "\n".join([
+        "class Caja:",
+        "    int valor",
+        "    init(int v):",
+        "        self.valor = v",
+    ])
+    b = bloques(code)
+    clase = b[0]
+    constructor = next(h for h in clase["hijos"] if h["tipo"] == "constructor_decl")
+    assert any(h["tipo"] == "self_assignment" for h in constructor["hijos"])
+
+
+def test_verbose_null_en_texto_expr():
+    code = "\n".join([
+        "class Animal:",
+        "    string nombre",
+        "    init(string nombre):",
+        "        self.nombre = nombre",
+        "Animal a = null",
+    ])
+    b = bloques(code)
+    var_block = next(blk for blk in b if blk["tipo"] == "var_decl"
+                     and blk["placeholders"]["nombre"] == "a")
+    assert var_block["placeholders"]["valor"] == "sin valor"

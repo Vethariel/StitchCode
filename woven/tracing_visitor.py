@@ -4,7 +4,13 @@ from antlr4 import CommonTokenStream, InputStream
 
 from WovenLexer import WovenLexer
 from WovenParser import WovenParser
-from interpreter_visitor import InterpreterVisitor, Value, WovenObject, _ReturnSignal
+from interpreter_visitor import (
+    InterpreterVisitor,
+    NullValue,
+    Value,
+    WovenObject,
+    _ReturnSignal,
+)
 
 
 class TracingInterpreterVisitor(InterpreterVisitor):
@@ -34,6 +40,8 @@ class TracingInterpreterVisitor(InterpreterVisitor):
 
     def _serializar_valor(self, valor):
         """Convierte cualquier valor Woven a algo serializable en JSON."""
+        if valor is None or isinstance(valor, NullValue):
+            return None
         if isinstance(valor, Value):
             return self._serializar_valor(valor.value)
         if isinstance(valor, WovenObject):

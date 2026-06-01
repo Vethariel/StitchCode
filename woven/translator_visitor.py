@@ -860,7 +860,9 @@ class TranslatorVisitor(WovenVisitor):
     def visitUnaryOp(self, ctx):
         v = self.visit(ctx.compExpr())
         if ctx.op.text == "!":
-            return ExprResult(f"{self.strategy.not_op()} {v.code}", "bool")
+            not_token = self.strategy.not_op()
+            sep = " " if not_token and not_token[-1].isalnum() else ""
+            return ExprResult(f"{not_token}{sep}{v.code}", "bool")
         return ExprResult(f"-{v.code}", v.type_name)
 
     def visitAtomExpr(self, ctx):

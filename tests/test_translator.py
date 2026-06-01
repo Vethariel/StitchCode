@@ -167,7 +167,7 @@ def test_translator_list_primitives_three_languages():
         ]
     )
     out = run(code)
-    assert "nums: list[int] = [1, 2]" in out["python"] or "nums = [1, 2]" in out["python"]
+    assert "nums: list[int] = [1, 2]" in out["python"]  # solo esta forma
     assert "ArrayList<Integer>" in out["java"]
     assert "std::vector<int>" in out["cpp"]
     assert ".add(" in out["java"]
@@ -188,7 +188,7 @@ def test_translator_list_objects_three_languages():
     out = run(code)
     assert "list[Item]" in out["python"] or "items = []" in out["python"]
     assert "ArrayList<Item>" in out["java"]
-    assert "std::vector<std::shared_ptr<Item>>" in out["cpp"] or "std::vector<Item*>" in out["cpp"] or "std::vector<Item>" in out["cpp"]
+    assert "std::vector<std::shared_ptr<Item>>" in out["cpp"]
 
 
 def test_translator_new_object_three_languages():
@@ -290,3 +290,147 @@ def test_translator_throw_three_languages():
     assert 'raise Exception("error de prueba")' in out["python"]
     assert 'throw new RuntimeException("error de prueba");' in out["java"]
     assert 'throw std::runtime_error("error de prueba");' in out["cpp"]
+
+
+def test_translator_not_operator_three_languages():
+    code = "\n".join([
+        "bool a = false",
+        "print(!a)",
+    ])
+    out = run(code)
+    assert "print(not a)" in out["python"]
+    assert "System.out.println(!a);" in java_main_block(out["java"])
+    assert "std::cout << !a << std::endl;" in out["cpp"]
+
+
+def test_translator_mod_operator_three_languages():
+    code = "print(7 % 4)\n"
+    out = run(code)
+    assert "print(7 % 4)" in out["python"]
+    assert "System.out.println(7 % 4);" in java_main_block(out["java"])
+    assert "std::cout << 7 % 4 << std::endl;" in out["cpp"]
+
+
+def test_translator_float_literal_three_languages():
+    code = "\n".join([
+        "float x = 1.5",
+        "print(x + 0.5)",
+    ])
+    out = run(code)
+    assert "x = 1.5" in out["python"]
+    assert "double x = 1.5;" in java_main_block(out["java"])
+    assert "double x = 1.5;" in cpp_main_block(out["cpp"])
+
+
+def test_translator_index_read_three_languages():
+    code = "\n".join([
+        "list<int> nums = [1, 2, 3]",
+        "print(nums[0])",
+    ])
+    out = run(code)
+    assert "print(nums[0])" in out["python"]
+    assert "System.out.println(nums.get(0));" in java_main_block(out["java"])
+    assert "std::cout << nums[0] << std::endl;" in out["cpp"]
+
+
+def test_translator_self_call_three_languages():
+    code = "\n".join([
+        "class Calc:",
+        "    int base",
+        "    init(int base):",
+        "        self.base = base",
+        "    function int mult(int n):",
+        "        return self.base * n",
+        "    function int triple():",
+        "        return self.mult(3)",
+        "Calc c = new Calc(4)",
+        "print(c.triple())",
+    ])
+    out = run(code)
+    assert "return self.mult(3)" in out["python"]
+    assert "return this.mult(3);" in out["java"]
+    assert "return this->mult(3);" in out["cpp"]
+
+
+def test_translator_for_assignment_init_three_languages():
+    code = "\n".join([
+        "int i = 0",
+        "for (i = 0; i < 3; i = i + 1):",
+        "    print(i)",
+    ])
+    out = run(code)
+    assert "i = 0" in out["python"]
+    assert "while i < 3:" in out["python"]
+    assert "for (i = 0; i < 3; i = i + 1) {" in java_main_block(out["java"])
+    assert "for (i = 0; i < 3; i = i + 1) {" in cpp_main_block(out["cpp"])
+
+
+def test_translator_for_expr_update_three_languages():
+    code = "\n".join([
+        "int i = 0",
+        "function void tick():",
+        "    i = i + 1",
+        "for (; i < 3; tick()):",
+        "    print(i)",
+    ])
+    out = run(code)
+    assert "while i < 3:" in out["python"]
+    assert "tick()" in out["python"]
+    assert "for (; i < 3; tick()) {" in java_main_block(out["java"])
+    assert "for (; i < 3; tick()) {" in cpp_main_block(out["cpp"])
+
+
+def test_translator_for_all_optional_parts_three_languages():
+    code = "\n".join([
+        "for (;;):",
+        "    break",
+    ])
+    out = run(code)
+    assert "while True:" in out["python"]
+    assert "for (; ; ) {" in java_main_block(out["java"])
+    assert "for (; ; ) {" in cpp_main_block(out["cpp"])
+
+
+def test_translator_throw_inside_method_three_languages():
+    code = "\n".join([
+        "class Validador:",
+        "    function void validar(int x):",
+        '        throw "valor invalido"',
+    ])
+    out = run(code)
+    assert 'raise Exception("valor invalido")' in out["python"]
+    assert 'throw new RuntimeException("valor invalido");' in out["java"]
+    assert 'throw std::runtime_error("valor invalido");' in out["cpp"]
+
+
+def test_translator_break_continue_in_for_three_languages():
+    code = "\n".join([
+        "for (int i = 0; i < 5; i = i + 1):",
+        "    if i == 2:",
+        "        continue",
+        "    if i == 4:",
+        "        break",
+    ])
+    out = run(code)
+    assert "continue" in out["python"]
+    assert "break" in out["python"]
+    assert "continue;" in out["java"]
+    assert "break;" in out["java"]
+    assert "continue;" in out["cpp"]
+    assert "break;" in out["cpp"]
+
+
+def test_translator_null_as_initial_value_three_languages():
+    code = "\n".join([
+        "class Nodo:",
+        "    int valor",
+        "    init(int valor):",
+        "        self.valor = valor",
+        "Nodo siguiente = null",
+        "string texto = null",
+    ])
+    out = run(code)
+    assert "None" in out["python"]
+    assert out["python"].count("None") >= 2
+    assert out["java"].count("null") >= 2
+    assert out["cpp"].count("nullptr") >= 2

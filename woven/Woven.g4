@@ -237,8 +237,8 @@ compExpr
 
 atom
     : literal                              # literalAtom
-    | SELF DOT IDENTIFIER                  # selfFieldAtom
     | SELF DOT IDENTIFIER LPAREN argList? RPAREN # selfCallAtom
+    | SELF DOT IDENTIFIER                  # selfFieldAtom
     | NEW IDENTIFIER LPAREN argList? RPAREN # newAtom
     | IDENTIFIER LPAREN argList? RPAREN    # callAtom
     | IDENTIFIER                           # idAtom
