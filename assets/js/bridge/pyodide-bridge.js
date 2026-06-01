@@ -8,12 +8,18 @@ const INTERPRETER_FILES = [
   "WovenParser.py",
   "WovenVisitor.py",
   "interpreter_visitor.py",
+  "pedagogical_error_listener.py",
+  "woven_runtime.py",
+  "linter_visitor.py",
+  "pedagogical_lint.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
 let pyodide = null;
 /** @type {((source: string) => import("pyodide").PyProxy) | null} */
 let runWovenFn = null;
+/** @type {((source: string) => import("pyodide").PyProxy) | null} */
+let lintWovenFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -91,29 +97,41 @@ import sys
 if "." not in sys.path:
     sys.path.append(".")
 
-def run_woven(source: str) -> list:
-    from antlr4 import CommonTokenStream, InputStream
-    from WovenLexer import WovenLexer
-    from WovenParser import WovenParser
-    from interpreter_visitor import InterpreterVisitor
-
-    lexer = WovenLexer(InputStream(source))
-    stream = CommonTokenStream(lexer)
-    parser = WovenParser(stream)
-    tree = parser.program()
-    visitor = InterpreterVisitor()
-    return visitor.visit(tree)
+from woven_runtime import run_woven
+from pedagogical_lint import lint_woven_pedagogico
 `);
 
     runWovenFn = pyodide.globals.get("run_woven");
+    lintWovenFn = pyodide.globals.get("lint_woven_pedagogico");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
     runWovenFn = null;
+    lintWovenFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
   }
+}
+
+function pyResultToString(pyResult) {
+  const value = pyResult.toString();
+  if (typeof pyResult.destroy === "function") {
+    pyResult.destroy();
+  }
+  return value;
+}
+
+/**
+ * @param {string} source
+ * @returns {Promise<import("../linter-controller.js").LintResult>}
+ */
+export async function lintWoven(source) {
+  if (!pyodide || !lintWovenFn) {
+    throw new Error("El analizador semántico aún no está listo.");
+  }
+  const raw = pyResultToString(lintWovenFn(source));
+  return JSON.parse(raw);
 }
 
 /**

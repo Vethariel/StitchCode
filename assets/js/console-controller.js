@@ -1,6 +1,8 @@
 /**
  * @param {{ body: HTMLElement }} els
  */
+import { esErrorWoven } from "./woven-errors.js";
+
 export function createConsoleController({ body }) {
   function clear() {
     body.innerHTML = "";
@@ -46,7 +48,7 @@ export function createConsoleController({ body }) {
   /** @param {string[]} lines */
   function appendOutputLines(lines) {
     for (const line of lines) {
-      const isError = line.startsWith("Error");
+      const isError = esErrorWoven(line);
       appendLine(line, isError ? "error" : "output", isError ? "!" : ">");
     }
   }

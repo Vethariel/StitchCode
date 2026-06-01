@@ -1,0 +1,101 @@
+.code-editor-stack {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.code-editor-stack .code-area {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+.code-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: var(--editor-pad-y) var(--editor-pad-x);
+  border: none;
+  background: var(--editor-bg);
+  color: transparent;
+  font-family: var(--font-code);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-box);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+  tab-size: 2;
+  box-sizing: border-box;
+}
+
+.code-highlight .hl-line {
+  display: block;
+  box-sizing: border-box;
+  height: var(--editor-line-box);
+  line-height: var(--editor-line-box);
+  overflow: hidden;
+}
+
+.code-highlight .hl-error {
+  background: var(--editor-diag-error-bg);
+  box-shadow: inset 3px 0 0 var(--linter-error);
+}
+
+.code-highlight .hl-warning {
+  background: var(--editor-diag-warning-bg);
+  box-shadow: inset 3px 0 0 var(--linter-warning);
+}
+
+.line-numbers span.lint-error {
+  color: var(--linter-error);
+  opacity: 1;
+  background: var(--editor-diag-error-bg);
+}
+
+.line-numbers span.lint-warning {
+  color: var(--linter-warning);
+  opacity: 1;
+  background: var(--editor-diag-warning-bg);
+}
+
+.line-numbers span.lint-error.active,
+.line-numbers span.lint-warning.active {
+  color: var(--editor-line-active);
+}
+
+.lint-tooltip {
+  position: absolute;
+  z-index: 20;
+  max-width: min(420px, calc(100% - 24px));
+  padding: 8px 12px;
+  background: var(--editor-diag-tooltip-bg);
+  color: var(--editor-diag-tooltip-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 20px rgba(var(--rgb-black), 0.35);
+  border: 1px solid var(--editor-diag-tooltip-border);
+  pointer-events: none;
+}
+
+.lint-tooltip-item + .lint-tooltip-item {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--editor-diag-tooltip-border);
+}
+
+.lint-tooltip-item strong {
+  font-weight: 600;
+}
+
+.lint-tooltip-item.lint-error strong {
+  color: var(--linter-error);
+}
+
+.lint-tooltip-item.lint-warning strong {
+  color: var(--linter-warning);
+}

@@ -131,6 +131,22 @@
   --editor-gutter-border: rgba(var(--rgb-brown), 0.1);
   --editor-line-active: var(--palette-accent);
 
+  --editor-diag-error-bg: rgba(224, 112, 112, 0.12);
+  --editor-diag-warning-bg: rgba(224, 175, 104, 0.1);
+  --editor-diag-tooltip-bg: var(--palette-ink-deep);
+  --editor-diag-tooltip-text: var(--palette-linen);
+  --editor-diag-tooltip-border: rgba(var(--rgb-accent), 0.22);
+
+  /* ── Semánticos · linter (panel del editor) ───────────────────── */
+
+  --linter-bg: rgba(var(--rgb-brown), 0.06);
+  --linter-border: rgba(var(--rgb-brown), 0.12);
+  --linter-ok: var(--palette-moss);
+  --linter-error: var(--palette-console-error);
+  --linter-warning: var(--palette-console-stderr);
+  --linter-muted: var(--palette-editor-muted);
+  --linter-hint: var(--palette-editor-title);
+
   /* ── Semánticos · consola ─────────────────────────────────────── */
 
   --console-bg: var(--palette-console-bg);

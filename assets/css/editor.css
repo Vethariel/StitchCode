@@ -67,7 +67,6 @@
 }
 
 .code-area {
-  flex: 1;
   margin: 0;
   padding: var(--editor-pad-y) var(--editor-pad-x);
   outline: none;

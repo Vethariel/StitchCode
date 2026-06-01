@@ -1,13 +1,16 @@
 import {
   initPyodide,
   isReady,
+  lintWoven,
   runWoven,
   setBridgeHandlers,
 } from "./bridge/pyodide-bridge.js";
 import { createEditorController } from "./editor-controller.js";
 import { createConsoleController } from "./console-controller.js";
+import { createLinterController } from "./linter-controller.js";
 import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
+import { esErrorWoven } from "./woven-errors.js";
 
 const codeArea = document.getElementById("code-area");
 const runBtn = document.getElementById("run-btn");
@@ -23,9 +26,30 @@ const runtimeLoader = createRuntimeLoader({
   clearBtn,
 });
 
+/** @type {ReturnType<typeof createLinterController>} */
+let linter;
+
 const editor = createEditorController({
   codeArea,
   lineNumbers: document.getElementById("line-numbers"),
+  codeHighlight: document.getElementById("code-highlight"),
+  tooltip: document.getElementById("lint-tooltip"),
+  onChange: () => linter?.scheduleLint(),
+});
+
+function syncEditorDiagnostics() {
+  editor.setDiagnostics(linter.getDiagnosticos());
+}
+
+linter = createLinterController({
+  panel: document.getElementById("linter-panel"),
+  getCode: () => editor.getCode(),
+  isReady,
+  lintFn: lintWoven,
+  onUpdate: () => {
+    updateRunButton();
+    syncEditorDiagnostics();
+  },
 });
 
 const consoleCtl = createConsoleController({
@@ -35,20 +59,30 @@ const consoleCtl = createConsoleController({
 let isRunning = false;
 
 function updateRunButton() {
-  runBtn.disabled = !isReady() || isRunning;
-}
-
-/**
- * @param {string} text
- * @param {"idle"|"loading"|"ready"|"error"} state
- */
-function onRuntimeStatus(text, state) {
-  runtimeLoader.setPhase(text, state);
-  updateRunButton();
+  const blockedByLint = linter.tieneErroresBloqueantes();
+  runBtn.disabled = !isReady() || isRunning || blockedByLint;
+  runBtn.title = blockedByLint
+    ? "Corrige los errores semánticos antes de ejecutar"
+    : "Ejecutar (Ctrl+Enter)";
 }
 
 async function handleRun() {
   if (!isReady() || isRunning) return;
+
+  await linter.runLint();
+
+  if (linter.tieneErroresBloqueantes()) {
+    consoleCtl.clear();
+    consoleCtl.appendLine(
+      "Hay errores semánticos. Corrígelos antes de ejecutar.",
+      "error",
+      "!"
+    );
+    for (const texto of linter.textosErrores()) {
+      consoleCtl.appendLine(texto, "error", "!");
+    }
+    return;
+  }
 
   isRunning = true;
   updateRunButton();
@@ -69,7 +103,7 @@ async function handleRun() {
       consoleCtl.appendOutputLines(output);
     }
 
-    const hasError = output.some((line) => line.startsWith("Error"));
+    const hasError = output.some((line) => esErrorWoven(line));
     if (!hasError) {
       consoleCtl.appendLine(`✓ Completado en ${ms} ms`, "info");
     }
@@ -102,7 +136,15 @@ initResizeController({
 setBridgeHandlers({
   onStdout: (msg) => consoleCtl.appendLine(msg, "output", ">"),
   onStderr: (msg) => consoleCtl.appendLine(msg, "stderr", "!"),
-  onStatus: onRuntimeStatus,
+  onStatus: (text, state) => {
+    runtimeLoader.setPhase(text, state);
+    if (state === "ready") {
+      linter.runLint();
+    } else {
+      linter.render();
+      updateRunButton();
+    }
+  },
 });
 
 updateRunButton();
