@@ -109,7 +109,7 @@ class VerboseVisitor(WovenVisitor):
             texto_local = s
             texto_local = texto_local.replace("self.", "este objeto.")
             texto_local = re.sub(r"new([A-Z])", r"new \1", texto_local)
-            texto_local = re.sub(r"(<=|>=|==|!=|&&|\|\||[<>+\-*/=])", r" \1 ", texto_local)
+            texto_local = re.sub(r"(<=|>=|==|!=|\*\*|&&|\|\||[<>+\-*/=%])", r" \1 ", texto_local)
             texto_local = re.sub(r"\b(and|or)\b", r" \1 ", texto_local)
             texto_local = re.sub(r"\bnew\s+", "nuevo ", texto_local)
             texto_local = re.sub(r"\s*,\s*", ", ", texto_local)
@@ -727,6 +727,15 @@ class VerboseVisitor(WovenVisitor):
         return self.visitChildren(ctx)
 
     def visitComparison(self, ctx: WovenParser.ComparisonContext):
+        return self.visitChildren(ctx)
+
+    def visitUnaryExprAlt(self, ctx: WovenParser.UnaryExprAltContext):
+        return self.visitChildren(ctx)
+
+    def visitPowerExprAlt(self, ctx: WovenParser.PowerExprAltContext):
+        return self.visitChildren(ctx)
+
+    def visitPowerOp(self, ctx: WovenParser.PowerOpContext):
         return self.visitChildren(ctx)
 
     def visitAtomExpr(self, ctx: WovenParser.AtomExprContext):

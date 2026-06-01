@@ -238,7 +238,7 @@ def test_translator_declaration_without_value_three_languages():
 def test_translator_break_three_languages():
     code = "\n".join([
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    if i == 3:",
         "        break",
         "    i = i + 1",
@@ -252,7 +252,7 @@ def test_translator_break_three_languages():
 def test_translator_continue_three_languages():
     code = "\n".join([
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    i = i + 1",
         "    if i == 3:",
         "        continue",
@@ -434,3 +434,14 @@ def test_translator_null_as_initial_value_three_languages():
     assert out["python"].count("None") >= 2
     assert out["java"].count("null") >= 2
     assert out["cpp"].count("nullptr") >= 2
+
+
+def test_translator_power_operator_three_languages():
+    code = "\n".join([
+        "int y = 15",
+        "print(y**2)",
+    ])
+    out = run(code)
+    assert "y ** 2" in out["python"]
+    assert "Math.pow(y, 2)" in out["java"]
+    assert "std::pow(y, 2)" in out["cpp"]

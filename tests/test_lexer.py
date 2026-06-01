@@ -50,8 +50,8 @@ def test_lexer_all_primitive_types_tokens():
 
 
 def test_lexer_arithmetic_and_comparison_operators_tokens():
-    tokens = run("print(1 + 2 - 3 * 4 / 5 % 2 == 1 != 0 < 2 <= 3 > 1 >= 1)\n")
-    for expected in ("ADD", "SUB", "MUL", "DIV", "MOD", "EQ", "NE", "LT", "LE", "GT", "GE"):
+    tokens = run("print(1 + 2 - 3 * 4 / 5 % 2 ** 3 == 1 != 0 < 2 <= 3 > 1 >= 1)\n")
+    for expected in ("ADD", "SUB", "MUL", "DIV", "MOD", "POW", "EQ", "NE", "LT", "LE", "GT", "GE"):
         assert expected in tokens
 
 
@@ -71,7 +71,7 @@ def test_lexer_keywords_tokens():
             "        print(\"ok\")",
             "    else:",
             "        for (int i = 0; i < 1; i = i + 1):",
-            "            while false:",
+            "            while (false):",
             "                return",
         ]
     )

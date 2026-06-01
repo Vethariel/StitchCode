@@ -1,0 +1,238 @@
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+/* ── NAVBAR ── */
+nav {
+  height: var(--navbar-h);
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 12px;
+  position: relative;
+  z-index: 50;
+  flex-shrink: 0;
+  box-shadow: 0 1px 16px var(--nav-shadow);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--app-text);
+  letter-spacing: -0.3px;
+}
+
+.logo-text em {
+  font-style: normal;
+  color: var(--palette-accent);
+}
+
+.nav-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--nav-sep);
+  flex-shrink: 0;
+}
+
+.lang-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--palette-linen-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  flex-shrink: 0;
+}
+
+.lang-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--palette-accent);
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.6);
+  }
+}
+
+/* ── WORKSPACE ── */
+.workspace {
+  display: flex;
+  height: calc(100vh - var(--navbar-h));
+  overflow: hidden;
+}
+
+.main-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 32px;
+  flex-shrink: 0;
+  gap: 7px;
+}
+
+.panel-title {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--panel-title);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.panel-badge {
+  background: var(--panel-badge-bg);
+  border: 1px solid var(--panel-badge-border);
+  color: var(--panel-badge-text);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-code);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.panel-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: none;
+  border: 1px solid var(--icon-btn-border);
+  color: var(--icon-btn-text);
+  border-radius: var(--radius-sm);
+  width: 22px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--tr);
+}
+
+.icon-btn:hover {
+  border-color: var(--icon-btn-border-hover);
+  color: var(--icon-btn-text-hover);
+  background: var(--icon-btn-bg-hover);
+}
+
+.run-btn {
+  background: var(--run-btn-bg);
+  border: none;
+  color: var(--run-btn-text);
+  border-radius: var(--radius-sm);
+  padding: 3px 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--tr);
+}
+
+.run-btn:hover:not(:disabled) {
+  background: var(--run-btn-bg-hover);
+  transform: translateY(-1px);
+}
+
+.run-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.run-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.resize-handle {
+  height: 4px;
+  background: transparent;
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 0.18s;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  background: var(--resize-handle-hover);
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.thread-path {
+  stroke: var(--logo-thread-stroke);
+  stroke-dasharray: 65;
+  stroke-dashoffset: 65;
+  animation: draw-thread 1.6s ease forwards 0.4s;
+}
+
+@keyframes draw-thread {
+  to {
+    stroke-dashoffset: 0;
+  }
+}

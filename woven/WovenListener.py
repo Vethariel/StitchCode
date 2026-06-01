@@ -1,4 +1,4 @@
-# Generated from woven/Woven.g4 by ANTLR 4.13.2
+# Generated from Woven.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .WovenParser import WovenParser
@@ -368,12 +368,12 @@ class WovenListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by WovenParser#atomExpr.
-    def enterAtomExpr(self, ctx:WovenParser.AtomExprContext):
+    # Enter a parse tree produced by WovenParser#unaryExprAlt.
+    def enterUnaryExprAlt(self, ctx:WovenParser.UnaryExprAltContext):
         pass
 
-    # Exit a parse tree produced by WovenParser#atomExpr.
-    def exitAtomExpr(self, ctx:WovenParser.AtomExprContext):
+    # Exit a parse tree produced by WovenParser#unaryExprAlt.
+    def exitUnaryExprAlt(self, ctx:WovenParser.UnaryExprAltContext):
         pass
 
 
@@ -383,6 +383,33 @@ class WovenListener(ParseTreeListener):
 
     # Exit a parse tree produced by WovenParser#unaryOp.
     def exitUnaryOp(self, ctx:WovenParser.UnaryOpContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#powerExprAlt.
+    def enterPowerExprAlt(self, ctx:WovenParser.PowerExprAltContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#powerExprAlt.
+    def exitPowerExprAlt(self, ctx:WovenParser.PowerExprAltContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#powerOp.
+    def enterPowerOp(self, ctx:WovenParser.PowerOpContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#powerOp.
+    def exitPowerOp(self, ctx:WovenParser.PowerOpContext):
+        pass
+
+
+    # Enter a parse tree produced by WovenParser#atomExpr.
+    def enterAtomExpr(self, ctx:WovenParser.AtomExprContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#atomExpr.
+    def exitAtomExpr(self, ctx:WovenParser.AtomExprContext):
         pass
 
 

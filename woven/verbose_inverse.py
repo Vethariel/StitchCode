@@ -35,7 +35,7 @@ class VerboseInverse:
                 self.indent -= 1
 
         elif tipo == "while_stmt":
-            self._indentar(f"while {p['condicion']}:")
+            self._indentar(f"while ({p['condicion']}):")
             self.indent += 1
             for hijo in bloque.get("hijos", []):
                 self._procesar(hijo)

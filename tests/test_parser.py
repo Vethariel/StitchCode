@@ -106,7 +106,7 @@ def test_parser_for_c_style_tree():
 def test_parser_while_tree():
     code = "\n".join(
         [
-            "while true:",
+            "while (true):",
             "    print(\"x\")",
         ]
     )
@@ -154,6 +154,14 @@ def test_parser_expression_precedence_tree():
     mul_pos = text.find("*")
     add_pos = text.find("+")
     assert mul_pos > add_pos  # mul aparece más adentro en el árbol
+
+
+def test_parser_power_operator():
+    tree, parser, lexer_errors, parser_errors = run("print(y**2)\n")
+    assert not lexer_errors
+    assert not parser_errors
+    text = tree.toStringTree(recog=parser)
+    assert "**" in text or "POW" in text
 
 
 def test_parser_function_call_with_arguments_tree():
@@ -211,7 +219,7 @@ def test_parser_break_continue_tree():
     code = "\n".join(
         [
             "int i = 0",
-            "while i < 5:",
+            "while (i < 5):",
             "    i = i + 1",
             "    if i == 2:",
             "        continue",

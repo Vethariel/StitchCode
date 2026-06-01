@@ -143,7 +143,7 @@ def test_linter_continue_outside_loop():
 def test_linter_break_inside_loop_valid():
     code = "\n".join([
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    break",
     ])
     resultado = lint(code)
@@ -410,6 +410,17 @@ def test_linter_float_literal_and_comparison_valid():
         "    print(x)",
         "else:",
         "    print(0)",
+    ])
+    resultado = lint(code)
+    errores = [d for d in resultado["diagnosticos"] if d["nivel"] == "error"]
+    assert len(errores) == 0
+
+
+def test_linter_power_expression_valid():
+    code = "\n".join([
+        "int y = 15",
+        "print(y**2)",
+        "print(2**3**2)",
     ])
     resultado = lint(code)
     errores = [d for d in resultado["diagnosticos"] if d["nivel"] == "error"]

@@ -199,7 +199,7 @@ def test_verbose_roundtrip_try_catch():
 def test_verbose_roundtrip_break_continue():
     code = "\n".join([
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    if i == 2:",
         "        continue",
         "    if i == 4:",
@@ -228,7 +228,7 @@ def test_verbose_var_decl_null_sin_valor():
 def test_verbose_break_continue_generan_bloques():
     code = "\n".join([
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    if i == 2:",
         "        continue",
         "    if i == 4:",
@@ -280,3 +280,13 @@ def test_verbose_null_en_texto_expr():
     var_block = next(blk for blk in b if blk["tipo"] == "var_decl"
                      and blk["placeholders"]["nombre"] == "a")
     assert var_block["placeholders"]["valor"] == "sin valor"
+
+
+def test_verbose_power_operator_en_texto_expr():
+    code = "\n".join([
+        "int y = 15",
+        "print(y**2)",
+    ])
+    b = bloques(code)
+    print_block = next(blk for blk in b if blk["tipo"] == "print_stmt")
+    assert print_block["placeholders"]["valor"] == "y ** 2"

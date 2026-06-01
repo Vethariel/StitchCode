@@ -681,8 +681,8 @@ class LinterVisitor(WovenVisitor):
         return self.visit(ctx.compExpr())
 
     def visitBinaryOp(self, ctx: WovenParser.BinaryOpContext):
-        left = self.visit(ctx.compExpr(0))
-        right = self.visit(ctx.compExpr(1))
+        left = self.visit(ctx.compExpr())
+        right = self.visit(ctx.unaryExpr())
         if left == "string" or right == "string":
             return "string"
         if left == "float" or right == "float":
@@ -690,8 +690,8 @@ class LinterVisitor(WovenVisitor):
         return "int"
 
     def visitComparison(self, ctx: WovenParser.ComparisonContext):
-        left_t = self.visit(ctx.compExpr(0))
-        right_t = self.visit(ctx.compExpr(1))
+        left_t = self.visit(ctx.compExpr())
+        right_t = self.visit(ctx.unaryExpr())
         if ctx.op.text in {"==", "!="}:
             if left_t == "null" and right_t in {"int", "float", "bool"}:
                 self._warning(ctx.start.line, f"El tipo {right_t} nunca puede ser null")
@@ -699,11 +699,26 @@ class LinterVisitor(WovenVisitor):
                 self._warning(ctx.start.line, f"El tipo {left_t} nunca puede ser null")
         return "bool"
 
+    def visitUnaryExprAlt(self, ctx: WovenParser.UnaryExprAltContext):
+        return self.visit(ctx.unaryExpr())
+
     def visitUnaryOp(self, ctx: WovenParser.UnaryOpContext):
-        t = self.visit(ctx.compExpr())
+        t = self.visit(ctx.unaryExpr())
         if ctx.op.text == "!":
             return "bool"
         return t
+
+    def visitPowerExprAlt(self, ctx: WovenParser.PowerExprAltContext):
+        return self.visit(ctx.powerExpr())
+
+    def visitPowerOp(self, ctx: WovenParser.PowerOpContext):
+        left = self.visit(ctx.atom())
+        right = self.visit(ctx.powerExpr())
+        if left == "string" or right == "string":
+            return "string"
+        if left == "float" or right == "float":
+            return "float"
+        return "int"
 
     def visitAtomExpr(self, ctx: WovenParser.AtomExprContext):
         return self.visit(ctx.atom())

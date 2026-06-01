@@ -1,0 +1,98 @@
+/* Pantalla de carga · bloquea la app hasta que Pyodide esté listo */
+
+.runtime-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--loader-bg);
+  color: var(--loader-text);
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+.runtime-loader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.runtime-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 32px 40px;
+  max-width: 360px;
+  text-align: center;
+}
+
+.runtime-loader-logo {
+  width: 56px;
+  height: 56px;
+}
+
+.runtime-loader-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.runtime-loader-title em {
+  font-style: normal;
+  color: var(--loader-accent);
+}
+
+.runtime-loader-message {
+  font-size: 13px;
+  font-family: var(--font-ui);
+  color: var(--loader-text-muted);
+  line-height: 1.5;
+  min-height: 1.5em;
+}
+
+.runtime-loader-detail {
+  font-size: 11px;
+  font-family: var(--font-code);
+  color: var(--loader-detail);
+  line-height: 1.55;
+  max-height: 4.5em;
+  overflow: auto;
+  display: none;
+}
+
+.runtime-loader.is-error .runtime-loader-detail {
+  display: block;
+}
+
+.runtime-loader.is-error .runtime-loader-message {
+  color: var(--loader-error);
+}
+
+.runtime-loader-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(var(--rgb-accent), 0.2);
+  border-top-color: var(--loader-accent);
+  border-radius: 50%;
+  animation: loader-spin 0.85s linear infinite;
+}
+
+.runtime-loader.is-error .runtime-loader-spinner,
+.runtime-loader.is-hidden .runtime-loader-spinner {
+  display: none;
+}
+
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* App debajo del loader: sin interacción mientras carga */
+#app-shell[inert] {
+  pointer-events: none;
+  user-select: none;
+}

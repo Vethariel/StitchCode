@@ -63,6 +63,35 @@ def test_interpreter_basic_arithmetic_operations():
     assert output == ["5", "6", "1"]
 
 
+def test_interpreter_power_operator():
+    code = "\n".join(
+        [
+            "int x = 5",
+            "print(x)",
+            "int y = x + 10",
+            "print(y)",
+            "print(y**2)",
+        ]
+    )
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["5", "15", "225"]
+
+
+def test_interpreter_power_precedence():
+    code = "\n".join(
+        [
+            "print(2*3**2)",
+            "print(2**3**2)",
+        ]
+    )
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["18", "512"]
+
+
 def test_interpreter_if_executes_correct_branch():
     code = "\n".join(
         [
@@ -98,7 +127,7 @@ def test_interpreter_while_loop():
     code = "\n".join(
         [
             "int i = 0",
-            "while i < 3:",
+            "while (i < 3):",
             "    i = i + 1",
             "print(i)",
         ]
@@ -468,7 +497,7 @@ def test_interpreter_list_can_be_null():
 def test_interpreter_break_exits_while():
     code = "\n".join([
         "int i = 0",
-        "while i < 10:",
+        "while (i < 10):",
         "    if i == 3:",
         "        break",
         "    i = i + 1",
@@ -484,7 +513,7 @@ def test_interpreter_continue_skips_iteration():
     code = "\n".join([
         "int total = 0",
         "int i = 0",
-        "while i < 5:",
+        "while (i < 5):",
         "    i = i + 1",
         "    if i == 3:",
         "        continue",
@@ -531,9 +560,9 @@ def test_interpreter_nested_break():
     code = "\n".join([
         "int cuenta = 0",
         "int i = 0",
-        "while i < 3:",
+        "while (i < 3):",
         "    int j = 0",
-        "    while j < 3:",
+        "    while (j < 3):",
         "        if j == 1:",
         "            break",
         "        cuenta = cuenta + 1",
@@ -643,7 +672,7 @@ def test_interpreter_block_scope_for_variable_not_visible_outside():
 def test_interpreter_block_scope_while_variable_not_visible_outside():
     code = "\n".join([
         "int contador = 0",
-        "while contador < 3:",
+        "while (contador < 3):",
         "    int temp = contador * 2",
         "    contador = contador + 1",
         "print(temp)",

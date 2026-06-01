@@ -1,4 +1,4 @@
-# Generated from woven/Woven.g4 by ANTLR 4.13.2
+# Generated from Woven.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .WovenParser import WovenParser
@@ -209,13 +209,28 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by WovenParser#atomExpr.
-    def visitAtomExpr(self, ctx:WovenParser.AtomExprContext):
+    # Visit a parse tree produced by WovenParser#unaryExprAlt.
+    def visitUnaryExprAlt(self, ctx:WovenParser.UnaryExprAltContext):
         return self.visitChildren(ctx)
 
 
     # Visit a parse tree produced by WovenParser#unaryOp.
     def visitUnaryOp(self, ctx:WovenParser.UnaryOpContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#powerExprAlt.
+    def visitPowerExprAlt(self, ctx:WovenParser.PowerExprAltContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#powerOp.
+    def visitPowerOp(self, ctx:WovenParser.PowerOpContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by WovenParser#atomExpr.
+    def visitAtomExpr(self, ctx:WovenParser.AtomExprContext):
         return self.visitChildren(ctx)
 
 

@@ -68,7 +68,7 @@ CICLO FOR (estilo C):
       print(i)
 
 CICLO WHILE:
-  while x > 0:
+  while (x > 0):
       x = x - 1
 
 FUNCIÓN:

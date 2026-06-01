@@ -1,0 +1,169 @@
+/*
+ * Paleta Stitch Code · Woven
+ * ─────────────────────────
+ * Ajustes de color: edita sobre todo la sección «Primitivos».
+ * Los tokens semánticos heredan de ahí; el resto de CSS no usa hex sueltos.
+ *
+ * Transparencias: --rgb-accent y --rgb-brown deben coincidir con
+ * --palette-accent y el marrón del editor (--palette-editor-text base).
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ── Primitivos (paleta base) ─────────────────────────────────── */
+
+  /* Marca · tierra */
+  --palette-ink: #0e0905;
+  --palette-ink-deep: #18100a;
+  --palette-terra-dark: #2a1a0e;
+  --palette-terra-mid: #3a2210;
+  --palette-accent: #c4703a;
+  --palette-accent-bright: #d4884e;
+  --palette-gold: #d4a853;
+  --palette-gold-soft: #e8c878;
+  --palette-linen: #f2e8dc;
+  --palette-linen-dim: #c8b89a;
+  --palette-linen-muted: #8a7060;
+  --palette-moss: #5a8a40;
+  --palette-white: #ffffff;
+
+  /* Editor (crema) */
+  --palette-editor-bg: #f5ede0;
+  --palette-editor-line: #ede0cc;
+  --palette-editor-text: #2a1a0e;
+  --palette-editor-muted: #9a7a60;
+  --palette-editor-title: #7a5a3a;
+  --palette-editor-badge-text: #8a4a1a;
+
+  /* Consola */
+  --palette-console-bg: #100c08;
+  --palette-console-output: #7fb069;
+  --palette-console-error: #e07070;
+  --palette-console-stderr: #e0af68;
+  --palette-console-muted: #4a3828;
+  --palette-console-empty: #3a2a1a;
+
+  /* Panel lateral (próximas fases) */
+  --palette-right-bg: #1a1008;
+  --palette-right-header: #120e07;
+
+  /* Acentos pastel (bloques, tabs) */
+  --palette-pastel-orange: #f5c9a0;
+  --palette-pastel-green: #b8dba8;
+  --palette-pastel-blue: #a8c8e8;
+  --palette-pastel-purple: #c8b8e8;
+  --palette-pastel-yellow: #f0dfa0;
+  --palette-pastel-pink: #f0b8c8;
+
+  /* Canales RGB (para rgba(); actualizar si cambias accent / marrón) */
+  --rgb-accent: 196, 112, 58;
+  --rgb-brown: 90, 52, 24;
+  --rgb-editor-header: 220, 200, 175;
+  --rgb-black: 0, 0, 0;
+
+  /* ── Semánticos · app shell ───────────────────────────────────── */
+
+  --app-bg: var(--palette-ink);
+  --app-text: var(--palette-linen);
+
+  --nav-bg: var(--palette-ink);
+  --nav-border: rgba(var(--rgb-accent), 0.18);
+  --nav-shadow: rgba(var(--rgb-black), 0.4);
+  --nav-sep: rgba(var(--rgb-accent), 0.2);
+
+  --logo-fill: var(--palette-terra-mid);
+  --logo-stroke: rgba(var(--rgb-accent), 0.3);
+  --logo-needle-fill: var(--palette-gold);
+  --logo-needle-stroke: var(--palette-gold);
+  --logo-eye-fill: var(--palette-ink-deep);
+  --logo-thread-stroke: var(--palette-accent);
+
+  /* Pantalla de carga del runtime */
+  --loader-bg: var(--palette-ink);
+  --loader-text: var(--palette-linen);
+  --loader-text-muted: var(--palette-linen-muted);
+  --loader-accent: var(--palette-accent);
+  --loader-error: var(--palette-console-error);
+  --loader-detail: var(--palette-linen-dim);
+
+  /* ── Semánticos · paneles compartidos ─────────────────────────── */
+
+  --panel-title: var(--palette-linen-muted);
+  --panel-badge-bg: rgba(var(--rgb-accent), 0.12);
+  --panel-badge-border: rgba(var(--rgb-accent), 0.2);
+  --panel-badge-text: var(--palette-accent);
+
+  --icon-btn-border: rgba(var(--rgb-accent), 0.12);
+  --icon-btn-text: var(--palette-linen-muted);
+  --icon-btn-border-hover: rgba(var(--rgb-accent), 0.35);
+  --icon-btn-text-hover: var(--palette-accent);
+  --icon-btn-bg-hover: rgba(var(--rgb-accent), 0.07);
+
+  --run-btn-bg: var(--palette-accent);
+  --run-btn-bg-hover: var(--palette-accent-bright);
+  --run-btn-text: var(--palette-white);
+
+  --resize-handle-hover: rgba(var(--rgb-accent), 0.28);
+
+  --scrollbar-thumb: rgba(var(--rgb-accent), 0.2);
+  --scrollbar-thumb-hover: rgba(var(--rgb-accent), 0.38);
+
+  /* ── Semánticos · editor ──────────────────────────────────────── */
+
+  --editor-bg: var(--palette-editor-bg);
+  --editor-line-bg: var(--palette-editor-line);
+  --editor-text: var(--palette-editor-text);
+  --editor-muted: var(--palette-editor-muted);
+  --editor-cursor: var(--palette-accent);
+  --editor-sel: rgba(var(--rgb-accent), 0.18);
+  --editor-border: rgba(var(--rgb-brown), 0.2);
+  --editor-header-bg: rgba(var(--rgb-editor-header), 0.6);
+  --editor-header-border: rgba(var(--rgb-brown), 0.14);
+  --editor-title: var(--palette-editor-title);
+  --editor-badge-bg: rgba(var(--rgb-accent), 0.1);
+  --editor-badge-text: var(--palette-editor-badge-text);
+  --editor-badge-border: rgba(var(--rgb-accent), 0.18);
+  --editor-gutter-border: rgba(var(--rgb-brown), 0.1);
+  --editor-line-active: var(--palette-accent);
+
+  /* ── Semánticos · consola ─────────────────────────────────────── */
+
+  --console-bg: var(--palette-console-bg);
+  --console-header: var(--palette-ink);
+  --console-header-border: rgba(var(--rgb-accent), 0.1);
+  --console-output: var(--palette-console-output);
+  --console-error: var(--palette-console-error);
+  --console-stderr: var(--palette-console-stderr);
+  --console-info: var(--palette-gold-soft);
+  --console-muted: var(--palette-console-muted);
+  --console-empty: var(--palette-console-empty);
+
+  /* ── Semánticos · panel derecho (reservado) ───────────────────── */
+
+  --right-bg: var(--palette-right-bg);
+  --right-header: var(--palette-right-header);
+
+  /* ── Semánticos · bloques / tabs (reservado) ──────────────────── */
+
+  --pastel-orange: var(--palette-pastel-orange);
+  --pastel-green: var(--palette-pastel-green);
+  --pastel-blue: var(--palette-pastel-blue);
+  --pastel-purple: var(--palette-pastel-purple);
+  --pastel-yellow: var(--palette-pastel-yellow);
+  --pastel-pink: var(--palette-pastel-pink);
+
+  /* ── Tipografía y forma ───────────────────────────────────────── */
+
+  --navbar-h: 48px;
+  --font-display: "Fraunces", serif;
+  --font-ui: "Epilogue", sans-serif;
+  --font-code: "JetBrains Mono", monospace;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --tr: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}

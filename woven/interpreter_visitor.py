@@ -692,8 +692,8 @@ class InterpreterVisitor(WovenVisitor):
         return self.visit(ctx.compExpr())
 
     def visitBinaryOp(self, ctx: WovenParser.BinaryOpContext):
-        left = self.visit(ctx.compExpr(0))
-        right = self.visit(ctx.compExpr(1))
+        left = self.visit(ctx.compExpr())
+        right = self.visit(ctx.unaryExpr())
         op = ctx.op.text
 
         if op in {"+", "-", "*", "/", "%"}:
@@ -731,8 +731,8 @@ class InterpreterVisitor(WovenVisitor):
         raise RuntimeError(f"Operador binario no soportado: {op}")
 
     def visitComparison(self, ctx: WovenParser.ComparisonContext):
-        left = self.visit(ctx.compExpr(0)).value
-        right = self.visit(ctx.compExpr(1)).value
+        left = self.visit(ctx.compExpr()).value
+        right = self.visit(ctx.unaryExpr()).value
         op = ctx.op.text
         if op == "<":
             return Value("bool", left < right)
@@ -748,8 +748,11 @@ class InterpreterVisitor(WovenVisitor):
             return Value("bool", left != right)
         raise RuntimeError(f"Comparador no soportado: {op}")
 
+    def visitUnaryExprAlt(self, ctx: WovenParser.UnaryExprAltContext):
+        return self.visit(ctx.unaryExpr())
+
     def visitUnaryOp(self, ctx: WovenParser.UnaryOpContext):
-        val = self.visit(ctx.compExpr())
+        val = self.visit(ctx.unaryExpr())
         if ctx.op.text == "-":
             if val.type_name not in {"int", "float"}:
                 raise RuntimeError(f"Operador '-' invalido para tipo {val.type_name}")
@@ -757,6 +760,24 @@ class InterpreterVisitor(WovenVisitor):
         if ctx.op.text == "!":
             return Value("bool", not self._truthy(val))
         raise RuntimeError(f"Operador unario no soportado: {ctx.op.text}")
+
+    def visitPowerExprAlt(self, ctx: WovenParser.PowerExprAltContext):
+        return self.visit(ctx.powerExpr())
+
+    def visitPowerOp(self, ctx: WovenParser.PowerOpContext):
+        left = self.visit(ctx.atom())
+        right = self.visit(ctx.powerExpr())
+        if left.type_name not in {"int", "float"} or right.type_name not in {"int", "float"}:
+            raise RuntimeError(f"Operacion de potencia invalida: {left.type_name} ** {right.type_name}")
+
+        mixed = left.type_name == "float" or right.type_name == "float"
+        lv = float(left.value) if mixed else int(left.value)
+        rv = float(right.value) if mixed else int(right.value)
+        res = lv ** rv
+
+        if isinstance(res, float):
+            return Value("float", res)
+        return Value("int", res)
 
     def visitAtomExpr(self, ctx: WovenParser.AtomExprContext):
         return self.visit(ctx.atom())

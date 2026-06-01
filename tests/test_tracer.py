@@ -271,3 +271,13 @@ def test_tracer_variable_null_en_traza():
     animal_var = next((e for e in vars_ if e["nombre"] == "a"), None)
     assert animal_var is not None
     assert animal_var["valor"] is None
+
+
+def test_tracer_power_operator():
+    code = "\n".join([
+        "int y = 15",
+        "print(y**2)",
+    ])
+    resultado = trace(code)
+    assert resultado["exito"] is True
+    assert not any(e["tipo"] == "error" for e in resultado["eventos"])

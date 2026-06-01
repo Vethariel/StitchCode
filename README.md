@@ -19,7 +19,7 @@ La premisa pedagógica es que la IA debe actuar como tutor de pensamiento comput
 - Tipos obligatorios en variables y parámetros.
 - `new` obligatorio para crear objetos.
 - Operadores lógicos `and` / `or` / `!` (estilo convergente con legibilidad Python).
-- `for` estilo C: `for (init; condición; update):`
+- `for` y `while` estilo C: `for (init; condición; update):` y `while (condición):`
 - Indentación significativa (estilo Python).
 
 ### Palabras clave principales
@@ -31,6 +31,7 @@ La premisa pedagógica es que la IA debe actuar como tutor de pensamiento comput
 | Funciones | `function` |
 | OOP | `class`, `extends`, `init`, `self`, `super`, `virtual`, `new` |
 | Lógicos/booleanos | `and`, `or`, `!`, `true`, `false` |
+| Aritméticos | `+`, `-`, `*`, `/`, `%`, `**` |
 | E/S | `print` |
 
 ### Referencia rápida con ejemplos
@@ -48,6 +49,9 @@ else:
 
 for (int i = 0; i < 3; i = i + 1):
     print(i)
+
+while (i < 10):
+    i = i + 1
 
 function int sumar(int a, int b):
     return a + b
@@ -152,39 +156,74 @@ Woven.g4 (ANTLR4)
 
 ### Requisitos
 
-- Python 3.x
-- ANTLR4 CLI
-- Runtime Python de ANTLR (`antlr4-python3-runtime`)
+- [uv](https://docs.astral.sh/uv/) (gestiona Python, dependencias y scripts del repo)
 
-### 1) Generar lexer/parser desde la gramática
+### Inicio rápido (clonar y compilar)
+
+```bash
+git clone <repo-url> StitchCode && cd StitchCode
+uv sync --all-groups
+make test
+```
+
+Si modificaste `woven/Woven.g4`, regenera el parser con `make generate` antes de correr tests.
+
+### 1) Instalar dependencias
 
 Desde la raíz del proyecto:
 
 ```bash
-antlr4 -Dlanguage=Python3 -visitor woven/Woven.g4
+uv sync --all-groups
 ```
 
-> Esto regenera `woven/WovenLexer.py`, `woven/WovenParser.py` y `woven/WovenVisitor.py`.
-
-### 2) Correr tests
+O con Make:
 
 ```bash
-pytest -q
+make sync
 ```
 
-O por capa:
+### 2) Generar lexer/parser desde la gramática
+
+Tras cambiar `woven/Woven.g4`:
 
 ```bash
-pytest -q tests/test_lexer.py tests/test_parser.py tests/test_interpreter.py
-pytest -q tests/test_translator.py tests/test_tracer.py tests/test_verbose.py tests/test_linter.py
+make generate
 ```
 
-### 3) Abrir frontend (estático)
+Equivalente directo con uv:
 
-El frontend es un solo archivo y no requiere backend:
+```bash
+cd woven && uv run antlr4 -Dlanguage=Python3 -visitor Woven.g4
+```
 
-- abrir `index.html` directamente en el navegador, o
-- opcionalmente servir carpeta local con `python -m http.server`.
+> Regenera `woven/WovenLexer.py`, `woven/WovenParser.py`, `woven/WovenVisitor.py` y archivos auxiliares ANTLR.
+
+### 3) Correr tests
+
+```bash
+make test
+```
+
+O con uv directamente:
+
+```bash
+uv run pytest -q
+```
+
+```bash
+uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_interpreter.py
+uv run pytest -q tests/test_translator.py tests/test_tracer.py tests/test_verbose.py tests/test_linter.py
+```
+
+### 4) Abrir frontend (estático)
+
+El frontend requiere un servidor local (Pyodide y `fetch` de `woven/*.py`):
+
+```bash
+python -m http.server 8000
+```
+
+Abrir `http://localhost:8000/` (raíz del repo). Los prototipos viven en `refs/`.
 
 ---
 
@@ -192,7 +231,17 @@ El frontend es un solo archivo y no requiere backend:
 
 ```text
 StitchCode/
-├── index.html                      # Frontend principal (Pyodide, editor, consola, vistas, chat)
+├── pyproject.toml                  # Dependencias y configuración (uv)
+├── uv.lock                         # Lockfile reproducible
+├── Makefile                        # Atajos: sync, generate, test
+├── .python-version                 # Versión de Python para uv
+├── index.html                      # App (navbar, editor, consola, Pyodide)
+├── assets/
+│   ├── css/                        # Estilos (tokens, layout, editor, consola)
+│   └── js/                         # Módulos ES (bridge, controladores, main)
+├── refs/
+│   ├── stitch-code.html            # Prototipo UI / vibe
+│   └── index.html                  # Prototipo Pyodide completo
 ├── woven/
 │   ├── Woven.g4                    # Gramática formal de Woven (ANTLR4)
 │   ├── WovenLexer.py               # Lexer generado

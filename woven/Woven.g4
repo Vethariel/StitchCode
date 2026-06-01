@@ -5,8 +5,8 @@ grammar Woven;
 // Decisión de diseño: for usa sintaxis C for(init; cond; update) de forma intencional,
 // alineada con Java/C en lugar del for-in de Python.
 //
-// Generar lexer y parser:
-//   antlr4 -Dlanguage=Python3 -visitor Woven.g4
+// Generar lexer y parser (desde la raíz del repo):
+//   make generate
 
 tokens { INDENT, DEDENT }
 
@@ -142,7 +142,7 @@ forUpdate
     ;
 
 whileStmt
-    : WHILE expr COLON block
+    : WHILE LPAREN expr RPAREN COLON block
     ;
 
 tryStmt
@@ -228,11 +228,20 @@ andExpr
     ;
 
 compExpr
-    : compExpr op=(MUL | DIV | MOD) compExpr       # binaryOp
-    | compExpr op=(ADD | SUB) compExpr             # binaryOp
-    | compExpr op=(LT | LE | GT | GE | EQ | NE) compExpr  # comparison
-    | op=(SUB | NOT) compExpr                      # unaryOp
-    | atom                                         # atomExpr
+    : compExpr op=(MUL | DIV | MOD) unaryExpr       # binaryOp
+    | compExpr op=(ADD | SUB) unaryExpr             # binaryOp
+    | compExpr op=(LT | LE | GT | GE | EQ | NE) unaryExpr  # comparison
+    | unaryExpr                                     # unaryExprAlt
+    ;
+
+unaryExpr
+    : op=(SUB | NOT) unaryExpr                      # unaryOp
+    | powerExpr                                     # powerExprAlt
+    ;
+
+powerExpr
+    : atom POW powerExpr                            # powerOp
+    | atom                                          # atomExpr
     ;
 
 atom
@@ -315,6 +324,7 @@ DOT       : '.' ;
 
 ADD       : '+' ;
 SUB       : '-' ;
+POW       : '**' ;
 MUL       : '*' ;
 DIV       : '/' ;
 MOD       : '%' ;

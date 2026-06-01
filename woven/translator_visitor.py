@@ -847,23 +847,39 @@ class TranslatorVisitor(WovenVisitor):
         return self.visit(ctx.compExpr())
 
     def visitBinaryOp(self, ctx):
-        l = self.visit(ctx.compExpr(0))
-        r = self.visit(ctx.compExpr(1))
+        l = self.visit(ctx.compExpr())
+        r = self.visit(ctx.unaryExpr())
         t = "bool" if ctx.op.text in {"<", "<=", ">", ">=", "==", "!="} else ("float" if "float" in (l.type_name, r.type_name) else l.type_name)
         return ExprResult(f"{l.code} {ctx.op.text} {r.code}", t)
 
     def visitComparison(self, ctx):
-        l = self.visit(ctx.compExpr(0))
-        r = self.visit(ctx.compExpr(1))
+        l = self.visit(ctx.compExpr())
+        r = self.visit(ctx.unaryExpr())
         return ExprResult(f"{l.code} {ctx.op.text} {r.code}", "bool")
 
+    def visitUnaryExprAlt(self, ctx):
+        return self.visit(ctx.unaryExpr())
+
     def visitUnaryOp(self, ctx):
-        v = self.visit(ctx.compExpr())
+        v = self.visit(ctx.unaryExpr())
         if ctx.op.text == "!":
             not_token = self.strategy.not_op()
             sep = " " if not_token and not_token[-1].isalnum() else ""
             return ExprResult(f"{not_token}{sep}{v.code}", "bool")
         return ExprResult(f"-{v.code}", v.type_name)
+
+    def visitPowerExprAlt(self, ctx):
+        return self.visit(ctx.powerExpr())
+
+    def visitPowerOp(self, ctx):
+        l = self.visit(ctx.atom())
+        r = self.visit(ctx.powerExpr())
+        t = "float" if "float" in (l.type_name, r.type_name) else "int"
+        if isinstance(self.strategy, PythonStrategy):
+            return ExprResult(f"{l.code} ** {r.code}", t)
+        if isinstance(self.strategy, JavaStrategy):
+            return ExprResult(f"(int)Math.pow({l.code}, {r.code})", t)
+        return ExprResult(f"std::pow({l.code}, {r.code})", t)
 
     def visitAtomExpr(self, ctx):
         return self.visit(ctx.atom())

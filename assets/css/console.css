@@ -1,0 +1,63 @@
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 38;
+  min-height: 60px;
+  background: var(--console-bg);
+}
+
+.console-panel .panel-header {
+  background: var(--console-header);
+  border-bottom: 1px solid var(--console-header-border);
+}
+
+.console-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 14px;
+  font-family: var(--font-code);
+  font-size: 12px;
+  line-height: 1.65;
+  min-height: 0;
+}
+
+.c-line {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 1px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.c-line.output {
+  color: var(--console-output);
+}
+
+.c-line.error {
+  color: var(--console-error);
+}
+
+.c-line.info {
+  color: var(--console-info);
+}
+
+.c-line.muted {
+  color: var(--console-muted);
+}
+
+.c-line.stderr {
+  color: var(--console-stderr);
+}
+
+.c-prefix {
+  opacity: 0.4;
+  flex-shrink: 0;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.c-empty {
+  color: var(--console-empty);
+  font-size: 11.5px;
+}
