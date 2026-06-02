@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/editor.css">
   <link rel="stylesheet" href="assets/css/editor-diagnostics.css">
+  <link rel="stylesheet" href="assets/css/editor-syntax.css">
+  <link rel="stylesheet" href="assets/css/blocks.css">
   <link rel="stylesheet" href="assets/css/console.css">
 </head>
 <body>
@@ -64,6 +66,11 @@
               Editor
               <span class="panel-badge">main.wvn</span>
             </div>
+            <div class="mode-selector" role="tablist" aria-label="Modo de edición">
+              <button type="button" class="mode-btn active" data-mode="text" role="tab" aria-selected="true">Texto</button>
+              <button type="button" class="mode-btn" data-mode="blocks" role="tab" aria-selected="false">Bloques</button>
+              <button type="button" class="mode-btn" data-mode="verbose" role="tab" aria-selected="false">Verboso</button>
+            </div>
             <div class="panel-acts">
               <button type="button" class="run-btn" id="run-btn" disabled title="Ejecutar (Ctrl+Enter)">
                 <svg width="8" height="9" viewBox="0 0 8 9" fill="none" aria-hidden="true">
@@ -73,23 +80,29 @@
               </button>
             </div>
           </header>
-          <div class="editor-body">
-            <div class="line-numbers" id="line-numbers" aria-hidden="true"></div>
-            <div class="code-editor-stack">
-              <pre class="code-highlight" id="code-highlight" aria-hidden="true"></pre>
-              <textarea
-                class="code-area"
-                id="code-area"
-                spellcheck="false"
-                aria-label="Código Woven"
-                disabled
-              >// Stitch Code · Woven
+          <div class="editor-body" id="editor-body">
+            <div class="text-view" id="text-view">
+              <div class="line-numbers" id="line-numbers" aria-hidden="true"></div>
+              <div class="code-editor-stack">
+                <pre class="code-highlight" id="code-highlight" aria-hidden="true"></pre>
+                <textarea
+                  class="code-area"
+                  id="code-area"
+                  spellcheck="false"
+                  aria-label="Código Woven"
+                  disabled
+                >// Stitch Code · Woven
 int x = 5
 print(x)
 
 int y = x + 10
 print(y)</textarea>
-              <div class="lint-tooltip" id="lint-tooltip" hidden role="tooltip"></div>
+                <div class="lint-tooltip" id="lint-tooltip" hidden role="tooltip"></div>
+              </div>
+            </div>
+            <div class="blocks-workspace" id="blocks-workspace" hidden>
+              <aside class="blocks-palette" id="blocks-palette" aria-label="Paleta de bloques"></aside>
+              <div class="blocks-document-wrap" id="blocks-document" aria-label="Programa en bloques"></div>
             </div>
           </div>
         </section>

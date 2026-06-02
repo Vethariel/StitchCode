@@ -20,7 +20,6 @@
   padding: var(--editor-pad-y) var(--editor-pad-x);
   border: none;
   background: var(--editor-bg);
-  color: transparent;
   font-family: var(--font-code);
   font-size: var(--editor-font-size);
   line-height: var(--editor-line-box);

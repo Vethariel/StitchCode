@@ -14,6 +14,8 @@ const INTERPRETER_FILES = [
   "pedagogical_lint.py",
   "pedagogical_common.py",
   "pedagogical_runtime.py",
+  "verbose_visitor.py",
+  "verbose_inverse.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
@@ -22,6 +24,10 @@ let pyodide = null;
 let runWovenFn = null;
 /** @type {((source: string) => import("pyodide").PyProxy) | null} */
 let lintWovenFn = null;
+/** @type {((source: string) => import("pyodide").PyProxy) | null} */
+let verboseWovenFn = null;
+/** @type {((json: string) => import("pyodide").PyProxy) | null} */
+let inverseVerboseFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -102,15 +108,21 @@ if "." not in sys.path:
 from woven_runtime import run_woven
 from pedagogical_lint import lint_woven_pedagogico
 from pedagogical_runtime import run_woven_pedagogico
+from verbose_visitor import verbose_woven
+from verbose_inverse import inverse_verbose
 `);
 
     runWovenFn = pyodide.globals.get("run_woven_pedagogico");
     lintWovenFn = pyodide.globals.get("lint_woven_pedagogico");
+    verboseWovenFn = pyodide.globals.get("verbose_woven");
+    inverseVerboseFn = pyodide.globals.get("inverse_verbose");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
     runWovenFn = null;
     lintWovenFn = null;
+    verboseWovenFn = null;
+    inverseVerboseFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
@@ -148,4 +160,29 @@ export async function runWoven(source) {
 
   const raw = pyResultToString(runWovenFn(source));
   return JSON.parse(raw);
+}
+
+/** @typedef {{ id: string, tipo: string, texto: string, placeholders: Record<string, string>, linea: number, hijos?: object[], hijos_else?: object[], hijos_catch?: object[] }} Bloque */
+
+/**
+ * @param {string} source
+ * @returns {Promise<{ bloques: Bloque[] }>}
+ */
+export async function parseBlocks(source) {
+  if (!pyodide || !verboseWovenFn) {
+    throw new Error("El convertidor a bloques aún no está listo.");
+  }
+  const raw = pyResultToString(verboseWovenFn(source));
+  return JSON.parse(raw);
+}
+
+/**
+ * @param {{ bloques: Bloque[] }} doc
+ * @returns {Promise<string>}
+ */
+export async function blocksToSource(doc) {
+  if (!pyodide || !inverseVerboseFn) {
+    throw new Error("El convertidor a código aún no está listo.");
+  }
+  return pyResultToString(inverseVerboseFn(JSON.stringify(doc)));
 }

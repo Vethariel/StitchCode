@@ -35,6 +35,14 @@
   --editor-pad-x: 14px;
 }
 
+.text-view {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .line-numbers {
   padding: var(--editor-pad-y) 0;
   background: var(--editor-line-bg);
@@ -72,13 +80,14 @@
   outline: none;
   border: none;
   background: transparent;
-  color: var(--editor-text);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--editor-cursor);
   font-family: var(--font-code);
   font-size: var(--editor-font-size);
   line-height: var(--editor-line-box);
   resize: none;
   tab-size: 2;
-  caret-color: var(--editor-cursor);
   white-space: pre;
   overflow-wrap: normal;
   overflow: auto;
@@ -87,4 +96,5 @@
 
 .code-area::selection {
   background: var(--editor-sel);
+  -webkit-text-fill-color: transparent;
 }

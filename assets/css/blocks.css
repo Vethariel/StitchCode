@@ -1,0 +1,591 @@
+/* Editor por bloques · documento lineal (estilo Scratch, paleta Stitch) */
+
+.mode-selector {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(var(--rgb-brown), 0.06);
+  border: 1px solid rgba(var(--rgb-brown), 0.12);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.editor-panel .panel-header .panel-title {
+  flex: 0 1 auto;
+}
+
+.editor-panel .panel-header .mode-selector {
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.mode-btn {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--editor-muted);
+  white-space: nowrap;
+  transition: background var(--tr), color var(--tr);
+}
+
+.mode-btn:hover:not(:disabled) {
+  color: var(--editor-text);
+  background: rgba(var(--rgb-brown), 0.08);
+}
+
+.mode-btn.active {
+  background: var(--pastel-orange);
+  color: var(--palette-terra-mid);
+}
+
+.mode-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.editor-body.blocks-active .text-view {
+  display: none;
+}
+
+.editor-body:not(.blocks-active) .blocks-workspace {
+  display: none;
+}
+
+.blocks-workspace {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.blocks-palette {
+  width: 148px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 10px 8px;
+  background: var(--editor-line-bg);
+  border-right: 1px solid var(--editor-gutter-border);
+}
+
+.blocks-palette-section {
+  margin-bottom: 12px;
+}
+
+.blocks-palette-cat {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--editor-muted);
+  margin-bottom: 6px;
+}
+
+.blocks-palette-chip {
+  font-size: 10.5px;
+  font-family: var(--font-ui);
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  border-left: 3px solid transparent;
+  background: var(--editor-bg);
+  color: var(--editor-text);
+  box-shadow: 0 1px 2px rgba(var(--rgb-brown), 0.08);
+}
+
+.blocks-palette-chip:active {
+  cursor: grabbing;
+}
+
+.blocks-palette-chip.block-fun {
+  border-left-color: var(--pastel-purple);
+}
+.blocks-palette-chip.block-let {
+  border-left-color: var(--pastel-blue);
+}
+.blocks-palette-chip.block-for {
+  border-left-color: var(--pastel-green);
+}
+.blocks-palette-chip.block-return {
+  border-left-color: var(--pastel-yellow);
+}
+.blocks-palette-chip.block-print {
+  border-left-color: var(--pastel-orange);
+}
+.blocks-palette-chip.block-assign {
+  border-left-color: var(--pastel-pink);
+}
+
+.blocks-document-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--editor-bg);
+}
+
+.blocks-doc-empty {
+  font-size: 12px;
+  color: var(--editor-muted);
+  line-height: 1.5;
+  max-width: 360px;
+  margin: 8px 0 0;
+  padding: 0 8px;
+}
+
+/* Workspace vacío: zona de soltar siempre visible (misma altura fija) */
+.blocks-document-empty .block-drop-gap {
+  pointer-events: auto;
+  height: 44px;
+  min-height: 44px;
+  margin: 2px 0;
+  opacity: 1;
+  border: 1px dashed rgba(var(--rgb-brown), 0.22);
+  background: rgba(var(--rgb-accent), 0.05);
+}
+
+.blocks-document-empty .block-drop-gap-mark {
+  color: var(--editor-muted);
+}
+
+.blocks-drag-active .blocks-document-empty .block-drop-gap:hover,
+.blocks-drag-active .blocks-document-empty .block-drop-gap.drag-over {
+  border-color: var(--palette-accent);
+  background: rgba(var(--rgb-accent), 0.1);
+}
+
+.blocks-document-wrap {
+  --blocks-gutter-w: 42px;
+  --blocks-type-w: 92px;
+}
+
+.blocks-document.blocks-doc-grid {
+  display: grid;
+  grid-template-columns: var(--blocks-gutter-w) var(--blocks-type-w) minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  max-width: 100%;
+}
+
+.blocks-line-num,
+.blocks-gap-cell.blocks-line-num {
+  grid-column: 1;
+  text-align: right;
+  padding: 2px 8px 2px 4px;
+  font-family: var(--font-code);
+  font-size: var(--editor-font-size, 12px);
+  line-height: 1.35;
+  color: var(--editor-muted);
+  opacity: 0.45;
+  user-select: none;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--editor-bg);
+  align-self: center;
+}
+
+.blocks-line-type,
+.blocks-gap-cell.blocks-line-type {
+  grid-column: 2;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--editor-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 4px 2px 0;
+  position: sticky;
+  left: var(--blocks-gutter-w);
+  z-index: 3;
+  background: var(--editor-bg);
+  align-self: center;
+}
+
+.blocks-line-main,
+.blocks-gap-main {
+  grid-column: 3;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.blocks-line-main {
+  padding-left: calc(var(--block-depth, 0) * 12px);
+  border-left: 2px solid transparent;
+}
+
+.blocks-line-main[style*="--block-depth: 1"],
+.blocks-line-main[style*="--block-depth: 2"],
+.blocks-line-main[style*="--block-depth: 3"],
+.blocks-line-main[style*="--block-depth: 4"] {
+  border-left-color: rgba(var(--rgb-brown), 0.12);
+}
+
+.blocks-line-aux {
+  opacity: 0.75;
+  font-style: italic;
+  font-size: 10px;
+}
+
+.woven-block {
+  display: flex;
+  align-items: stretch;
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: var(--font-code);
+  font-size: 12px;
+  box-shadow: 0 1px 4px rgba(var(--rgb-brown), 0.1);
+  max-width: 100%;
+}
+
+.block-notch {
+  width: 5px;
+  flex-shrink: 0;
+}
+
+.block-draggable {
+  cursor: grab;
+}
+
+.block-draggable:active {
+  cursor: grabbing;
+}
+
+body.blocks-pointer-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+body.blocks-pointer-dragging * {
+  cursor: grabbing;
+}
+
+body.blocks-pointer-dragging input,
+body.blocks-pointer-dragging select,
+body.blocks-pointer-dragging button {
+  cursor: grabbing;
+}
+
+.block-drag-ghost {
+  position: fixed;
+  z-index: 10000;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  box-shadow: 0 4px 16px rgba(var(--rgb-brown), 0.2);
+  border: 1px solid rgba(var(--rgb-brown), 0.15);
+}
+
+.block-drag-ghost-type {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+}
+
+.block-drag-ghost-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.block-drag-ghost.block-let {
+  background: #eef4f8;
+  border-left: 4px solid var(--pastel-blue);
+}
+.block-drag-ghost.block-print {
+  background: #faf0e6;
+  border-left: 4px solid var(--pastel-orange);
+}
+.block-drag-ghost.block-for {
+  background: #eef6ea;
+  border-left: 4px solid var(--pastel-green);
+}
+.block-drag-ghost.block-fun {
+  background: #f3eff8;
+  border-left: 4px solid var(--pastel-purple);
+}
+.block-drag-ghost.block-return {
+  background: #f8f4e8;
+  border-left: 4px solid var(--pastel-yellow);
+}
+.block-drag-ghost.block-assign {
+  background: #f8eef2;
+  border-left: 4px solid var(--pastel-pink);
+}
+
+.block-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 5px 8px 5px 10px;
+  min-width: 0;
+  background: var(--editor-bg);
+  color: var(--editor-text);
+}
+
+.block-fun .block-notch {
+  background: var(--pastel-purple);
+}
+.block-fun .block-body {
+  background: #f3eff8;
+}
+
+.block-let .block-notch {
+  background: var(--pastel-blue);
+}
+.block-let .block-body {
+  background: #eef4f8;
+}
+
+.block-for .block-notch {
+  background: var(--pastel-green);
+}
+.block-for .block-body {
+  background: #eef6ea;
+}
+
+.block-return .block-notch {
+  background: var(--pastel-yellow);
+}
+.block-return .block-body {
+  background: #f8f4e8;
+}
+
+.block-print .block-notch {
+  background: var(--pastel-orange);
+}
+.block-print .block-body {
+  background: #faf0e6;
+}
+
+.block-assign .block-notch {
+  background: var(--pastel-pink);
+}
+.block-assign .block-body {
+  background: #f8eef2;
+}
+
+.block-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.block-inline-text {
+  white-space: pre;
+  color: var(--editor-text);
+}
+
+.block-inline-readonly {
+  white-space: pre;
+  color: var(--editor-muted);
+  font-style: italic;
+}
+
+.block-inline-field {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.block-inline-input {
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  line-height: 1.3;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border: 1px solid rgba(var(--rgb-brown), 0.22);
+  border-radius: 3px;
+  background: var(--palette-white);
+  color: var(--editor-text);
+  min-width: 2.5em;
+  max-width: 14em;
+}
+
+.block-inline-input:focus {
+  outline: none;
+  border-color: var(--palette-accent);
+  box-shadow: 0 0 0 2px rgba(var(--rgb-accent), 0.15);
+}
+
+.block-inline-select {
+  padding-right: 2px;
+  max-width: 5.5em;
+}
+
+.block-inline-check {
+  margin: 0 2px;
+  accent-color: var(--palette-accent);
+}
+
+.block-act-btn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--editor-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.block-act-btn:hover {
+  color: var(--linter-error);
+  background: var(--editor-diag-error-bg);
+}
+
+.blocks-gap-cell {
+  align-self: start;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.blocks-gap-main {
+  align-self: stretch;
+}
+
+.blocks-gap-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.block-drop-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0 8px;
+  margin-left: calc(var(--gap-indent, 0) * 12px);
+  border: 1px solid transparent;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  box-sizing: border-box;
+  border-radius: 4px;
+  transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+/* Paleta: todos los gaps visibles al arrastrar */
+.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap {
+  pointer-events: auto;
+  height: 28px;
+  min-height: 28px;
+  margin: 2px 0;
+  opacity: 0.4;
+  border: 1px dashed rgba(var(--rgb-brown), 0.18);
+  background: rgba(var(--rgb-accent), 0.03);
+}
+
+.blocks-drag-active:not(.blocks-move-dragging) .blocks-gap-stack .block-drop-gap {
+  opacity: 1;
+  background: rgba(var(--rgb-accent), 0.04);
+}
+
+.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap:hover,
+.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap.drag-over {
+  opacity: 1;
+  border-color: var(--palette-accent);
+  background: rgba(var(--rgb-accent), 0.1);
+}
+
+/* Mover bloque existente: gaps ocultos hasta pasar el cursor */
+.blocks-move-dragging.blocks-drag-active .block-drop-gap {
+  pointer-events: auto;
+  height: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 8px 0;
+  opacity: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.blocks-move-dragging.blocks-drag-active .block-drop-gap--disabled {
+  display: none;
+  pointer-events: none;
+}
+
+.blocks-move-dragging.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled):hover,
+.blocks-move-dragging.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled).drag-over {
+  height: 28px;
+  min-height: 28px;
+  margin: 2px 0;
+  padding: 0 8px;
+  opacity: 1;
+  border: 1px dashed rgba(var(--rgb-brown), 0.22);
+  background: rgba(var(--rgb-accent), 0.08);
+}
+
+.block-drop-gap-mark {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--editor-muted);
+  line-height: 1;
+  width: 1.2em;
+  text-align: center;
+}
+
+.block-drop-gap-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--editor-muted);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blocks-drag-active .block-drop-gap:hover .block-drop-gap-mark,
+.blocks-drag-active .block-drop-gap.drag-over .block-drop-gap-mark {
+  color: var(--palette-accent);
+}
+
+.blocks-drag-active .block-drop-gap:hover .block-drop-gap-label,
+.blocks-drag-active .block-drop-gap.drag-over .block-drop-gap-label {
+  color: var(--editor-title);
+}
+
+.blocks-move-dragging.blocks-drag-active
+  .block-drop-gap:not(.block-drop-gap--disabled):hover
+  .block-drop-gap-mark,
+.blocks-move-dragging.blocks-drag-active
+  .block-drop-gap:not(.block-drop-gap--disabled).drag-over
+  .block-drop-gap-mark {
+  color: var(--palette-accent);
+}

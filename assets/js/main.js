@@ -5,7 +5,9 @@ import {
   runWoven,
   setBridgeHandlers,
 } from "./bridge/pyodide-bridge.js";
+import { createBlocksController } from "./blocks-controller.js";
 import { createEditorController } from "./editor-controller.js";
+import { createEditorModeController } from "./editor-mode-controller.js";
 import { createConsoleController } from "./console-controller.js";
 import { createLinterController } from "./linter-controller.js";
 import { initResizeController } from "./resize-controller.js";
@@ -27,13 +29,25 @@ const runtimeLoader = createRuntimeLoader({
 
 /** @type {ReturnType<typeof createLinterController>} */
 let linter;
+/** @type {ReturnType<typeof createEditorModeController>} */
+let editorMode;
 
 const editor = createEditorController({
   codeArea,
   lineNumbers: document.getElementById("line-numbers"),
   codeHighlight: document.getElementById("code-highlight"),
   tooltip: document.getElementById("lint-tooltip"),
-  onChange: () => linter?.scheduleLint(),
+  onChange: () => {
+    if (!editorMode?.isBlockMode()) {
+      linter?.scheduleLint();
+    }
+  },
+});
+
+const blocksCtl = createBlocksController({
+  paletteEl: document.getElementById("blocks-palette"),
+  documentEl: document.getElementById("blocks-document"),
+  onChange: () => editorMode?.scheduleSyncFromBlocks(),
 });
 
 function syncEditorDiagnostics() {
@@ -48,6 +62,20 @@ linter = createLinterController({
     updateRunButton();
     syncEditorDiagnostics();
     syncConsoleWithLinter();
+  },
+});
+
+editorMode = createEditorModeController({
+  editorBody: document.getElementById("editor-body"),
+  textView: document.getElementById("text-view"),
+  modeButtons: document.querySelector(".mode-selector"),
+  getCode: () => editor.getCode(),
+  setCode: (code) => editor.setCode(code),
+  blocks: blocksCtl,
+  onLint: () => linter.scheduleLint(),
+  onModeError: (msg) => {
+    consoleCtl.clear();
+    consoleCtl.appendLine(msg, "error", "!");
   },
 });
 
@@ -92,6 +120,9 @@ function updateRunButton() {
 async function handleRun() {
   if (!isReady() || isRunning) return;
 
+  if (editorMode.isBlockMode()) {
+    await editorMode.syncBlocksToText();
+  }
   await linter.runLint();
 
   if (linter.tieneErroresBloqueantes()) {

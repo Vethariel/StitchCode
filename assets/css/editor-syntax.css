@@ -1,0 +1,39 @@
+/* Resaltado de sintaxis Woven (capa code-highlight) */
+
+.code-highlight {
+  color: var(--editor-text);
+}
+
+.code-highlight .tok-keyword {
+  color: var(--syntax-keyword);
+  font-weight: 500;
+}
+
+.code-highlight .tok-type {
+  color: var(--syntax-type);
+}
+
+.code-highlight .tok-operator {
+  color: var(--syntax-operator);
+}
+
+.code-highlight .tok-string {
+  color: var(--syntax-string);
+}
+
+.code-highlight .tok-number {
+  color: var(--syntax-number);
+}
+
+.code-highlight .tok-comment {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.code-highlight .tok-function {
+  color: var(--syntax-function);
+}
+
+.code-highlight .tok-identifier {
+  color: var(--syntax-identifier);
+}

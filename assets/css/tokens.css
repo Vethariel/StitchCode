@@ -137,7 +137,18 @@
   --editor-diag-tooltip-text: var(--palette-linen);
   --editor-diag-tooltip-border: rgba(var(--rgb-accent), 0.22);
 
-  /* ── Semánticos · linter (panel del editor) ───────────────────── */
+  /* ── Semánticos · sintaxis del editor ─────────────────────────── */
+
+  --syntax-keyword: var(--palette-accent);
+  --syntax-type: var(--palette-editor-title);
+  --syntax-operator: var(--palette-editor-badge-text);
+  --syntax-string: var(--palette-moss);
+  --syntax-number: var(--palette-editor-title);
+  --syntax-comment: var(--palette-editor-muted);
+  --syntax-function: var(--palette-accent-bright);
+  --syntax-identifier: var(--palette-editor-text);
+
+  /* ── Semánticos · linter (diagnósticos en editor) ─────────────── */
 
   --linter-bg: rgba(var(--rgb-brown), 0.06);
   --linter-border: rgba(var(--rgb-brown), 0.12);

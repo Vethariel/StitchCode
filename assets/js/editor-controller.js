@@ -1,5 +1,7 @@
 /** @typedef {{ nivel: string, linea: number, mensaje: string, texto?: string }} Diagnostico */
 
+import { highlightSourceLines } from "./woven-highlighter.js";
+
 /**
  * @param {{ codeArea: HTMLTextAreaElement, lineNumbers: HTMLElement, codeHighlight?: HTMLElement, tooltip?: HTMLElement, onChange?: () => void }} els
  */
@@ -44,12 +46,15 @@ export function createEditorController({
 
     const byLine = diagsPorLinea();
     const lines = codeArea.value.split("\n");
+    const highlighted = highlightSourceLines(codeArea.value);
+
     codeHighlight.innerHTML = lines
-      .map((line, i) => {
+      .map((_, i) => {
         const num = i + 1;
         const sev = severidadLinea(num, byLine);
-        const cls = sev ? `hl-line hl-${sev}` : "hl-line";
-        return `<span class="${cls}">${escapeHtml(line) || " "}</span>`;
+        const lineCls = sev ? `hl-line hl-${sev}` : "hl-line";
+        const inner = highlighted[i] ?? " ";
+        return `<span class="${lineCls}">${inner}</span>`;
       })
       .join("");
   }
@@ -69,7 +74,11 @@ export function createEditorController({
 
   function syncScroll() {
     lineNumbers.scrollTop = codeArea.scrollTop;
-    if (codeHighlight) codeHighlight.scrollTop = codeArea.scrollTop;
+    lineNumbers.scrollLeft = codeArea.scrollLeft;
+    if (codeHighlight) {
+      codeHighlight.scrollTop = codeArea.scrollTop;
+      codeHighlight.scrollLeft = codeArea.scrollLeft;
+    }
   }
 
   function updateActiveLine() {
@@ -172,6 +181,10 @@ export function createEditorController({
   return {
     getCode() {
       return codeArea.value;
+    },
+    setCode(code) {
+      codeArea.value = code;
+      updateLines();
     },
     setDiagnostics,
   };
