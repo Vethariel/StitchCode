@@ -34,6 +34,7 @@ export async function callGeminiHilo(apiKey, payloadJson) {
  *   modo: string,
  *   nivelAyuda: number,
  *   apiKey: string,
+ *   perfilJson: string,
  * }} ctx
  */
 export async function sendHiloMessage(ctx) {
@@ -46,6 +47,7 @@ export async function sendHiloMessage(ctx) {
     tieneError: ctx.tieneError,
     modo: ctx.modo,
     nivelAyuda: ctx.nivelAyuda,
+    perfilJson: ctx.perfilJson,
   });
 
   if (!prep.ok) {

@@ -207,6 +207,7 @@ export async function blocksToSource(doc) {
  *   tieneError: boolean,
  *   modo: string,
  *   nivelAyuda: number,
+ *   perfilJson: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -222,7 +223,8 @@ export async function hiloPrepareMessage(args) {
       args.erroresJson,
       args.tieneError,
       args.modo,
-      args.nivelAyuda
+      args.nivelAyuda,
+      args.perfilJson ?? "{}"
     )
   );
   return JSON.parse(raw);

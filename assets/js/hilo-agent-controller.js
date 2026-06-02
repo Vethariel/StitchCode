@@ -21,7 +21,8 @@ import {
  *   form: HTMLFormElement,
  *   input: HTMLInputElement,
  *   sendBtn: HTMLButtonElement,
- *   geminiApiKey: { isValid: () => boolean, getActiveKey: () => string },
+ *   geminiApi: { isValid: () => boolean, getActiveKey: () => string },
+ *   getPerfilJson: () => string,
  *   isRuntimeReady: () => boolean,
  *   getContext: () => {
  *     codigo: string,
@@ -165,16 +166,16 @@ export function createHiloAgentController({
       return;
     }
 
-    if (!geminiApiKey.isValid()) {
+    if (!geminiApi.isValid()) {
       setEmotionState("api_missing");
       showStaticMessage(
-        "Necesito una clave de Gemini válida. Configúrala abajo y pulsa Validar.",
+        "Necesito una clave de Gemini válida. Ábrela en Ajustes y valida la clave.",
         "sad"
       );
       return;
     }
 
-    const apiKey = geminiApiKey.getActiveKey();
+    const apiKey = geminiApi.getActiveKey();
     const ctx = getContext();
 
     setBusy(true);
@@ -195,6 +196,7 @@ export function createHiloAgentController({
         modo: ctx.modo,
         nivelAyuda,
         apiKey,
+        perfilJson: getPerfilJson(),
       });
 
       const turn = parseHiloTurn(raw);

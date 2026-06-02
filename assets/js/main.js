@@ -12,29 +12,30 @@ import { createConsoleController } from "./console-controller.js";
 import { createLinterController } from "./linter-controller.js";
 import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
-import { createGeminiApiKeyController } from "./gemini-api-key-controller.js";
+import { createGeminiApiAccess } from "./gemini-api-state.js";
 import { createHiloAgentController } from "./hilo-agent-controller.js";
+import {
+  createOnboardingController,
+  createSettingsModalController,
+} from "./setup-form.js";
+import {
+  isOnboardingComplete,
+  loadUserProfile,
+  profileForHilo,
+} from "./user-settings.js";
 
 const codeArea = document.getElementById("code-area");
 const runBtn = document.getElementById("run-btn");
 const clearBtn = document.getElementById("clear-console-btn");
+const appShell = document.getElementById("app-shell");
 
-const geminiApiKey = createGeminiApiKeyController({
-  dock: document.getElementById("gemini-key-dock"),
-  wrap: document.getElementById("gemini-key-wrap"),
-  input: document.getElementById("gemini-api-key-input"),
-  dot: document.getElementById("gemini-key-dot"),
-  hint: document.getElementById("gemini-key-hint"),
-  validateBtn: document.getElementById("gemini-api-key-validate"),
-  toggleBtn: document.getElementById("gemini-api-key-toggle"),
-  clearBtn: document.getElementById("gemini-api-key-clear"),
-});
+const geminiApi = createGeminiApiAccess();
 
 const runtimeLoader = createRuntimeLoader({
   overlay: document.getElementById("runtime-loader"),
   messageEl: document.getElementById("runtime-loader-message"),
   detailEl: document.getElementById("runtime-loader-detail"),
-  appShell: document.getElementById("app-shell"),
+  appShell,
   codeArea,
   runBtn,
   clearBtn,
@@ -44,6 +45,63 @@ const runtimeLoader = createRuntimeLoader({
 let linter;
 /** @type {ReturnType<typeof createEditorModeController>} */
 let editorMode;
+/** @type {ReturnType<typeof createHiloAgentController>} */
+let hiloAgent;
+
+async function syncGeminiFromForm(form) {
+  if (form.apiKey.isValid()) {
+    geminiApi.setValidated(form.apiKey.getActiveKey());
+    return;
+  }
+  form.apiKey.persistInput();
+  await geminiApi.refresh();
+}
+
+function unlockApp() {
+  appShell.classList.remove("app-shell--locked");
+  appShell.removeAttribute("inert");
+  runtimeLoader.unlockWorkspace();
+  document.getElementById("settings-open-btn").hidden = false;
+  updateRunButton();
+}
+
+function beginAppAfterRuntime() {
+  if (!isOnboardingComplete()) {
+    onboarding.show();
+    return;
+  }
+  unlockApp();
+  void geminiApi.refresh().then(() => {
+    linter?.runLint();
+  });
+}
+
+const onboarding = createOnboardingController({
+  overlay: document.getElementById("setup-overlay"),
+  formRoot: document.getElementById("setup-form"),
+  steps: document.getElementById("setup-steps"),
+  panels: document.querySelectorAll("#setup-form [data-setup-panel]"),
+  btnBack: document.getElementById("setup-back"),
+  btnNext: document.getElementById("setup-next"),
+  btnFinish: document.getElementById("setup-finish"),
+  onComplete: async (form) => {
+    await syncGeminiFromForm(form);
+    unlockApp();
+    linter?.runLint();
+  },
+});
+
+createSettingsModalController({
+  modal: document.getElementById("settings-modal"),
+  formRoot: document.getElementById("settings-form"),
+  openBtn: document.getElementById("settings-open-btn"),
+  closeBtn: document.getElementById("settings-close"),
+  backdrop: document.getElementById("settings-backdrop"),
+  saveBtn: document.getElementById("settings-save"),
+  onSave: syncGeminiFromForm,
+});
+
+document.getElementById("settings-open-btn").hidden = !isOnboardingComplete();
 
 const editor = createEditorController({
   codeArea,
@@ -98,15 +156,6 @@ const consoleCtl = createConsoleController({
   body: document.getElementById("console-body"),
 });
 
-let isRunning = false;
-let consoleShowsLintErrors = false;
-/** @type {string[]} */
-let lastRunOutput = [];
-let lastRunHadError = false;
-
-/** @type {ReturnType<typeof createHiloAgentController>} */
-let hiloAgent;
-
 hiloAgent = createHiloAgentController({
   root: document.getElementById("hilo-agent"),
   bubble: document.getElementById("hilo-bubble"),
@@ -116,8 +165,9 @@ hiloAgent = createHiloAgentController({
   form: document.getElementById("hilo-form"),
   input: document.getElementById("hilo-input"),
   sendBtn: document.getElementById("hilo-send"),
-  geminiApiKey,
+  geminiApi,
   isRuntimeReady: isReady,
+  getPerfilJson: () => JSON.stringify(profileForHilo(loadUserProfile())),
   getContext: () => {
     const mode = editorMode?.getMode() ?? "text";
     const modo =
@@ -134,6 +184,12 @@ hiloAgent = createHiloAgentController({
     };
   },
 });
+
+let isRunning = false;
+let consoleShowsLintErrors = false;
+/** @type {string[]} */
+let lastRunOutput = [];
+let lastRunHadError = false;
 
 function syncConsoleWithLinter() {
   if (isRunning) return;
@@ -250,7 +306,7 @@ setBridgeHandlers({
   onStatus: (text, state) => {
     runtimeLoader.setPhase(text, state);
     if (state === "ready") {
-      linter.runLint();
+      beginAppAfterRuntime();
     } else {
       updateRunButton();
     }

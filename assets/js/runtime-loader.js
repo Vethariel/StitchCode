@@ -38,7 +38,6 @@ export function createRuntimeLoader(els) {
 
     if (state === "ready") {
       overlay.classList.add("is-hidden");
-      setLocked(false);
       return;
     }
 
@@ -49,5 +48,9 @@ export function createRuntimeLoader(els) {
   setPhase("Preparando entorno…", "loading");
   setLocked(true);
 
-  return { setPhase };
+  function unlockWorkspace() {
+    setLocked(false);
+  }
+
+  return { setPhase, unlockWorkspace };
 }

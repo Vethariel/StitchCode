@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="assets/css/editor-syntax.css">
   <link rel="stylesheet" href="assets/css/blocks.css">
   <link rel="stylesheet" href="assets/css/console.css">
-  <link rel="stylesheet" href="assets/css/gemini-api-key.css">
+  <link rel="stylesheet" href="assets/css/user-settings.css">
   <link rel="stylesheet" href="assets/css/hilo-agent.css">
 </head>
 <body>
@@ -43,7 +43,161 @@
     </div>
   </div>
 
-  <div id="app-shell" inert>
+  <div id="setup-overlay" class="setup-overlay" hidden>
+    <div class="setup-card" role="dialog" aria-labelledby="setup-title" aria-modal="true">
+      <h2 class="setup-title" id="setup-title">Configura tu espacio</h2>
+      <p class="setup-lead">
+        Personaliza a Hilo y conecta Gemini. Puedes dejar campos en blanco y ajustar todo después en Ajustes.
+      </p>
+      <div class="setup-steps" id="setup-steps" aria-hidden="true">
+        <span class="setup-step-dot is-active"></span>
+        <span class="setup-step-dot"></span>
+        <span class="setup-step-dot"></span>
+        <span class="setup-step-dot"></span>
+      </div>
+
+      <div id="setup-form" data-profile-form>
+        <section class="setup-panel" data-setup-panel>
+          <div class="setup-field">
+            <label class="setup-label" for="setup-tono">¿Qué tono te gustaría que maneje Hilo?</label>
+            <p class="setup-hint">Opcional. Escríbelo con tus palabras o elige una sugerencia.</p>
+            <textarea
+              id="setup-tono"
+              class="setup-textarea setup-textarea--short"
+              data-field-tono
+              placeholder="Ej.: amigable y paciente, formal, motivador…"
+              maxlength="200"
+            ></textarea>
+            <div class="setup-chips" data-chips-tono aria-label="Sugerencias de tono"></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-setup-panel hidden>
+          <div class="setup-field">
+            <label class="setup-label" for="setup-estilo">¿Cómo te gustaría que te explicara Hilo?</label>
+            <p class="setup-hint">Opcional. Describe cómo prefieres las explicaciones.</p>
+            <textarea
+              id="setup-estilo"
+              class="setup-textarea setup-textarea--short"
+              data-field-estilo
+              placeholder="Ej.: paso a paso, con analogías, directo al punto…"
+              maxlength="200"
+            ></textarea>
+            <div class="setup-chips" data-chips-estilo aria-label="Sugerencias de estilo"></div>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-setup-panel hidden>
+          <div class="setup-field">
+            <label class="setup-label" for="setup-objetivos">¿Cuáles son tus objetivos de aprendizaje?</label>
+            <p class="setup-hint">Opcional. Ej.: aprobar el curso, entender bucles, preparar un examen…</p>
+            <textarea
+              id="setup-objetivos"
+              class="setup-textarea"
+              data-field-objetivos
+              placeholder="Escribe tus metas (opcional)…"
+              maxlength="500"
+            ></textarea>
+          </div>
+        </section>
+
+        <section class="setup-panel" data-setup-panel hidden>
+          <div class="setup-field" data-api-field>
+            <label class="setup-label" for="setup-api-input">Clave de API de Gemini</label>
+            <p class="setup-hint">Opcional sin validar. Necesaria para que Hilo responda con IA.</p>
+            <div class="setup-api-row">
+              <input
+                type="password"
+                id="setup-api-input"
+                class="setup-api-input"
+                data-api-input
+                placeholder="AIza…"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="setup-btn setup-btn--ghost" data-api-validate>Validar</button>
+              <button type="button" class="setup-btn setup-btn--ghost" data-api-clear title="Borrar">✕</button>
+            </div>
+            <p class="setup-api-hint" data-api-hint aria-live="polite"></p>
+          </div>
+        </section>
+      </div>
+
+      <div class="setup-actions">
+        <button type="button" class="setup-btn setup-btn--ghost" id="setup-back" hidden>Atrás</button>
+        <span></span>
+        <button type="button" class="setup-btn setup-btn--primary" id="setup-next">Siguiente</button>
+        <button type="button" class="setup-btn setup-btn--primary" id="setup-finish" hidden>Entrar al editor</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="settings-modal" hidden>
+    <div class="settings-modal-backdrop" id="settings-backdrop"></div>
+    <div class="settings-modal-card" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+      <header class="settings-modal-header">
+        <div>
+          <h2 class="setup-title" id="settings-title">Ajustes</h2>
+          <p class="setup-lead" style="margin-bottom: 0">Perfil de Hilo y clave de Gemini.</p>
+        </div>
+        <button type="button" class="settings-modal-close" id="settings-close" aria-label="Cerrar">✕</button>
+      </header>
+
+      <div id="settings-form" data-profile-form>
+        <div class="setup-field">
+          <label class="setup-label" for="settings-tono">Tono de Hilo</label>
+          <textarea
+            id="settings-tono"
+            class="setup-textarea setup-textarea--short"
+            data-field-tono
+            maxlength="200"
+          ></textarea>
+          <div class="setup-chips" data-chips-tono></div>
+        </div>
+        <div class="setup-field">
+          <label class="setup-label" for="settings-estilo">Estilo de explicación</label>
+          <textarea
+            id="settings-estilo"
+            class="setup-textarea setup-textarea--short"
+            data-field-estilo
+            maxlength="200"
+          ></textarea>
+          <div class="setup-chips" data-chips-estilo></div>
+        </div>
+        <div class="setup-field">
+          <label class="setup-label" for="settings-objetivos">Objetivos de aprendizaje</label>
+          <textarea
+            id="settings-objetivos"
+            class="setup-textarea"
+            data-field-objetivos
+            maxlength="500"
+          ></textarea>
+        </div>
+        <div class="setup-field" data-api-field>
+          <label class="setup-label" for="settings-api-input">Clave de API de Gemini</label>
+          <div class="setup-api-row">
+            <input
+              type="password"
+              id="settings-api-input"
+              class="setup-api-input"
+              data-api-input
+              placeholder="AIza…"
+              autocomplete="off"
+            />
+            <button type="button" class="setup-btn setup-btn--ghost" data-api-validate>Validar</button>
+            <button type="button" class="setup-btn setup-btn--ghost" data-api-clear>✕</button>
+          </div>
+          <p class="setup-api-hint" data-api-hint aria-live="polite"></p>
+        </div>
+        <div class="setup-actions" style="border-top: none; padding-top: 8px">
+          <span></span>
+          <button type="button" class="setup-btn setup-btn--primary" id="settings-save">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-shell" class="app-shell--locked" inert>
     <nav>
       <a class="logo" href="#" aria-label="Stitch Code">
         <svg class="logo-icon" viewBox="0 0 28 28" fill="none" aria-hidden="true">
@@ -57,6 +211,8 @@
 
       <div class="nav-sep"></div>
       <div class="lang-pill"><span class="lang-dot"></span>Woven</div>
+      <div class="nav-spacer" aria-hidden="true"></div>
+      <button type="button" class="nav-settings-btn" id="settings-open-btn" hidden>Ajustes</button>
     </nav>
 
     <div class="workspace">
@@ -138,8 +294,7 @@ print(y)</textarea>
             class="hilo-avatar"
             id="hilo-avatar"
             aria-label="Hilo — clic para continuar o repetir el mensaje"
-          >
-          </button>
+          ></button>
           <div class="hilo-controls">
             <form class="hilo-input-wrap" id="hilo-form">
               <input
@@ -159,44 +314,6 @@ print(y)</textarea>
           </div>
         </div>
       </aside>
-
-      <div class="gemini-key-dock" id="gemini-key-dock" data-active="false" data-expanded="true">
-      <button
-        type="button"
-        class="gemini-key-toggle"
-        id="gemini-api-key-toggle"
-        aria-expanded="false"
-        aria-controls="gemini-key-wrap"
-        hidden
-      >
-        <span class="gemini-key-toggle-dot" aria-hidden="true"></span>
-        Ver API
-      </button>
-      <div class="gemini-key-wrap" id="gemini-key-wrap" data-key-state="unknown">
-        <label class="gemini-key-label" for="gemini-api-key-input">
-          <span class="gemini-key-dot" id="gemini-key-dot" data-state="unknown" aria-hidden="true"></span>
-          Gemini API
-        </label>
-        <div class="gemini-key-row">
-          <input
-            type="password"
-            id="gemini-api-key-input"
-            class="gemini-key-input"
-            placeholder="AIza…"
-            autocomplete="off"
-            spellcheck="false"
-            aria-describedby="gemini-key-hint"
-          />
-          <button type="button" class="gemini-key-btn" id="gemini-api-key-validate" title="Validar y guardar clave">
-            Validar
-          </button>
-          <button type="button" class="gemini-key-btn gemini-key-btn--ghost" id="gemini-api-key-clear" title="Borrar clave guardada">
-            ✕
-          </button>
-        </div>
-        <p class="gemini-key-hint" id="gemini-key-hint" aria-live="polite"></p>
-      </div>
-    </div>
     </div>
   </div>
 

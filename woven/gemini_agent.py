@@ -205,6 +205,29 @@ def construir_contexto(codigo: str, output: list, errores: list, tiene_error: bo
     return "\n\n".join(partes)
 
 
+def construir_preferencias_estudiante(perfil_json: str) -> str:
+    try:
+        perfil = json.loads(perfil_json) if perfil_json else {}
+    except json.JSONDecodeError:
+        perfil = {}
+    if not isinstance(perfil, dict):
+        perfil = {}
+
+    tono = (perfil.get("tono") or "").strip() or "amigable y cercano"
+    estilo = (perfil.get("estilo") or "").strip() or "explicaciones claras paso a paso"
+    objetivos = (
+        (perfil.get("objetivos") or "").strip()
+        or "aprender a programar en Woven con buenas prácticas"
+    )
+
+    return (
+        "PREFERENCIAS DEL ESTUDIANTE (respeta este perfil en cada fragmento):\n"
+        f"- Tono deseado para Hilo: {tono}\n"
+        f"- Estilo de explicación: {estilo}\n"
+        f"- Objetivos de aprendizaje: {objetivos}"
+    )
+
+
 def construir_payload_hilo(
     mensaje: str,
     historial_json: str,
@@ -213,7 +236,8 @@ def construir_payload_hilo(
     errores_json: str,
     tiene_error: bool,
     modo: str,
-    nivel_ayuda: int = 1
+    nivel_ayuda: int = 1,
+    perfil_json: str = "{}",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -236,8 +260,11 @@ def construir_payload_hilo(
             4: "Estás en Nivel 4. Muestra la corrección en Woven con explicación.",
         }.get(nivel_ayuda, "")
 
+    preferencias = construir_preferencias_estudiante(perfil_json)
+
     system_completo = (
         SYSTEM_PROMPT
+        + f"\n\n{preferencias}"
         + f"\n\nCONTEXTO DEL PROGRAMA:\n{contexto}"
         + f"\n\nNIVEL ACTUAL: {nivel_instruccion}"
     )
@@ -340,11 +367,11 @@ def parsear_respuesta_hilo(response_json: str) -> str:
     return json.dumps(normalizar_respuesta_hilo(raw), ensure_ascii=False)
 
 
-def hilo_chat(mensaje, historial_json, codigo, output_json, errores_json, tiene_error, modo, nivel_ayuda):
+def hilo_chat(mensaje, historial_json, codigo, output_json, errores_json, tiene_error, modo, nivel_ayuda, perfil_json="{}"):
     try:
         payload = construir_payload_hilo(
             mensaje, historial_json, codigo, output_json,
-            errores_json, tiene_error, modo, nivel_ayuda
+            errores_json, tiene_error, modo, nivel_ayuda, perfil_json
         )
         return json.dumps({
             "ok": True,
