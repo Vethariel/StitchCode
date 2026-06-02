@@ -1,7 +1,7 @@
 import { normalizeSpriteEmotion } from "./hilo-emotions.js";
 
 /** @typedef {{ line: number, start?: number, end?: number }} HiloHighlight */
-/** @typedef {'editor' | 'console'} HiloPanel */
+/** @typedef {'editor' | 'blocks' | 'console'} HiloPanel */
 /** @typedef {{
  *   text: string,
  *   emotion: string,
@@ -25,7 +25,7 @@ function normalizeChunk(c) {
     emotion: normalizeSpriteEmotion(c.emotion),
   };
   const panel = String(c.panel ?? "").toLowerCase();
-  if (panel === "editor" || panel === "console") {
+  if (panel === "editor" || panel === "blocks" || panel === "console") {
     chunk.panel = panel;
   }
   if (c.highlight && typeof c.highlight === "object") {

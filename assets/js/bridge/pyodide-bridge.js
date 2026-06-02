@@ -209,6 +209,7 @@ export async function blocksToSource(doc) {
  *   nivelAyuda: number,
  *   perfilJson: string,
  *   tipoInteraccion?: string,
+ *   bloquesResumen?: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -226,7 +227,8 @@ export async function hiloPrepareMessage(args) {
       args.modo,
       args.nivelAyuda,
       args.perfilJson ?? "{}",
-      args.tipoInteraccion ?? "conversacion"
+      args.tipoInteraccion ?? "conversacion",
+      args.bloquesResumen ?? ""
     )
   );
   return JSON.parse(raw);
@@ -234,7 +236,12 @@ export async function hiloPrepareMessage(args) {
 
 /**
  * @param {string} responseJson
- * @param {{ codigo?: string, outputJson?: string }} [ctx]
+ * @param {{
+ *   codigo?: string,
+ *   outputJson?: string,
+ *   bloquesResumen?: string,
+ *   modo?: string,
+ * }} [ctx]
  */
 export async function hiloParseResponse(responseJson, ctx = {}) {
   if (!parseHiloResponseFn) {
@@ -244,7 +251,9 @@ export async function hiloParseResponse(responseJson, ctx = {}) {
     parseHiloResponseFn(
       responseJson,
       ctx.codigo ?? "",
-      ctx.outputJson ?? "[]"
+      ctx.outputJson ?? "[]",
+      ctx.bloquesResumen ?? "",
+      ctx.modo ?? "texto"
     )
   );
 }

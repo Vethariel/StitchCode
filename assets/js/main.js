@@ -14,6 +14,7 @@ import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
 import { createGeminiApiAccess } from "./gemini-api-state.js";
 import { createHiloAgentController } from "./hilo-agent-controller.js";
+import { buildHiloContext } from "./hilo-context.js";
 import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
 import {
@@ -167,7 +168,9 @@ const hiloHighlight = createHiloHighlightController({
   codeArea,
   lineNumbers: document.getElementById("line-numbers"),
   codeHighlight: document.getElementById("code-highlight"),
+  blocksDocument: document.getElementById("blocks-document"),
   consoleBody: document.getElementById("console-body"),
+  getVista: () => editorMode?.getMode() ?? "text",
 });
 
 hiloAgent = createHiloAgentController({
@@ -184,21 +187,18 @@ hiloAgent = createHiloAgentController({
   getPerfilJson: () => profileJsonForGemini(),
   focus: hiloFocus,
   highlight: hiloHighlight,
-  getContext: () => {
-    const mode = editorMode?.getMode() ?? "text";
-    const modo =
-      mode === "verbose" ? "verboso" : mode === "blocks" ? "bloques" : "woven";
-    const lintErrores = linter?.textosErrores() ?? [];
-    const tieneError =
-      (linter?.tieneErroresBloqueantes() ?? false) || lastRunHadError;
-    return {
+  getContext: () =>
+    buildHiloContext({
+      vista: editorMode?.getMode() ?? "text",
       codigo: editor.getCode(),
       output: lastRunOutput,
-      errores: lintErrores,
-      tieneError,
-      modo,
-    };
-  },
+      errores: linter?.textosErrores() ?? [],
+      tieneError:
+        (linter?.tieneErroresBloqueantes() ?? false) || lastRunHadError,
+      bloquesResumen: editorMode?.isBlockMode()
+        ? blocksCtl.getProgramSummary()
+        : "",
+    }),
 });
 
 let isRunning = false;

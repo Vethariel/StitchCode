@@ -31,7 +31,7 @@ export function detectHiloIntent(message) {
   const asksExplain =
     /\b(?:explic|entender|significa|descr|cu[eé]nta)\w*/i.test(lower);
   const aboutCode =
-    /\b(?:c[oó]digo|programa|l[ií]nea|editor|woven|variable|funci[oó]n|bucle|bloque)\w*/i.test(
+    /\b(?:c[oó]digo|programa|l[ií]nea|editor|woven|variable|funci[oó]n|bucle|bloque|bloques|verboso|L\d+)\w*/i.test(
       lower
     );
   const aboutConsole =

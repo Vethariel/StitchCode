@@ -1,20 +1,25 @@
-/** @typedef {'editor' | 'console'} HiloPanelId */
+/** @typedef {'editor' | 'blocks' | 'console'} HiloPanelId */
+/** @typedef {'text' | 'blocks' | 'verbose'} EditorVista */
 /** @typedef {{ line: number, start?: number, end?: number }} HiloHighlightRange */
 
 /**
- * Resalta líneas en editor y consola durante una explicación.
+ * Resalta líneas en editor de texto, bloques o consola durante una explicación.
  * @param {{
  *   codeArea: HTMLTextAreaElement,
  *   lineNumbers: HTMLElement,
  *   codeHighlight: HTMLElement | null,
+ *   blocksDocument: HTMLElement,
  *   consoleBody: HTMLElement,
+ *   getVista: () => EditorVista,
  * }} els
  */
 export function createHiloHighlightController({
   codeArea,
   lineNumbers,
   codeHighlight,
+  blocksDocument,
   consoleBody,
+  getVista,
 }) {
   function clearEditor() {
     lineNumbers
@@ -22,6 +27,12 @@ export function createHiloHighlightController({
       .forEach((el) => el.classList.remove("hilo-highlight-line"));
     codeHighlight
       ?.querySelectorAll(".hilo-highlight-line")
+      .forEach((el) => el.classList.remove("hilo-highlight-line"));
+  }
+
+  function clearBlocks() {
+    blocksDocument
+      .querySelectorAll(".hilo-highlight-line")
       .forEach((el) => el.classList.remove("hilo-highlight-line"));
   }
 
@@ -33,12 +44,13 @@ export function createHiloHighlightController({
 
   function clear() {
     clearEditor();
+    clearBlocks();
     clearConsole();
   }
 
   /** @param {number} line 1-based */
   function applyEditor(line) {
-    clearEditor();
+    clear();
     const total = codeArea.value.split("\n").length;
     const ln = Math.max(1, Math.min(line, total));
 
@@ -46,31 +58,57 @@ export function createHiloHighlightController({
       .querySelector(`[data-line="${ln}"]`)
       ?.classList.add("hilo-highlight-line");
 
-    const hlLine = codeHighlight?.querySelectorAll(".hl-line")?.[ln - 1];
-    hlLine?.classList.add("hilo-highlight-line");
+    codeHighlight
+      ?.querySelectorAll(".hl-line")
+      ?.[ln - 1]?.classList.add("hilo-highlight-line");
 
     scrollEditorToLine(ln);
   }
 
+  /** @param {number} line 1-based (L1, L2… en la cuadrícula de bloques) */
+  function applyBlocks(line) {
+    clear();
+    const nodes = blocksDocument.querySelectorAll(
+      `[data-hilo-line="${line}"]`
+    );
+    nodes.forEach((el) => el.classList.add("hilo-highlight-line"));
+    blocksDocument
+      .querySelector(`.blocks-line-num[data-hilo-line="${line}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
   /** @param {number} line 1-based entre filas .c-line */
   function applyConsole(line) {
-    clearConsole();
+    clear();
     const rows = consoleBody.querySelectorAll(".c-line");
     if (!rows.length) return;
     const ln = Math.max(1, Math.min(line, rows.length));
-    const row = rows[ln - 1];
-    row.classList.add("hilo-highlight-line");
-    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    rows[ln - 1].classList.add("hilo-highlight-line");
+    rows[ln - 1].scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   /**
    * @param {{ panel?: HiloPanelId, highlight?: HiloHighlightRange }} chunk
    */
   function applyForChunk(chunk) {
-    const panel = chunk.panel ?? "editor";
+    const vista = getVista();
+    let panel = chunk.panel;
+    if (!panel) {
+      panel = vista === "text" ? "editor" : "blocks";
+    }
+    if (vista !== "text" && panel === "editor") {
+      panel = "blocks";
+    }
+    if (vista === "text" && panel === "blocks") {
+      panel = "editor";
+    }
+
     const line = chunk.highlight?.line ?? 1;
+
     if (panel === "console") {
       applyConsole(line);
+    } else if (panel === "blocks") {
+      applyBlocks(line);
     } else {
       applyEditor(line);
     }
@@ -93,5 +131,5 @@ export function createHiloHighlightController({
     codeArea.dispatchEvent(new Event("scroll"));
   }
 
-  return { clear, applyForChunk, applyEditor, applyConsole };
+  return { clear, applyForChunk, applyEditor, applyBlocks, applyConsole };
 }

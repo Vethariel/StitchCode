@@ -40,3 +40,20 @@ test("parseHiloTurn lee explicación con panel y highlight", () => {
   assert.equal(turn.chunks[0].highlight?.line, 2);
   assert.equal(turn.chunks[1].panel, "console");
 });
+
+test("parseHiloTurn acepta panel blocks", () => {
+  const raw = JSON.stringify({
+    type: "explanation",
+    chunks: [
+      {
+        text: "El bloque L2 imprime.",
+        emotion: "wink",
+        panel: "blocks",
+        highlight: { line: 2 },
+      },
+    ],
+  });
+  const turn = parseHiloTurn(raw);
+  assert.equal(turn.chunks[0].panel, "blocks");
+  assert.equal(turn.chunks[0].highlight?.line, 2);
+});

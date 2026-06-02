@@ -2,6 +2,7 @@ import { sendHiloMessage } from "./hilo-chat.js";
 import { emotionForState } from "./hilo-emotions.js";
 import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
+import { defaultExplanationPanel } from "./hilo-context.js";
 import { detectHiloIntent, intentToApiTipo } from "./hilo-intent.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
@@ -39,6 +40,8 @@ import {
  *     errores: string[],
  *     tieneError: boolean,
  *     modo: string,
+ *     vista: 'text' | 'blocks' | 'verbose',
+ *     bloquesResumen: string,
  *   },
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
@@ -132,7 +135,8 @@ export function createHiloAgentController({
   function applyExplanationFocus(index) {
     const chunk = activeTurn?.chunks[index];
     if (!chunk) return;
-    const panel = chunk.panel ?? "editor";
+    const ctx = getContext();
+    const panel = chunk.panel ?? defaultExplanationPanel(ctx.vista);
     focus.enter(panel);
     focus.positionNear(panel);
     highlight.applyForChunk(chunk);
@@ -323,18 +327,20 @@ export function createHiloAgentController({
         apiKey,
         perfilJson: getPerfilJson(),
         tipoInteraccion: intentToApiTipo(intent),
+        bloquesResumen: ctx.bloquesResumen,
         codigoForParse: ctx.codigo,
         outputJsonForParse: JSON.stringify(ctx.output),
       });
 
       let turn = parseHiloTurn(raw);
-      if (intent === "explanation" && turn.type !== "explanation") {
+      const defaultPanel = defaultExplanationPanel(ctx.vista);
+      if (intent === "explanation") {
         turn = {
           ...turn,
           type: "explanation",
           chunks: turn.chunks.map((c, i) => ({
             ...c,
-            panel: c.panel ?? "editor",
+            panel: c.panel ?? defaultPanel,
             highlight: c.highlight ?? { line: i + 1 },
           })),
         };

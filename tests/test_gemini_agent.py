@@ -7,6 +7,7 @@ sys.path.append(str(ROOT / "woven"))
 import json
 
 from gemini_agent import (  # noqa: E402
+    construir_contexto,
     construir_payload_hilo,
     construir_preferencias_estudiante,
     normalizar_perfil,
@@ -74,6 +75,22 @@ def test_payload_gemini_incluye_parametros_perfil():
     assert "objetivos: Aprobar examen" in system_text
 
 
+def test_construir_contexto_modo_bloques():
+    ctx = construir_contexto(
+        "int x = 1",
+        ["1"],
+        [],
+        False,
+        "bloques",
+        "Vista: bloques\nL1 · [Declarar]: int x = 1",
+    )
+    assert "MODO DE VISTA" in ctx
+    assert "bloques" in ctx
+    assert "PROGRAMA EN BLOQUES" in ctx
+    assert "L1 ·" in ctx
+    assert "CÓDIGO WOVEN EQUIVALENTE" in ctx
+
+
 def test_normalizar_explicacion_con_panel():
     raw = json.dumps(
         {
@@ -96,12 +113,40 @@ def test_normalizar_explicacion_con_panel():
         ensure_ascii=False,
     )
     out = normalizar_respuesta_hilo(
-        raw, codigo="int x = 1\nprint(x)", output_json='["5"]'
+        raw,
+        codigo="int x = 1\nprint(x)",
+        output_json='["5"]',
+        modo_vista="texto",
     )
     assert out["type"] == "explanation"
     assert out["chunks"][0]["panel"] == "editor"
     assert out["chunks"][0]["highlight"]["line"] == 2
     assert out["chunks"][1]["panel"] == "console"
+
+
+def test_normalizar_explicacion_panel_blocks_en_modo_bloques():
+    raw = json.dumps(
+        {
+            "type": "explanation",
+            "chunks": [
+                {
+                    "text": "Bloque L1.",
+                    "emotion": "smile",
+                    "panel": "blocks",
+                    "highlight": {"line": 1},
+                }
+            ],
+        }
+    )
+    resumen = "Vista: bloques\nL1 · [Declarar]: int x = 1\nL2 · [Mostrar]: print(x)"
+    out = normalizar_respuesta_hilo(
+        raw,
+        codigo="int x = 1\nprint(x)",
+        bloques_resumen=resumen,
+        modo_vista="bloques",
+    )
+    assert out["chunks"][0]["panel"] == "blocks"
+    assert out["chunks"][0]["highlight"]["line"] == 1
 
 
 def test_payload_explicacion_incluye_modo_foco():

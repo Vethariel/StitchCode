@@ -285,6 +285,74 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     return { bloques: structuredClone(bloques) };
   }
 
+  /** Resumen numerado (L1, L2…) para el contexto de Hilo — misma numeración que la UI. */
+  function getProgramSummary() {
+    if (!bloques.length) {
+      return "(programa vacío — sin bloques en el documento)";
+    }
+
+    const lines = [];
+    const counter = { n: 1 };
+    const vista = viewMode === "verbose" ? "verboso" : "bloques";
+
+    /**
+     * @param {Bloque[]} list
+     */
+    function walk(list) {
+      for (const bloque of list) {
+        const line = counter.n++;
+        const schema = BLOCK_SCHEMAS[bloque.tipo];
+        const label = schema?.label || bloque.tipo;
+        const preview = (bloque.texto || "")
+          .trim()
+          .replace(/\s+/g, " ")
+          .slice(0, 140);
+        lines.push(
+          `L${line} · [${label}] ${preview || "(sin texto en el bloque)"}`
+        );
+
+        if (schema?.slots?.includes("hijos") && bloque.hijos?.length) {
+          walk(bloque.hijos);
+        }
+        if (schema?.slots?.includes("hijos_else") && bloque.hijos_else?.length) {
+          lines.push(`  └ rama sino de L${line}:`);
+          walk(bloque.hijos_else);
+        }
+        if (schema?.slots?.includes("hijos_catch") && bloque.hijos_catch?.length) {
+          lines.push(`  └ rama capturar de L${line}:`);
+          walk(bloque.hijos_catch);
+        }
+      }
+    }
+
+    walk(bloques);
+    return `Vista: ${vista}\n${lines.join("\n")}`;
+  }
+
+  /** @returns {number} */
+  function getBlockLineCount() {
+    if (!bloques.length) return 0;
+    const counter = { n: 1 };
+
+    /** @param {Bloque[]} list */
+    function walk(list) {
+      for (const bloque of list) {
+        counter.n += 1;
+        const schema = BLOCK_SCHEMAS[bloque.tipo];
+        if (schema?.slots?.includes("hijos") && bloque.hijos?.length) walk(bloque.hijos);
+        if (schema?.slots?.includes("hijos_else") && bloque.hijos_else?.length) {
+          walk(bloque.hijos_else);
+        }
+        if (schema?.slots?.includes("hijos_catch") && bloque.hijos_catch?.length) {
+          walk(bloque.hijos_catch);
+        }
+      }
+    }
+
+    walk(bloques);
+    return counter.n - 1;
+  }
+
   function setViewMode(mode) {
     viewMode = mode;
     render();
@@ -593,13 +661,16 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     num.className = "blocks-line-num";
     num.textContent = String(line);
     num.setAttribute("aria-label", `Línea ${line}`);
+    num.dataset.hiloLine = String(line);
 
     const kind = document.createElement("div");
     kind.className = "blocks-line-type";
     kind.textContent = schema?.label || bloque.tipo;
+    kind.dataset.hiloLine = String(line);
 
     const main = document.createElement("div");
     main.className = "blocks-line-main";
+    main.dataset.hiloLine = String(line);
     main.style.setProperty("--block-depth", String(rowCtx.indent));
     main.appendChild(renderBlockCard(bloque, parentList, index));
 
@@ -853,6 +924,8 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     setDocument,
     getDocument,
     setViewMode,
+    getProgramSummary,
+    getBlockLineCount,
     render,
   };
 }

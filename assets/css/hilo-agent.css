@@ -28,7 +28,7 @@
 .hilo-bubble {
   background: var(--palette-ink);
   border: 1px solid rgba(var(--rgb-accent), 0.26);
-  border-radius: 12px 12px 2px 12px;
+  border-radius: 12px 12px 12px 2px;
   padding: 10px 12px 8px;
   max-width: 100%;
   min-width: 0;
@@ -46,13 +46,13 @@
   content: "";
   position: absolute;
   bottom: -6px;
-  right: 18px;
+  left: 18px;
   width: 9px;
   height: 9px;
   background: var(--palette-ink);
   border-right: 1px solid rgba(var(--rgb-accent), 0.26);
   border-bottom: 1px solid rgba(var(--rgb-accent), 0.26);
-  transform: rotate(45deg);
+  transform: scaleX(-1) rotate(45deg);
 }
 
 .hilo-bubble.show {

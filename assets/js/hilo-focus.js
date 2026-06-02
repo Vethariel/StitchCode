@@ -1,7 +1,9 @@
-/** @typedef {'editor' | 'console'} HiloFocusPanel */
+/** @typedef {'editor' | 'blocks' | 'console'} HiloFocusPanel */
 
-const PANEL_ELEMENT_IDS = {
+/** Panel DOM iluminado (editor-panel agrupa texto, bloques y verboso). */
+const PANEL_DOM_ID = {
   editor: "editor-panel",
+  blocks: "editor-panel",
   console: "console-panel",
 };
 
@@ -23,8 +25,8 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
 
   /** @param {HiloFocusPanel} panel */
   function panelEl(panel) {
-    const id = PANEL_ELEMENT_IDS[panel];
-    return id ? document.getElementById(id) : null;
+    const id = PANEL_DOM_ID[panel] ?? PANEL_DOM_ID.editor;
+    return document.getElementById(id);
   }
 
   function clearDockPosition() {
@@ -60,10 +62,13 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
     appShell.classList.add("hilo-focus-active");
     dock.classList.add("hilo-focus-dock");
 
-    for (const key of Object.keys(PANEL_ELEMENT_IDS)) {
-      const el = panelEl(/** @type {HiloFocusPanel} */ (key));
-      el?.classList.toggle("hilo-focus-illuminated", key === panel);
-    }
+    const editorOn = panel === "editor" || panel === "blocks";
+    document
+      .getElementById("editor-panel")
+      ?.classList.toggle("hilo-focus-illuminated", editorOn);
+    document
+      .getElementById("console-panel")
+      ?.classList.toggle("hilo-focus-illuminated", panel === "console");
 
     positionAtPanelCorner(panel);
   }
@@ -76,11 +81,12 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
     dock.classList.remove("hilo-focus-dock");
     clearDockPosition();
 
-    for (const key of Object.keys(PANEL_ELEMENT_IDS)) {
-      panelEl(/** @type {HiloFocusPanel} */ (key))?.classList.remove(
-        "hilo-focus-illuminated"
-      );
-    }
+    document
+      .getElementById("editor-panel")
+      ?.classList.remove("hilo-focus-illuminated");
+    document
+      .getElementById("console-panel")
+      ?.classList.remove("hilo-focus-illuminated");
   }
 
   function onResize() {

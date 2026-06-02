@@ -54,9 +54,10 @@ ESTILO PEDAGÓGICO
   qué explorar a continuación dentro del mismo concepto.
 
 CONTEXTO DISPONIBLE
-Recibirás al inicio de cada conversación el estado actual del programa:
-código Woven, output de consola, errores si los hay, y el modo de vista
-(código o verboso). Úsalo siempre para personalizar tu respuesta.
+Recibirás al inicio de cada turno el estado del programa y el MODO DE VISTA
+(texto = código Woven, bloques = editor visual, verboso = bloques en lenguaje
+natural). Úsalo siempre: no hables de "líneas de código" si el estudiante está
+en bloques; referencia L1, L2… y el nombre del bloque.
 
 PARÁMETROS DE PERFIL (obligatorios en cada turno)
 Recibirás tres parámetros del estudiante definidos en el onboarding:
@@ -198,34 +199,63 @@ Si MODO DE VISTA es "verboso":
 
 EXPLANATION_PROMPT = """
 PODER: EXPLICACIÓN (modo foco)
-El estudiante pidió entender lo que tiene en pantalla (código o consola).
+El estudiante pidió entender lo que tiene en pantalla.
 Responde con type: "explanation" y entre 2 y 6 chunks.
 
 Cada chunk DEBE incluir:
 - text, emotion (igual que en conversación)
-- panel: "editor" si hablas del código Woven; "console" si hablas de la salida
-- highlight: { "line": N } con N = número de línea (1 = primera línea del panel)
+- panel: según MODO DE VISTA del contexto:
+  · modo "texto" → "editor" (líneas del código Woven)
+  · modo "bloques" o "verboso" → "blocks" (líneas L1, L2… del programa en bloques)
+  · salida de ejecución → "console"
+- highlight: { "line": N } — N es la línea en ese panel (1 = primera)
 
 Reglas de la explicación:
-- Una idea por fragmento; el highlight debe corresponder a lo que dices en ese fragmento.
-- Usa líneas reales del código y de la consola del contexto (no inventes números).
-- Si la consola está vacía o solo dice que no se ejecutó, no uses panel "console".
-- No hagas preguntas socráticas: explica con claridad según el perfil del estudiante.
-- No corrijas código salvo que el estudiante lo pida en el mensaje.
+- Respeta el MODO DE VISTA: en bloques/verboso habla de bloques y usa panel "blocks";
+  en texto habla del código y usa panel "editor". No mezcles sin avisar.
+- Una idea por fragmento; el highlight debe corresponder a lo que dices.
+- Usa numeración real del contexto (no inventes líneas).
+- Si la consola está vacía, no uses panel "console".
+- En verboso, usa lenguaje natural del bloque, no sintaxis Woven salvo que ayude.
 
-Ejemplo:
+Ejemplo (modo bloques):
 {
   "type": "explanation",
   "chunks": [
-    {"text": "Aquí declaras x con valor 5.", "emotion": "smile", "panel": "editor", "highlight": {"line": 2}},
-    {"text": "Al ejecutar, la consola muestra 5.", "emotion": "wink", "panel": "console", "highlight": {"line": 1}}
+    {"text": "El bloque L1 declara x.", "emotion": "smile", "panel": "blocks", "highlight": {"line": 1}},
+    {"text": "L2 muestra el valor en consola.", "emotion": "wink", "panel": "console", "highlight": {"line": 1}}
   ]
 }
 """
 
 
-def construir_contexto(codigo: str, output: list, errores: list, tiene_error: bool, modo: str) -> str:
-    partes = [f"CÓDIGO WOVEN ACTUAL:\n```\n{codigo}\n```"]
+def construir_contexto(
+    codigo: str,
+    output: list,
+    errores: list,
+    tiene_error: bool,
+    modo: str,
+    bloques_resumen: str = "",
+) -> str:
+    modo_norm = (modo or "texto").strip().lower()
+    partes = [
+        "MODO DE VISTA DEL ESTUDIANTE: "
+        f"{modo_norm} — el estudiante está editando en este modo ahora mismo. "
+        "Adapta vocabulario, referencias (líneas de código vs líneas L1, L2 de bloques) "
+        "y el panel de explicación según este modo."
+    ]
+
+    if modo_norm in ("bloques", "verboso") and (bloques_resumen or "").strip():
+        partes.append(
+            "PROGRAMA EN BLOQUES (numeración visible en pantalla):\n"
+            f"```\n{bloques_resumen.strip()}\n```"
+        )
+        partes.append(
+            "CÓDIGO WOVEN EQUIVALENTE (sincronizado con los bloques):\n"
+            f"```\n{codigo}\n```"
+        )
+    else:
+        partes.append(f"CÓDIGO WOVEN ACTUAL:\n```\n{codigo}\n```")
 
     if tiene_error:
         partes.append(f"ERRORES:\n" + "\n".join(errores))
@@ -234,7 +264,6 @@ def construir_contexto(codigo: str, output: list, errores: list, tiene_error: bo
     else:
         partes.append("El programa no ha sido ejecutado aún.")
 
-    partes.append(f"MODO DE VISTA: {modo}")
     return "\n\n".join(partes)
 
 
@@ -288,12 +317,15 @@ def construir_payload_hilo(
     nivel_ayuda: int = 1,
     perfil_json: str = "{}",
     tipo_interaccion: str = "conversacion",
+    bloques_resumen: str = "",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
     errores = json.loads(errores_json)
 
-    contexto = construir_contexto(codigo, output, errores, tiene_error, modo)
+    contexto = construir_contexto(
+        codigo, output, errores, tiene_error, modo, bloques_resumen
+    )
 
     if not tiene_error:
         nivel_instruccion = (
@@ -354,7 +386,7 @@ EMOCIONES_VALIDAS = {
     "happy", "smile", "kiss", "heart_eyes", "grin", "tongue", "sleep", "cool",
     "laugh", "wink", "neutral", "expressionless", "cry", "sad", "worried", "angry",
 }
-PANELES_VALIDOS = frozenset({"editor", "console"})
+PANELES_VALIDOS = frozenset({"editor", "blocks", "console"})
 
 
 def _normalizar_highlight(panel: str, highlight: object, max_line: int = 999) -> dict:
@@ -375,7 +407,21 @@ def _normalizar_highlight(panel: str, highlight: object, max_line: int = 999) ->
     return out
 
 
-def _normalizar_chunk(item: dict, tipo: str, codigo_lineas: int, consola_lineas: int) -> dict | None:
+def _contar_lineas_bloques(bloques_resumen: str) -> int:
+    import re
+
+    count = len(re.findall(r"(?m)^L\d+\s*·", bloques_resumen or ""))
+    return max(count, 1)
+
+
+def _normalizar_chunk(
+    item: dict,
+    tipo: str,
+    codigo_lineas: int,
+    consola_lineas: int,
+    bloques_lineas: int,
+    modo_vista: str,
+) -> dict | None:
     text = str(item.get("text", "")).strip()
     if not text:
         return None
@@ -389,9 +435,18 @@ def _normalizar_chunk(item: dict, tipo: str, codigo_lineas: int, consola_lineas:
     panel = str(item.get("panel", "editor")).strip().lower()
     if panel not in PANELES_VALIDOS:
         panel = "editor"
-    if panel == "console" and consola_lineas < 1:
+    if modo_vista in ("bloques", "verboso") and panel == "editor":
+        panel = "blocks"
+    if modo_vista == "texto" and panel == "blocks":
         panel = "editor"
-    max_line = codigo_lineas if panel == "editor" else max(consola_lineas, 1)
+    if panel == "console" and consola_lineas < 1:
+        panel = "blocks" if modo_vista in ("bloques", "verboso") else "editor"
+    if panel == "blocks":
+        max_line = bloques_lineas
+    elif panel == "console":
+        max_line = max(consola_lineas, 1)
+    else:
+        max_line = codigo_lineas
     chunk["panel"] = panel
     chunk["highlight"] = _normalizar_highlight(panel, item.get("highlight"), max_line)
     return chunk
@@ -431,6 +486,8 @@ def normalizar_respuesta_hilo(
     texto_modelo: str,
     codigo: str = "",
     output_json: str = "[]",
+    bloques_resumen: str = "",
+    modo_vista: str = "texto",
 ) -> dict:
     crudo = _limpiar_json_crudo(texto_modelo)
     codigo_lineas = max(1, len((codigo or "").split("\n")))
@@ -439,6 +496,8 @@ def normalizar_respuesta_hilo(
     except json.JSONDecodeError:
         output = []
     consola_lineas = len(output) if isinstance(output, list) else 0
+    modo_norm = (modo_vista or "texto").strip().lower()
+    bloques_lineas = _contar_lineas_bloques(bloques_resumen)
 
     chunks = None
     tipo = "conversation"
@@ -452,7 +511,14 @@ def normalizar_respuesta_hilo(
             for item in data["chunks"]:
                 if not isinstance(item, dict):
                     continue
-                norm = _normalizar_chunk(item, tipo, codigo_lineas, consola_lineas)
+                norm = _normalizar_chunk(
+                    item,
+                    tipo,
+                    codigo_lineas,
+                    consola_lineas,
+                    bloques_lineas,
+                    modo_norm,
+                )
                 if norm:
                     chunks.append(norm)
     except json.JSONDecodeError:
@@ -468,20 +534,34 @@ def normalizar_respuesta_hilo(
             chunks = extra
 
     if tipo == "explanation":
+        default_panel = "blocks" if modo_norm in ("bloques", "verboso") else "editor"
+        default_max = bloques_lineas if default_panel == "blocks" else codigo_lineas
         for i, ch in enumerate(chunks):
             if "panel" not in ch:
-                ch["panel"] = "editor"
-                ch["highlight"] = {"line": min(i + 1, codigo_lineas)}
+                ch["panel"] = default_panel
+                ch["highlight"] = {"line": min(i + 1, default_max)}
 
     texto_completo = " ".join(c["text"] for c in chunks)
     return {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
 
 
-def parsear_respuesta_hilo(response_json: str, codigo: str = "", output_json: str = "[]") -> str:
+def parsear_respuesta_hilo(
+    response_json: str,
+    codigo: str = "",
+    output_json: str = "[]",
+    bloques_resumen: str = "",
+    modo_vista: str = "texto",
+) -> str:
     data = json.loads(response_json)
     raw = data["candidates"][0]["content"]["parts"][0]["text"]
     return json.dumps(
-        normalizar_respuesta_hilo(raw, codigo=codigo, output_json=output_json),
+        normalizar_respuesta_hilo(
+            raw,
+            codigo=codigo,
+            output_json=output_json,
+            bloques_resumen=bloques_resumen,
+            modo_vista=modo_vista,
+        ),
         ensure_ascii=False,
     )
 
@@ -497,10 +577,12 @@ def hilo_chat(
     nivel_ayuda,
     perfil_json="{}",
     tipo_interaccion="conversacion",
+    bloques_resumen="",
 ):
     """
     Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
     tipo_interaccion: "conversacion" | "explicacion" (poder Explicación / modo foco).
+    bloques_resumen: programa L1… cuando modo es bloques o verboso.
     """
     try:
         payload = construir_payload_hilo(
@@ -514,6 +596,7 @@ def hilo_chat(
             nivel_ayuda,
             perfil_json,
             tipo_interaccion,
+            bloques_resumen,
         )
         return json.dumps({
             "ok": True,

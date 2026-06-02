@@ -65,3 +65,18 @@
   box-shadow: inset 3px 0 0 var(--palette-gold-soft);
   border-radius: 4px;
 }
+
+.blocks-line-num.hilo-highlight-line,
+.blocks-line-type.hilo-highlight-line,
+.blocks-line-main.hilo-highlight-line {
+  background: rgba(212, 168, 83, 0.1);
+}
+
+.blocks-line-num.hilo-highlight-line {
+  color: var(--palette-gold-soft);
+  font-weight: 700;
+}
+
+.blocks-line-main.hilo-highlight-line .woven-block {
+  box-shadow: 0 0 0 2px rgba(212, 168, 83, 0.45);
+}

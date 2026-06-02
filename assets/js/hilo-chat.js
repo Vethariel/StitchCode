@@ -38,6 +38,7 @@ export async function callGeminiHilo(apiKey, payloadJson) {
  *   tipoInteraccion?: string,
  *   codigoForParse?: string,
  *   outputJsonForParse?: string,
+ *   bloquesResumen?: string,
  * }} ctx
  */
 export async function sendHiloMessage(ctx) {
@@ -52,6 +53,7 @@ export async function sendHiloMessage(ctx) {
     nivelAyuda: ctx.nivelAyuda,
     perfilJson: ctx.perfilJson,
     tipoInteraccion: ctx.tipoInteraccion ?? "conversacion",
+    bloquesResumen: ctx.bloquesResumen ?? "",
   });
 
   if (!prep.ok) {
@@ -62,6 +64,8 @@ export async function sendHiloMessage(ctx) {
   const parsed = await hiloParseResponse(JSON.stringify(responseJson), {
     codigo: ctx.codigoForParse ?? ctx.codigo,
     outputJson: ctx.outputJsonForParse ?? JSON.stringify(ctx.output),
+    bloquesResumen: ctx.bloquesResumen ?? "",
+    modo: ctx.modo,
   });
   return parsed;
 }
