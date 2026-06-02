@@ -1,5 +1,6 @@
 /** @typedef {{ nivel: string, linea: number, mensaje: string, texto?: string }} Diagnostico */
 
+import { createEditorKeydownHandler } from "./editor-editing.js";
 import { highlightSourceLines } from "./woven-highlighter.js";
 
 /**
@@ -88,15 +89,12 @@ export function createEditorController({
     });
   }
 
-  function handleTab(event) {
-    if (event.key !== "Tab") return;
-    event.preventDefault();
-    const start = codeArea.selectionStart;
-    const end = codeArea.selectionEnd;
-    codeArea.value = `${codeArea.value.slice(0, start)}  ${codeArea.value.slice(end)}`;
-    codeArea.selectionStart = codeArea.selectionEnd = start + 2;
-    updateLines();
-  }
+  const handleEditorKeydown = createEditorKeydownHandler(codeArea, {
+    onEdit: () => {
+      updateLines();
+      onChange?.();
+    },
+  });
 
   function onInput() {
     updateLines();
@@ -169,7 +167,7 @@ export function createEditorController({
   codeArea.addEventListener("scroll", syncScroll);
   codeArea.addEventListener("click", updateActiveLine);
   codeArea.addEventListener("keyup", updateActiveLine);
-  codeArea.addEventListener("keydown", handleTab);
+  codeArea.addEventListener("keydown", handleEditorKeydown);
   codeArea.addEventListener("mousemove", handleEditorMouseMove);
   codeArea.addEventListener("mouseleave", hideTooltip);
 
