@@ -15,6 +15,8 @@
   <link rel="stylesheet" href="assets/css/editor-syntax.css">
   <link rel="stylesheet" href="assets/css/blocks.css">
   <link rel="stylesheet" href="assets/css/console.css">
+  <link rel="stylesheet" href="assets/css/gemini-api-key.css">
+  <link rel="stylesheet" href="assets/css/hilo-agent.css">
 </head>
 <body>
 
@@ -122,6 +124,79 @@ print(y)</textarea>
         </section>
 
       </div>
+    </div>
+
+    <div class="floating-dock" id="floating-dock">
+      <aside class="hilo-agent" id="hilo-agent" aria-label="Hilo, tutor conversacional" data-busy="false">
+        <div class="hilo-bubble" id="hilo-bubble" role="status" aria-live="polite">
+          <p class="hilo-bubble-text" id="hilo-bubble-text"></p>
+          <p class="hilo-bubble-hint" id="hilo-bubble-hint" hidden></p>
+        </div>
+        <div class="hilo-main">
+          <button
+            type="button"
+            class="hilo-avatar"
+            id="hilo-avatar"
+            aria-label="Hilo — clic para continuar o repetir el mensaje"
+          >
+          </button>
+          <div class="hilo-controls">
+            <form class="hilo-input-wrap" id="hilo-form">
+              <input
+                type="text"
+                class="hilo-input"
+                id="hilo-input"
+                placeholder="Pregúntale a Hilo…"
+                autocomplete="off"
+                maxlength="2000"
+              />
+              <button type="submit" class="hilo-send" id="hilo-send" title="Enviar mensaje" aria-label="Enviar">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M1 1L9 5L1 9V1Z" fill="currentColor"/>
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      </aside>
+
+      <div class="gemini-key-dock" id="gemini-key-dock" data-active="false" data-expanded="true">
+      <button
+        type="button"
+        class="gemini-key-toggle"
+        id="gemini-api-key-toggle"
+        aria-expanded="false"
+        aria-controls="gemini-key-wrap"
+        hidden
+      >
+        <span class="gemini-key-toggle-dot" aria-hidden="true"></span>
+        Ver API
+      </button>
+      <div class="gemini-key-wrap" id="gemini-key-wrap" data-key-state="unknown">
+        <label class="gemini-key-label" for="gemini-api-key-input">
+          <span class="gemini-key-dot" id="gemini-key-dot" data-state="unknown" aria-hidden="true"></span>
+          Gemini API
+        </label>
+        <div class="gemini-key-row">
+          <input
+            type="password"
+            id="gemini-api-key-input"
+            class="gemini-key-input"
+            placeholder="AIza…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-describedby="gemini-key-hint"
+          />
+          <button type="button" class="gemini-key-btn" id="gemini-api-key-validate" title="Validar y guardar clave">
+            Validar
+          </button>
+          <button type="button" class="gemini-key-btn gemini-key-btn--ghost" id="gemini-api-key-clear" title="Borrar clave guardada">
+            ✕
+          </button>
+        </div>
+        <p class="gemini-key-hint" id="gemini-key-hint" aria-live="polite"></p>
+      </div>
+    </div>
     </div>
   </div>
 

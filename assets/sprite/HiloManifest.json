@@ -1,0 +1,85 @@
+{
+  "size": 244,
+  "frames": [
+    {
+      "name": "happy",
+      "file": "frames/happy.png",
+      "size": 244
+    },
+    {
+      "name": "smile",
+      "file": "frames/smile.png",
+      "size": 244
+    },
+    {
+      "name": "kiss",
+      "file": "frames/kiss.png",
+      "size": 244
+    },
+    {
+      "name": "heart_eyes",
+      "file": "frames/heart_eyes.png",
+      "size": 244
+    },
+    {
+      "name": "grin",
+      "file": "frames/grin.png",
+      "size": 244
+    },
+    {
+      "name": "tongue",
+      "file": "frames/tongue.png",
+      "size": 244
+    },
+    {
+      "name": "sleep",
+      "file": "frames/sleep.png",
+      "size": 244
+    },
+    {
+      "name": "cool",
+      "file": "frames/cool.png",
+      "size": 244
+    },
+    {
+      "name": "laugh",
+      "file": "frames/laugh.png",
+      "size": 244
+    },
+    {
+      "name": "wink",
+      "file": "frames/wink.png",
+      "size": 244
+    },
+    {
+      "name": "neutral",
+      "file": "frames/neutral.png",
+      "size": 244
+    },
+    {
+      "name": "expressionless",
+      "file": "frames/expressionless.png",
+      "size": 244
+    },
+    {
+      "name": "cry",
+      "file": "frames/cry.png",
+      "size": 244
+    },
+    {
+      "name": "sad",
+      "file": "frames/sad.png",
+      "size": 244
+    },
+    {
+      "name": "worried",
+      "file": "frames/worried.png",
+      "size": 244
+    },
+    {
+      "name": "angry",
+      "file": "frames/angry.png",
+      "size": 244
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+import {
+  geminiGenerateContentUrl,
+  geminiErrorMessage,
+} from "./gemini-api-key.js";
+import { hiloParseResponse, hiloPrepareMessage } from "./bridge/pyodide-bridge.js";
+
+/**
+ * @param {string} apiKey
+ * @param {string} payloadJson
+ */
+export async function callGeminiHilo(apiKey, payloadJson) {
+  const response = await fetch(geminiGenerateContentUrl(apiKey), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payloadJson,
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(await geminiErrorMessage(response, body));
+  }
+
+  return response.json();
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   historial: { role: string, content: string }[],
+ *   codigo: string,
+ *   output: string[],
+ *   errores: string[],
+ *   tieneError: boolean,
+ *   modo: string,
+ *   nivelAyuda: number,
+ *   apiKey: string,
+ * }} ctx
+ */
+export async function sendHiloMessage(ctx) {
+  const prep = await hiloPrepareMessage({
+    mensaje: ctx.mensaje,
+    historialJson: JSON.stringify(ctx.historial),
+    codigo: ctx.codigo,
+    outputJson: JSON.stringify(ctx.output),
+    erroresJson: JSON.stringify(ctx.errores),
+    tieneError: ctx.tieneError,
+    modo: ctx.modo,
+    nivelAyuda: ctx.nivelAyuda,
+  });
+
+  if (!prep.ok) {
+    throw new Error(prep.error ?? "No se pudo preparar el mensaje para Hilo.");
+  }
+
+  const responseJson = await callGeminiHilo(ctx.apiKey, prep.payload);
+  const parsed = await hiloParseResponse(JSON.stringify(responseJson));
+  return parsed;
+}

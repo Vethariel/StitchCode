@@ -16,6 +16,7 @@ const INTERPRETER_FILES = [
   "pedagogical_runtime.py",
   "verbose_visitor.py",
   "verbose_inverse.py",
+  "gemini_agent.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
@@ -28,6 +29,10 @@ let lintWovenFn = null;
 let verboseWovenFn = null;
 /** @type {((json: string) => import("pyodide").PyProxy) | null} */
 let inverseVerboseFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let hiloChatFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let parseHiloResponseFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -110,12 +115,15 @@ from pedagogical_lint import lint_woven_pedagogico
 from pedagogical_runtime import run_woven_pedagogico
 from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
+from gemini_agent import hilo_chat, parsear_respuesta_hilo
 `);
 
     runWovenFn = pyodide.globals.get("run_woven_pedagogico");
     lintWovenFn = pyodide.globals.get("lint_woven_pedagogico");
     verboseWovenFn = pyodide.globals.get("verbose_woven");
     inverseVerboseFn = pyodide.globals.get("inverse_verbose");
+    hiloChatFn = pyodide.globals.get("hilo_chat");
+    parseHiloResponseFn = pyodide.globals.get("parsear_respuesta_hilo");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
@@ -123,6 +131,8 @@ from verbose_inverse import inverse_verbose
     lintWovenFn = null;
     verboseWovenFn = null;
     inverseVerboseFn = null;
+    hiloChatFn = null;
+    parseHiloResponseFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
@@ -185,4 +195,43 @@ export async function blocksToSource(doc) {
     throw new Error("El convertidor a código aún no está listo.");
   }
   return pyResultToString(inverseVerboseFn(JSON.stringify(doc)));
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   historialJson: string,
+ *   codigo: string,
+ *   outputJson: string,
+ *   erroresJson: string,
+ *   tieneError: boolean,
+ *   modo: string,
+ *   nivelAyuda: number,
+ * }} args
+ */
+export async function hiloPrepareMessage(args) {
+  if (!hiloChatFn) {
+    return { ok: false, error: "Hilo aún no está listo." };
+  }
+  const raw = pyResultToString(
+    hiloChatFn(
+      args.mensaje,
+      args.historialJson,
+      args.codigo,
+      args.outputJson,
+      args.erroresJson,
+      args.tieneError,
+      args.modo,
+      args.nivelAyuda
+    )
+  );
+  return JSON.parse(raw);
+}
+
+/** @param {string} responseJson */
+export async function hiloParseResponse(responseJson) {
+  if (!parseHiloResponseFn) {
+    throw new Error("Hilo aún no está listo.");
+  }
+  return pyResultToString(parseHiloResponseFn(responseJson));
 }

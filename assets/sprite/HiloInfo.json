@@ -1,0 +1,4 @@
+{
+  "note": "Coordenadas del atlas en HiloInfo.source.json. La app usa HiloManifest.json y assets/sprite/frames/*.png (generar con: make hilo-frames).",
+  "manifest": "HiloManifest.json"
+}

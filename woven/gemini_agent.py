@@ -8,7 +8,24 @@ OBJETIVO
 Tu meta no es dar respuestas sino guiar al estudiante a descubrirlas.
 Usa siempre el contexto del programa que el estudiante tiene abierto.
 Sé específico: menciona líneas, variables y valores reales del código del estudiante.
-Responde siempre en español. Máximo 3 párrafos por respuesta.
+Responde siempre en español.
+
+FORMATO DE RESPUESTA (obligatorio)
+Debes responder ÚNICAMENTE con un objeto JSON válido (sin markdown ni texto fuera del JSON):
+{
+  "chunks": [
+    {"text": "Una frase corta y clara.", "emotion": "wink"},
+    {"text": "Otra frase sencilla.", "emotion": "neutral"}
+  ]
+}
+
+Reglas del JSON:
+- chunks: entre 2 y 6 frases, en orden conversacional natural.
+- text: una sola idea por fragmento; máximo 120 caracteres; sin listas largas ni párrafos.
+- emotion: exactamente uno de estos valores:
+  happy, smile, kiss, heart_eyes, grin, tongue, sleep, cool, laugh, wink,
+  neutral, expressionless, cry, sad, worried, angry
+- El estudiante verá un fragmento a la vez y avanzará con clic; escribe como diálogo oral.
 
 NIVELES DE AYUDA
 Cada problema tiene un nivel que avanza si el estudiante sigue atascado.
@@ -242,15 +259,85 @@ def construir_payload_hilo(
         "generationConfig": {
             "temperature": 0.7,
             "maxOutputTokens": 1024,
+            "responseMimeType": "application/json",
         }
     }
 
     return json.dumps(payload, ensure_ascii=False)
 
 
+EMOCIONES_VALIDAS = {
+    "happy", "smile", "kiss", "heart_eyes", "grin", "tongue", "sleep", "cool",
+    "laugh", "wink", "neutral", "expressionless", "cry", "sad", "worried", "angry",
+}
+
+
+def _limpiar_json_crudo(texto: str) -> str:
+    t = texto.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[-1]
+        if t.endswith("```"):
+            t = t.rsplit("```", 1)[0]
+    return t.strip()
+
+
+def _fallback_chunks(texto: str) -> list:
+    import re
+    partes = re.split(r"(?<=[.!?…])\s+|\n+", texto.strip())
+    chunks = []
+    for p in partes:
+        p = p.strip()
+        if not p:
+            continue
+        if len(p) > 120:
+            sub = re.split(r"(?<=[,;])\s+", p)
+            for s in sub:
+                s = s.strip()
+                if s:
+                    chunks.append({"text": s, "emotion": "neutral"})
+        else:
+            chunks.append({"text": p, "emotion": "neutral"})
+    if not chunks:
+        chunks = [{"text": texto.strip() or "…", "emotion": "neutral"}]
+    return chunks[:6]
+
+
+def normalizar_respuesta_hilo(texto_modelo: str) -> dict:
+    crudo = _limpiar_json_crudo(texto_modelo)
+    chunks = None
+    try:
+        data = json.loads(crudo)
+        if isinstance(data, dict) and isinstance(data.get("chunks"), list):
+            chunks = []
+            for item in data["chunks"]:
+                if not isinstance(item, dict):
+                    continue
+                text = str(item.get("text", "")).strip()
+                if not text:
+                    continue
+                emo = str(item.get("emotion", "neutral")).strip().lower()
+                if emo not in EMOCIONES_VALIDAS:
+                    emo = "neutral"
+                chunks.append({"text": text[:120], "emotion": emo})
+    except json.JSONDecodeError:
+        chunks = None
+
+    if not chunks:
+        chunks = _fallback_chunks(crudo or texto_modelo)
+
+    if len(chunks) == 1:
+        extra = _fallback_chunks(texto_modelo)
+        if len(extra) > 1:
+            chunks = extra
+
+    texto_completo = " ".join(c["text"] for c in chunks)
+    return {"chunks": chunks, "texto_completo": texto_completo}
+
+
 def parsear_respuesta_hilo(response_json: str) -> str:
     data = json.loads(response_json)
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+    return json.dumps(normalizar_respuesta_hilo(raw), ensure_ascii=False)
 
 
 def hilo_chat(mensaje, historial_json, codigo, output_json, errores_json, tiene_error, modo, nivel_ayuda):

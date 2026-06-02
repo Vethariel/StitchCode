@@ -12,10 +12,23 @@ import { createConsoleController } from "./console-controller.js";
 import { createLinterController } from "./linter-controller.js";
 import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
+import { createGeminiApiKeyController } from "./gemini-api-key-controller.js";
+import { createHiloAgentController } from "./hilo-agent-controller.js";
 
 const codeArea = document.getElementById("code-area");
 const runBtn = document.getElementById("run-btn");
 const clearBtn = document.getElementById("clear-console-btn");
+
+const geminiApiKey = createGeminiApiKeyController({
+  dock: document.getElementById("gemini-key-dock"),
+  wrap: document.getElementById("gemini-key-wrap"),
+  input: document.getElementById("gemini-api-key-input"),
+  dot: document.getElementById("gemini-key-dot"),
+  hint: document.getElementById("gemini-key-hint"),
+  validateBtn: document.getElementById("gemini-api-key-validate"),
+  toggleBtn: document.getElementById("gemini-api-key-toggle"),
+  clearBtn: document.getElementById("gemini-api-key-clear"),
+});
 
 const runtimeLoader = createRuntimeLoader({
   overlay: document.getElementById("runtime-loader"),
@@ -41,6 +54,7 @@ const editor = createEditorController({
     if (!editorMode?.isBlockMode()) {
       linter?.scheduleLint();
     }
+    hiloAgent?.onExecutionContextChange();
   },
 });
 
@@ -62,6 +76,7 @@ linter = createLinterController({
     updateRunButton();
     syncEditorDiagnostics();
     syncConsoleWithLinter();
+    hiloAgent?.onExecutionContextChange();
   },
 });
 
@@ -85,6 +100,40 @@ const consoleCtl = createConsoleController({
 
 let isRunning = false;
 let consoleShowsLintErrors = false;
+/** @type {string[]} */
+let lastRunOutput = [];
+let lastRunHadError = false;
+
+/** @type {ReturnType<typeof createHiloAgentController>} */
+let hiloAgent;
+
+hiloAgent = createHiloAgentController({
+  root: document.getElementById("hilo-agent"),
+  bubble: document.getElementById("hilo-bubble"),
+  bubbleText: document.getElementById("hilo-bubble-text"),
+  bubbleHint: document.getElementById("hilo-bubble-hint"),
+  avatar: document.getElementById("hilo-avatar"),
+  form: document.getElementById("hilo-form"),
+  input: document.getElementById("hilo-input"),
+  sendBtn: document.getElementById("hilo-send"),
+  geminiApiKey,
+  isRuntimeReady: isReady,
+  getContext: () => {
+    const mode = editorMode?.getMode() ?? "text";
+    const modo =
+      mode === "verbose" ? "verboso" : mode === "blocks" ? "bloques" : "woven";
+    const lintErrores = linter?.textosErrores() ?? [];
+    const tieneError =
+      (linter?.tieneErroresBloqueantes() ?? false) || lastRunHadError;
+    return {
+      codigo: editor.getCode(),
+      output: lastRunOutput,
+      errores: lintErrores,
+      tieneError,
+      modo,
+    };
+  },
+});
 
 function syncConsoleWithLinter() {
   if (isRunning) return;
@@ -156,12 +205,19 @@ async function handleRun() {
       syncEditorDiagnostics();
     }
 
+    lastRunOutput = result.salida ?? [];
+    lastRunHadError = !!result.tiene_errores;
+    hiloAgent?.onExecutionContextChange();
+
     if (!result.tiene_errores) {
       consoleCtl.appendLine(`✓ Completado en ${ms} ms`, "info");
     }
   } catch (err) {
     consoleCtl.removeLine(runningLine);
     const message = err instanceof Error ? err.message : String(err);
+    lastRunHadError = true;
+    lastRunOutput = [];
+    hiloAgent?.onExecutionContextChange();
     consoleCtl.appendLine(message, "error", "!");
   } finally {
     isRunning = false;
