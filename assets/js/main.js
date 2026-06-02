@@ -10,7 +10,6 @@ import { createConsoleController } from "./console-controller.js";
 import { createLinterController } from "./linter-controller.js";
 import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
-import { esErrorWoven } from "./woven-errors.js";
 
 const codeArea = document.getElementById("code-area");
 const runBtn = document.getElementById("run-btn");
@@ -42,13 +41,13 @@ function syncEditorDiagnostics() {
 }
 
 linter = createLinterController({
-  panel: document.getElementById("linter-panel"),
   getCode: () => editor.getCode(),
   isReady,
   lintFn: lintWoven,
   onUpdate: () => {
     updateRunButton();
     syncEditorDiagnostics();
+    syncConsoleWithLinter();
   },
 });
 
@@ -57,6 +56,30 @@ const consoleCtl = createConsoleController({
 });
 
 let isRunning = false;
+let consoleShowsLintErrors = false;
+
+function syncConsoleWithLinter() {
+  if (isRunning) return;
+
+  if (linter.tieneErroresBloqueantes()) {
+    consoleShowsLintErrors = true;
+    consoleCtl.clear();
+    consoleCtl.appendLine(
+      "Errores semánticos — corrígelos antes de ejecutar.",
+      "error",
+      "!"
+    );
+    for (const texto of linter.textosErrores()) {
+      consoleCtl.appendLine(texto, "error", "!");
+    }
+    return;
+  }
+
+  if (consoleShowsLintErrors) {
+    consoleShowsLintErrors = false;
+    consoleCtl.showEmpty("// Errores corregidos. Presiona Run para ejecutar…");
+  }
+}
 
 function updateRunButton() {
   const blockedByLint = linter.tieneErroresBloqueantes();
@@ -72,18 +95,11 @@ async function handleRun() {
   await linter.runLint();
 
   if (linter.tieneErroresBloqueantes()) {
-    consoleCtl.clear();
-    consoleCtl.appendLine(
-      "Hay errores semánticos. Corrígelos antes de ejecutar.",
-      "error",
-      "!"
-    );
-    for (const texto of linter.textosErrores()) {
-      consoleCtl.appendLine(texto, "error", "!");
-    }
+    syncConsoleWithLinter();
     return;
   }
 
+  consoleShowsLintErrors = false;
   isRunning = true;
   updateRunButton();
   consoleCtl.clear();
@@ -93,18 +109,23 @@ async function handleRun() {
   const t0 = performance.now();
 
   try {
-    const output = await runWoven(code);
+    const result = await runWoven(code);
     consoleCtl.removeLine(runningLine);
     const ms = Math.round(performance.now() - t0);
 
-    if (!output.length) {
+    if (!result.salida.length) {
       consoleCtl.appendLine("Ejecución completada sin salida.", "muted");
     } else {
-      consoleCtl.appendOutputLines(output);
+      consoleCtl.appendOutputLines(result.salida);
     }
 
-    const hasError = output.some((line) => esErrorWoven(line));
-    if (!hasError) {
+    if (result.tiene_errores) {
+      editor.setDiagnostics(result.diagnosticos);
+    } else {
+      syncEditorDiagnostics();
+    }
+
+    if (!result.tiene_errores) {
       consoleCtl.appendLine(`✓ Completado en ${ms} ms`, "info");
     }
   } catch (err) {
@@ -118,7 +139,10 @@ async function handleRun() {
 }
 
 runBtn.addEventListener("click", handleRun);
-clearBtn.addEventListener("click", () => consoleCtl.showEmpty("// Consola limpiada…"));
+clearBtn.addEventListener("click", () => {
+  consoleShowsLintErrors = false;
+  consoleCtl.showEmpty("// Consola limpiada…");
+});
 
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -141,7 +165,6 @@ setBridgeHandlers({
     if (state === "ready") {
       linter.runLint();
     } else {
-      linter.render();
       updateRunButton();
     }
   },

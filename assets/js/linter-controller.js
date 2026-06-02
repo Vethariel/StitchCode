@@ -2,12 +2,11 @@
 /** @typedef {{ parse_ok: boolean, diagnosticos: Diagnostico[], tiene_errores: boolean, tiene_advertencias: boolean }} LintResult */
 
 const LINT_DEBOUNCE_MS = 800;
-const MAX_VISIBLE = 4;
 
 /**
- * @param {{ panel: HTMLElement, getCode: () => string, isReady: () => boolean, lintFn: (code: string) => Promise<LintResult>, onUpdate?: () => void }} opts
+ * @param {{ getCode: () => string, isReady: () => boolean, lintFn: (code: string) => Promise<LintResult>, onUpdate?: () => void }} opts
  */
-export function createLinterController({ panel, getCode, isReady, lintFn, onUpdate }) {
+export function createLinterController({ getCode, isReady, lintFn, onUpdate }) {
   /** @type {LintResult} */
   let state = {
     parse_ok: true,
@@ -19,53 +18,6 @@ export function createLinterController({ panel, getCode, isReady, lintFn, onUpda
   let debounceTimer = null;
   let lintGeneration = 0;
 
-  function render() {
-    panel.innerHTML = "";
-    panel.hidden = true;
-    panel.classList.remove("has-errors");
-
-    if (!isReady() || !state.parse_ok || !state.tiene_errores) {
-      return;
-    }
-
-    const errores = state.diagnosticos.filter((d) => d.nivel === "error");
-    if (!errores.length) {
-      return;
-    }
-
-    panel.hidden = false;
-    panel.classList.add("has-errors");
-
-    const title = document.createElement("div");
-    title.className = "linter-panel-title";
-    title.textContent = "Errores semánticos";
-    panel.appendChild(title);
-
-    const list = document.createElement("div");
-    list.className = "linter-list";
-
-    const visible = errores.slice(0, MAX_VISIBLE);
-    for (const d of visible) {
-      const row = document.createElement("div");
-      row.className = "linter-item error";
-      row.innerHTML = `
-        <span class="linter-item-line">Línea ${d.linea}</span>
-        <span class="linter-item-msg"></span>
-      `;
-      row.querySelector(".linter-item-msg").textContent = d.mensaje;
-      list.appendChild(row);
-    }
-
-    panel.appendChild(list);
-
-    if (errores.length > MAX_VISIBLE) {
-      const more = document.createElement("div");
-      more.className = "linter-item-more";
-      more.textContent = `+ ${errores.length - MAX_VISIBLE} más…`;
-      panel.appendChild(more);
-    }
-  }
-
   async function runLint() {
     if (!isReady()) return state;
 
@@ -76,7 +28,6 @@ export function createLinterController({ panel, getCode, isReady, lintFn, onUpda
       const result = await lintFn(code);
       if (gen !== lintGeneration) return state;
       state = result;
-      render();
       onUpdate?.();
       return state;
     } catch {
@@ -118,6 +69,5 @@ export function createLinterController({ panel, getCode, isReady, lintFn, onUpda
     textosErrores,
     getState,
     getDiagnosticos,
-    render,
   };
 }

@@ -46,10 +46,17 @@ def run_woven(source: str) -> list:
     if syntax_errors:
         return syntax_errors
 
+    salida, _ = ejecutar_woven(source)
+    return salida
+
+
+def ejecutar_woven(source: str) -> tuple[list, list]:
+    """Ejecuta código ya validado; devuelve (salida, diagnósticos runtime)."""
     lexer = WovenLexer(InputStream(source))
     stream = CommonTokenStream(lexer)
     parser = WovenParser(stream)
     tree = parser.program()
 
-    visitor = InterpreterVisitor()
-    return visitor.visit(tree)
+    visitor = InterpreterVisitor(source)
+    salida = visitor.visit(tree)
+    return salida, visitor.runtime_diagnosticos

@@ -11,7 +11,10 @@ from typing import Any, List
 from pedagogical_error_listener import (
     _ensamblar_mensaje,
     detectar_anti_patrones,
+    diagnosticos_desde_mensajes,
+    filtrar_errores_cascada,
 )
+from pedagogical_common import ejemplo_para_mensaje, filtrar_diagnosticos_cascada
 from woven_runtime import collect_syntax_errors
 from linter_visitor import lint_woven
 
@@ -49,29 +52,6 @@ _MENSAJE_MEJORAS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
-_SYNTAX_LINE = re.compile(r"línea (\d+):\d+")
-
-
-def _diagnosticos_desde_errores(errores: List[str]) -> List[dict[str, Any]]:
-    """Convierte mensajes de sintaxis/léxico en diagnósticos con línea para el editor."""
-    out: List[dict[str, Any]] = []
-    for err in errores:
-        m = _SYNTAX_LINE.search(err)
-        if not m:
-            continue
-        linea = int(m.group(1))
-        mensaje = err.split(" — ", 1)[1].split("\n")[0] if " — " in err else err
-        out.append(
-            {
-                "nivel": "error",
-                "linea": linea,
-                "mensaje": mensaje,
-                "texto": err,
-            }
-        )
-    return out
-
-
 def _mejorar_mensaje(mensaje: str) -> str:
     for patron, reemplazo in _MENSAJE_MEJORAS:
         nuevo = patron.sub(reemplazo, mensaje)
@@ -100,7 +80,8 @@ def _formatear_diagnostico(
         if limpia:
             columna = lineas[linea - 1].index(limpia[0])
 
-    return _ensamblar_mensaje(cuerpo, source, linea, columna)
+    ejemplo = ejemplo_para_mensaje(mensaje, "semantico")
+    return _ensamblar_mensaje(cuerpo, source, linea, columna, ejemplo=ejemplo)
 
 
 def lint_woven_pedagogico(source: str) -> str:
@@ -126,7 +107,10 @@ def lint_woven_pedagogico(source: str) -> str:
 
     anti = detectar_anti_patrones(source)
     if anti:
-        diagnosticos = _diagnosticos_desde_errores(anti)
+        errores = filtrar_errores_cascada(anti)
+        diagnosticos = filtrar_diagnosticos_cascada(
+            diagnosticos_desde_mensajes(errores)
+        )
         return json.dumps(
             {
                 "parse_ok": False,
@@ -139,7 +123,9 @@ def lint_woven_pedagogico(source: str) -> str:
 
     syntax = collect_syntax_errors(source)
     if syntax:
-        diagnosticos = _diagnosticos_desde_errores(syntax)
+        diagnosticos = filtrar_diagnosticos_cascada(
+            diagnosticos_desde_mensajes(syntax)
+        )
         return json.dumps(
             {
                 "parse_ok": False,
@@ -162,6 +148,8 @@ def lint_woven_pedagogico(source: str) -> str:
                 "texto": texto,
             }
         )
+
+    diagnosticos = filtrar_diagnosticos_cascada(diagnosticos)
 
     tiene_errores = any(d["nivel"] == "error" for d in diagnosticos)
     tiene_advertencias = any(d["nivel"] == "warning" for d in diagnosticos)

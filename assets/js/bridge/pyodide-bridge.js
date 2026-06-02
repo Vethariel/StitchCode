@@ -12,6 +12,8 @@ const INTERPRETER_FILES = [
   "woven_runtime.py",
   "linter_visitor.py",
   "pedagogical_lint.py",
+  "pedagogical_common.py",
+  "pedagogical_runtime.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
@@ -99,9 +101,10 @@ if "." not in sys.path:
 
 from woven_runtime import run_woven
 from pedagogical_lint import lint_woven_pedagogico
+from pedagogical_runtime import run_woven_pedagogico
 `);
 
-    runWovenFn = pyodide.globals.get("run_woven");
+    runWovenFn = pyodide.globals.get("run_woven_pedagogico");
     lintWovenFn = pyodide.globals.get("lint_woven_pedagogico");
     setStatus("ready", "Listo");
   } catch (err) {
@@ -136,19 +139,13 @@ export async function lintWoven(source) {
 
 /**
  * @param {string} source
- * @returns {Promise<string[]>}
+ * @returns {Promise<{ salida: string[], diagnosticos: import("../linter-controller.js").Diagnostico[], tiene_errores: boolean }>}
  */
 export async function runWoven(source) {
   if (!pyodide || !runWovenFn) {
     throw new Error("El motor Woven aún no está listo.");
   }
 
-  const outputProxy = runWovenFn(source);
-  try {
-    return outputProxy.toJs().map((line) => String(line));
-  } finally {
-    if (typeof outputProxy.destroy === "function") {
-      outputProxy.destroy();
-    }
-  }
+  const raw = pyResultToString(runWovenFn(source));
+  return JSON.parse(raw);
 }

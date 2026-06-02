@@ -58,19 +58,32 @@ class WovenThrowSignal(Exception):
 
 
 class InterpreterVisitor(WovenVisitor):
-    def __init__(self):
+    def __init__(self, source: str = ""):
+        self.source = source
         self.scopes = [{}]
         self.types = [{}]
         self.functions = {}   # nombre -> {ctx, return_type, params}
         self.classes = {}     # nombre -> {fields, methods, parent, constructor}
         self.output = []
+        self.runtime_diagnosticos = []
+        self._linea_actual = 1
         self.current_class_stack = []
         self.return_type_actual = None
         self.return_encontrado = False
         self.scopes_cerrados = []
 
     # ---------- helpers ----------
-    def _runtime_error(self, message):
+    def _runtime_error(self, message, linea=None, columna=None, forma=None):
+        linea = linea or self._linea_actual
+        if self.source:
+            from pedagogical_runtime import formatear_error_ejecucion
+
+            texto, diag = formatear_error_ejecucion(
+                message, self.source, linea, columna, forma
+            )
+            self.runtime_diagnosticos.append(diag)
+            self.output.append(texto)
+            return
         self.output.append(f"Error: {message}")
 
     def _es_error_no_capturable(self, exc: Exception):
@@ -350,9 +363,10 @@ class InterpreterVisitor(WovenVisitor):
             if ret_type == "void":
                 return Value("void", None)
             if not self.return_encontrado:
-                self.output.append(
-                    f"Error: la función '{method_name}' debe retornar un valor de tipo "
-                    f"{ret_type} pero no tiene return"
+                self._runtime_error(
+                    f"la función '{method_name}' debe retornar un valor de tipo "
+                    f"{ret_type} pero no tiene return",
+                    method_ctx.start.line,
                 )
                 return Value("void", None)
             return self._cast_value(ret_type, returned)
@@ -381,11 +395,14 @@ class InterpreterVisitor(WovenVisitor):
                 if comp and (comp.functionDecl() or comp.classDecl()):
                     continue
                 self.visit(stmt)
+        except WovenThrowSignal as exc:
+            self._runtime_error(exc.mensaje, exc.linea)
         except Exception as exc:
-            self._runtime_error(str(exc))
+            self._runtime_error(str(exc), self._linea_actual)
         return self.output
 
     def visitStatement(self, ctx: WovenParser.StatementContext):
+        self._linea_actual = ctx.start.line
         if ctx.compoundStmt():
             return self.visit(ctx.compoundStmt())
         return self.visit(ctx.simpleStmt())
@@ -638,22 +655,27 @@ class InterpreterVisitor(WovenVisitor):
 
         if ctx.expr() is None:
             if self.return_type_actual and self.return_type_actual != "void":
-                self.output.append(
-                    f"Error: se esperaba retornar {self.return_type_actual} "
-                    f"pero return no tiene valor"
+                self._runtime_error(
+                    f"se esperaba retornar {self.return_type_actual} "
+                    f"pero return no tiene valor",
+                    ctx.start.line,
                 )
             raise _ReturnSignal(Value("void", None))
 
         valor = self.visit(ctx.expr())
 
         if self.return_type_actual == "void":
-            self.output.append("Error: función void no debe retornar un valor")
+            self._runtime_error(
+                "función void no debe retornar un valor",
+                ctx.start.line,
+            )
             raise _ReturnSignal(valor)
 
         if self.return_type_actual and not self._is_compatible(self.return_type_actual, valor):
-            self.output.append(
-                f"Error: se esperaba retornar {self.return_type_actual} "
-                f"pero se retornó {valor.type_name}"
+            self._runtime_error(
+                f"se esperaba retornar {self.return_type_actual} "
+                f"pero se retornó {valor.type_name}",
+                ctx.start.line,
             )
 
         raise _ReturnSignal(valor)
@@ -846,9 +868,10 @@ class InterpreterVisitor(WovenVisitor):
             if ret_type == "void":
                 return Value("void", None)
             if not self.return_encontrado:
-                self.output.append(
-                    f"Error: la función '{fn_name}' debe retornar un valor de tipo "
-                    f"{ret_type} pero no tiene return"
+                self._runtime_error(
+                    f"la función '{fn_name}' debe retornar un valor de tipo "
+                    f"{ret_type} pero no tiene return",
+                    fn_meta["ctx"].start.line,
                 )
                 return Value("void", None)
             return self._cast_value(ret_type, returned)
@@ -917,9 +940,10 @@ class InterpreterVisitor(WovenVisitor):
                     raise RuntimeError("append requiere exactamente 1 argumento")
                 inner_type = self._get_list_inner_type(base.type_name)
                 if not self._is_compatible(inner_type, args[0]):
-                    self.output.append(
-                        f"Error: no se puede agregar {args[0].type_name} "
-                        f"a una lista de {inner_type}"
+                    self._runtime_error(
+                        f"no se puede agregar {args[0].type_name} "
+                        f"a una lista de {inner_type}",
+                        ctx.start.line,
                     )
                     return Value("void", None)
                 base.value.append(args[0].value)

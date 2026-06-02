@@ -25,7 +25,7 @@ def test_while_sin_parentesis_mensaje_contextual():
     assert "línea" in msg
     assert "│" in msg
     assert "^" in msg
-    assert "Forma esperada:" in msg
+    assert "Ejemplo mínimo:" in msg
     assert not any("x = 1" in line for line in output)
 
 
@@ -46,7 +46,7 @@ def test_for_in_estilo_python():
     assert "for" in output[0]
     assert "estilo C" in output[0] or "for x in" in output[0]
     assert "│" in output[0]
-    assert "Forma esperada:" in output[0]
+    assert "Ejemplo mínimo:" in output[0]
 
 
 def test_def_estilo_python():

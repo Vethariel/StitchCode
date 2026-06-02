@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any, List, Optional
 
+from pedagogical_common import EJEMPLO_ETIQUETA
+
 from antlr4.Lexer import Lexer
 from antlr4.Parser import Parser
 from antlr4.Token import Token
@@ -164,6 +166,29 @@ def _ubicacion(line: int, column: int) -> str:
     return f"línea {line}:{column}"
 
 
+_LINEA_RE = re.compile(r"línea (\d+):\d+")
+
+
+def diagnosticos_desde_mensajes(errores: List[str]) -> List[dict[str, Any]]:
+    """Convierte mensajes formateados (sintaxis/léxico/runtime) en diagnósticos."""
+    out: List[dict[str, Any]] = []
+    for err in errores:
+        m = _LINEA_RE.search(err)
+        if not m:
+            continue
+        linea = int(m.group(1))
+        mensaje = err.split(" — ", 1)[1].split("\n")[0] if " — " in err else err
+        out.append(
+            {
+                "nivel": "error",
+                "linea": linea,
+                "mensaje": mensaje,
+                "texto": err,
+            }
+        )
+    return out
+
+
 def _texto_token(token: Any) -> str:
     if token is None:
         return "fin de línea"
@@ -254,10 +279,12 @@ def _ensamblar_mensaje(
     line: int,
     column: int,
     forma: Optional[str] = None,
+    ejemplo: Optional[str] = None,
 ) -> str:
     partes = [cuerpo, "", _snippet_fuente(source, line, column)]
-    if forma:
-        partes.extend(["", f"Forma esperada: {forma}"])
+    muestra = ejemplo or forma
+    if muestra:
+        partes.extend(["", EJEMPLO_ETIQUETA, muestra])
     return "\n".join(partes)
 
 
@@ -394,8 +421,7 @@ def _mensaje_indentacion(
     if regla and regla.get("regla") == "block":
         return (
             f"Error de {tipo}: {ubic} — "
-            f"{regla['tras_palabra']}. "
-            f"Forma esperada: {regla['forma']}",
+            f"{regla['tras_palabra']}.",
             regla["forma"],
         )
 
@@ -579,7 +605,7 @@ def formatear_error_pedagogico(
     if source:
         return _ensamblar_mensaje(cuerpo, source, line, column, forma)
     if forma:
-        return f"{cuerpo}\n\nForma esperada: {forma}"
+        return f"{cuerpo}\n\n{EJEMPLO_ETIQUETA}\n{forma}"
     return cuerpo
 
 
@@ -623,6 +649,10 @@ def filtrar_errores_cascada(errores: List[str]) -> List[str]:
             for e in filtrados
             if "volvió al margen izquierdo" not in e
         ] or filtrados[:1]
+
+    # Fase D: un error principal (el primero por línea)
+    if len(filtrados) > 1:
+        return filtrados[:1]
 
     return filtrados
 
