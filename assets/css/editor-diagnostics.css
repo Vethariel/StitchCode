@@ -73,7 +73,7 @@
   background: var(--editor-diag-tooltip-bg);
   color: var(--editor-diag-tooltip-text);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--text-base);
   line-height: 1.45;
   border-radius: var(--radius-md);
   box-shadow: 0 6px 20px rgba(var(--rgb-black), 0.35);

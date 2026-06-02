@@ -190,6 +190,23 @@
   --font-display: "Fraunces", serif;
   --font-ui: "Epilogue", sans-serif;
   --font-code: "JetBrains Mono", monospace;
+
+  /* Tamaños de texto (global) */
+  --text-2xs: 13px;
+  --text-xs: 14px;
+  --text-sm: 15px;
+  --text-base: 16px;
+  --text-md: 17px;
+  --text-lg: 19px;
+  --text-xl: 23px;
+  --text-2xl: 27px;
+
+  --editor-font-size: 17px;
+  --editor-line-height: 1.72;
+  --editor-line-box: calc(var(--editor-font-size) * var(--editor-line-height));
+  --editor-pad-y: 10px;
+  --editor-pad-x: 14px;
+
   --radius-sm: 4px;
   --radius-md: 8px;
   --tr: 0.22s cubic-bezier(0.4, 0, 0.2, 1);

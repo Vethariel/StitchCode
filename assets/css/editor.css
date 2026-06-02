@@ -27,12 +27,7 @@
   flex: 1;
   overflow: hidden;
   min-height: 0;
-  /* Tipografía compartida: gutter y textarea deben coincidir pixel a pixel */
-  --editor-font-size: 13px;
-  --editor-line-height: 1.72;
-  --editor-line-box: calc(var(--editor-font-size) * var(--editor-line-height));
-  --editor-pad-y: 10px;
-  --editor-pad-x: 14px;
+  /* Tipografía: hereda de tokens.css (--editor-font-size, etc.) */
 }
 
 .text-view {
