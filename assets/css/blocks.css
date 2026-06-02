@@ -471,6 +471,8 @@ body.blocks-pointer-dragging button {
 
 .blocks-gap-main {
   align-self: stretch;
+  position: relative;
+  min-height: 0;
 }
 
 .blocks-gap-stack {
@@ -499,55 +501,127 @@ body.blocks-pointer-dragging button {
   transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
-/* Paleta: todos los gaps visibles al arrastrar */
-.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap {
-  pointer-events: auto;
-  height: 28px;
-  min-height: 28px;
-  margin: 2px 0;
-  opacity: 0.4;
-  border: 1px dashed rgba(var(--rgb-brown), 0.18);
-  background: rgba(var(--rgb-accent), 0.03);
+/* Arrastrar: sin separación visual; zona de apuntado con ::before (no mueve el layout) */
+.blocks-drag-active .blocks-gap-cell {
+  min-height: 0;
+  padding: 0;
+  align-self: start;
 }
 
-.blocks-drag-active:not(.blocks-move-dragging) .blocks-gap-stack .block-drop-gap {
-  opacity: 1;
-  background: rgba(var(--rgb-accent), 0.04);
+.blocks-drag-active .blocks-gap-main {
+  min-height: 0;
 }
 
-.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap:hover,
-.blocks-drag-active:not(.blocks-move-dragging) .block-drop-gap.drag-over {
-  opacity: 1;
-  border-color: var(--palette-accent);
-  background: rgba(var(--rgb-accent), 0.1);
-}
-
-/* Mover bloque existente: gaps ocultos hasta pasar el cursor */
-.blocks-move-dragging.blocks-drag-active .block-drop-gap {
-  pointer-events: auto;
+.blocks-drag-active .block-drop-gap {
+  position: relative;
   height: 0;
   min-height: 0;
+  max-height: 0;
   margin: 0;
-  padding: 8px 0;
+  padding: 0;
   opacity: 0;
+  overflow: visible;
+  pointer-events: none;
   border-color: transparent;
   background: transparent;
 }
 
-.blocks-move-dragging.blocks-drag-active .block-drop-gap--disabled {
+.blocks-drag-active .block-drop-gap--disabled {
   display: none;
   pointer-events: none;
 }
 
-.blocks-move-dragging.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled):hover,
-.blocks-move-dragging.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled).drag-over {
+.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -11px;
+  height: 22px;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled):hover,
+.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled).drag-over {
   height: 28px;
   min-height: 28px;
+  max-height: none;
   margin: 2px 0;
   padding: 0 8px;
   opacity: 1;
+  pointer-events: auto;
+  border: 1px dashed var(--palette-accent);
+  background: rgba(var(--rgb-accent), 0.1);
+}
+
+.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled):hover::before,
+.blocks-drag-active .block-drop-gap:not(.block-drop-gap--disabled).drag-over::before {
+  content: none;
+  pointer-events: none;
+}
+
+/* Varios destinos (bloques anidados): mostrar todos los gaps a la vez */
+.blocks-drag-active .blocks-gap-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.blocks-drag-active .blocks-gap-main:has(.blocks-gap-stack) {
+  overflow: visible;
+  align-self: stretch;
+}
+
+.blocks-drag-active .blocks-gap-stack .block-drop-gap {
+  position: relative;
+  height: auto;
+  min-height: 26px;
+  max-height: none;
+  margin: 0;
+  margin-left: calc(var(--gap-indent, 0) * 12px);
+  padding: 0 8px;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+  border: 1px dashed rgba(var(--rgb-brown), 0.2);
+  background: rgba(var(--rgb-accent), 0.04);
+}
+
+.blocks-drag-active .blocks-gap-stack .block-drop-gap::before {
+  content: none;
+  pointer-events: none;
+}
+
+.blocks-drag-active .blocks-gap-stack .block-drop-gap--disabled {
+  display: none;
+}
+
+.blocks-drag-active .blocks-gap-stack .block-drop-gap:hover,
+.blocks-drag-active .blocks-gap-stack .block-drop-gap.drag-over {
+  border-color: var(--palette-accent);
+  background: rgba(var(--rgb-accent), 0.1);
+}
+
+/* Workspace vacío: el único gap sigue visible al arrastrar desde paleta */
+.blocks-drag-active .blocks-document-empty .block-drop-gap {
+  height: 44px;
+  min-height: 44px;
+  max-height: none;
+  margin: 2px 0;
+  padding: 0 8px;
+  opacity: 1;
+  pointer-events: auto;
   border: 1px dashed rgba(var(--rgb-brown), 0.22);
-  background: rgba(var(--rgb-accent), 0.08);
+  background: rgba(var(--rgb-accent), 0.05);
+}
+
+.blocks-drag-active .blocks-document-empty .block-drop-gap::before {
+  content: none;
+  pointer-events: none;
 }
 
 .block-drop-gap-mark {
@@ -581,11 +655,3 @@ body.blocks-pointer-dragging button {
   color: var(--editor-title);
 }
 
-.blocks-move-dragging.blocks-drag-active
-  .block-drop-gap:not(.block-drop-gap--disabled):hover
-  .block-drop-gap-mark,
-.blocks-move-dragging.blocks-drag-active
-  .block-drop-gap:not(.block-drop-gap--disabled).drag-over
-  .block-drop-gap-mark {
-  color: var(--palette-accent);
-}
