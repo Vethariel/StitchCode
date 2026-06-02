@@ -6,6 +6,11 @@ import { defaultExplanationPanel } from "./hilo-context.js";
 import { detectHiloIntent, intentToApiTipo } from "./hilo-intent.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
+  getHiloTutorialScript,
+  isHiloTutorialComplete,
+  markHiloTutorialComplete,
+} from "./hilo-tutorial.js";
+import {
   applyHiloEmotion,
   getDefaultEmotion,
   loadHiloSpriteAtlas,
@@ -13,11 +18,13 @@ import {
 
 /**
  * @typedef {import("./hilo-response.js").HiloTurn} HiloTurn
+ * @typedef {import("./hilo-tutorial.js").TutorialChunk} TutorialChunk
  * @typedef {{
- *   chunks: HiloTurn["chunks"],
+ *   chunks: (HiloTurn["chunks"][number] & Partial<TutorialChunk>)[],
  *   index: number,
  *   type: 'conversation' | 'explanation',
  *   explanationComplete: boolean,
+ *   isTutorial?: boolean,
  * }} ActiveTurn
  */
 
@@ -45,6 +52,7 @@ import {
  *   },
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
+ *   onTutorialAction?: (action: string) => void | Promise<void>,
  * }} opts
  */
 export function createHiloAgentController({
@@ -62,6 +70,7 @@ export function createHiloAgentController({
   getContext,
   focus,
   highlight,
+  onTutorialAction,
 }) {
   /** @type {{ role: string, content: string }[]} */
   let historial = [];
@@ -70,6 +79,8 @@ export function createHiloAgentController({
   /** @type {ActiveTurn | null} */
   let activeTurn = null;
   let busy = false;
+  let tutorialActive = false;
+  let spriteReady = false;
 
   function isExplaining() {
     return activeTurn?.type === "explanation";
@@ -77,10 +88,11 @@ export function createHiloAgentController({
 
   function setExplainingUi(on) {
     root.classList.toggle("hilo-agent--explaining", on);
+    root.classList.toggle("hilo-agent--tutorial", on && tutorialActive);
     avatar.setAttribute(
       "aria-label",
       on
-        ? "Hilo — Enter para continuar la explicación"
+        ? "Hilo — Enter para continuar"
         : "Hilo — clic para continuar o repetir el mensaje"
     );
   }
@@ -99,8 +111,8 @@ export function createHiloAgentController({
     const n = activeTurn.chunks.length;
     const i = activeTurn.index + 1;
 
-    if (activeTurn.type === "explanation") {
-      if (activeTurn.explanationComplete) {
+    if (activeTurn.isTutorial || activeTurn.type === "explanation") {
+      if (activeTurn.explanationComplete && !activeTurn.isTutorial) {
         bubbleHint.hidden = false;
         bubbleHint.textContent = "Enter para repetir la explicación";
         return;
@@ -108,6 +120,8 @@ export function createHiloAgentController({
       bubbleHint.hidden = false;
       if (activeTurn.index < n - 1) {
         bubbleHint.textContent = `Enter para continuar (${i}/${n})`;
+      } else if (activeTurn.isTutorial) {
+        bubbleHint.textContent = "Enter para empezar a programar";
       } else {
         bubbleHint.textContent = `Enter para terminar (${i}/${n})`;
       }
@@ -131,28 +145,23 @@ export function createHiloAgentController({
     }
   }
 
-  /** @param {number} index */
-  function applyExplanationFocus(index) {
-    const chunk = activeTurn?.chunks[index];
-    if (!chunk) return;
-    const ctx = getContext();
-    const panel = chunk.panel ?? defaultExplanationPanel(ctx.vista);
+  /** @param {ActiveTurn["chunks"][number]} chunk */
+  function applyFocusForChunk(chunk) {
+    const panel = chunk.panel ?? defaultExplanationPanel(getContext().vista);
     focus.enter(panel);
     focus.positionNear(panel);
     highlight.applyForChunk(chunk);
   }
 
-  function endExplanationFocus() {
-    focus.exit();
-    highlight.clear();
-    setExplainingUi(false);
-  }
-
   /** @param {number} index */
-  function showChunk(index, { pulse = false } = {}) {
+  async function showChunk(index, { pulse = false } = {}) {
     if (!activeTurn) return;
     const chunk = activeTurn.chunks[index];
     if (!chunk) return;
+
+    if (chunk.action && onTutorialAction) {
+      await onTutorialAction(chunk.action);
+    }
 
     activeTurn.index = index;
     applyHiloEmotion(avatar, chunk.emotion);
@@ -160,11 +169,17 @@ export function createHiloAgentController({
     bubble.classList.add("show");
     root.dataset.hiloChunk = String(index + 1);
 
+    const presentation = chunk.presentation ?? "focus";
     if (
-      isExplaining() &&
+      (activeTurn.isTutorial || isExplaining()) &&
       !activeTurn.explanationComplete
     ) {
-      applyExplanationFocus(index);
+      if (presentation === "center") {
+        highlight.clear();
+        focus.enterPresentation();
+      } else {
+        applyFocusForChunk(chunk);
+      }
     }
 
     updateBubbleHint();
@@ -190,7 +205,7 @@ export function createHiloAgentController({
       setEmotionState("explaining");
     }
 
-    showChunk(0, { pulse: true });
+    void showChunk(0, { pulse: true });
   }
 
   function showStaticMessage(text, emotion = "smile") {
@@ -204,9 +219,64 @@ export function createHiloAgentController({
     root.dataset.hiloChunk = "";
   }
 
+  function endExplanationFocus() {
+    focus.exit();
+    highlight.clear();
+    setExplainingUi(false);
+  }
+
+  function finishTutorial() {
+    markHiloTutorialComplete();
+    tutorialActive = false;
+    document.body.classList.remove("hilo-tutorial-active");
+    endExplanationFocus();
+    activeTurn = null;
+    input.disabled = false;
+    applyHiloEmotion(avatar, "smile");
+    queueTurn(
+      localHiloTurn([
+        {
+          text: "Cuando quieras, pregúntame o pídeme que te explique tu código.",
+          emotion: "wink",
+        },
+      ])
+    );
+  }
+
+  async function startTutorial() {
+    if (isHiloTutorialComplete() || tutorialActive || busy) return;
+    if (!spriteReady) {
+      try {
+        await loadHiloSpriteAtlas();
+        spriteReady = true;
+      } catch {
+        markHiloTutorialComplete();
+        return;
+      }
+    }
+
+    tutorialActive = true;
+    document.body.classList.add("hilo-tutorial-active");
+    activeTurn = {
+      chunks: getHiloTutorialScript(),
+      index: 0,
+      type: "explanation",
+      explanationComplete: false,
+      isTutorial: true,
+    };
+
+    input.disabled = true;
+    setExplainingUi(true);
+    setEmotionState("explaining");
+    bubble.classList.add("show");
+    await showChunk(0, { pulse: true });
+  }
+
   function setBusy(next) {
     busy = next;
-    input.disabled = next;
+    if (!tutorialActive) {
+      input.disabled = next;
+    }
     sendBtn.disabled = next;
     root.dataset.busy = next ? "true" : "false";
     avatar.classList.toggle("hilo-avatar--active", next);
@@ -229,19 +299,28 @@ export function createHiloAgentController({
   }
 
   function replayCurrentTurn() {
-    if (!activeTurn?.chunks.length) return;
+    if (!activeTurn?.chunks.length || activeTurn.isTutorial) return;
     if (isExplaining()) {
       activeTurn.explanationComplete = false;
       setExplainingUi(true);
       setEmotionState("explaining");
     }
-    showChunk(0, { pulse: true });
+    void showChunk(0, { pulse: true });
   }
 
   function advanceTurn() {
     if (!activeTurn?.chunks.length || busy) return;
 
-    const { chunks, index, type, explanationComplete } = activeTurn;
+    const { chunks, index, type, explanationComplete, isTutorial } = activeTurn;
+
+    if (isTutorial) {
+      if (index < chunks.length - 1) {
+        void showChunk(index + 1, { pulse: true });
+        return;
+      }
+      finishTutorial();
+      return;
+    }
 
     if (type === "explanation") {
       if (explanationComplete) {
@@ -249,7 +328,7 @@ export function createHiloAgentController({
         return;
       }
       if (index < chunks.length - 1) {
-        showChunk(index + 1, { pulse: true });
+        void showChunk(index + 1, { pulse: true });
         return;
       }
       endExplanationFocus();
@@ -259,14 +338,17 @@ export function createHiloAgentController({
     }
 
     if (index < chunks.length - 1) {
-      showChunk(index + 1, { pulse: true });
+      void showChunk(index + 1, { pulse: true });
       return;
     }
     replayCurrentTurn();
   }
 
   function onAvatarClick() {
-    if (busy) return;
+    if (busy || tutorialActive) {
+      if (tutorialActive) advanceTurn();
+      return;
+    }
     if (!activeTurn?.chunks.length) {
       bubble.classList.toggle("show", !bubble.classList.contains("show"));
       return;
@@ -274,8 +356,9 @@ export function createHiloAgentController({
     advanceTurn();
   }
 
-  function onExplanationKeydown(e) {
-    if (busy || !isExplaining()) return;
+  function onTutorialKeydown(e) {
+    if (busy) return;
+    if (!tutorialActive && !isExplaining()) return;
     if (e.key !== "Enter" || e.shiftKey) return;
     if (e.target === input) return;
     e.preventDefault();
@@ -283,6 +366,8 @@ export function createHiloAgentController({
   }
 
   async function sendUserMessage(mensaje) {
+    if (tutorialActive) return;
+
     if (!isRuntimeReady()) {
       setEmotionState("error");
       showStaticMessage(
@@ -364,35 +449,31 @@ export function createHiloAgentController({
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const mensaje = input.value.trim();
-    if (!mensaje || busy) return;
+    if (!mensaje || busy || tutorialActive) return;
     input.value = "";
     void sendUserMessage(mensaje);
   });
 
   avatar.addEventListener("click", onAvatarClick);
-  document.addEventListener("keydown", onExplanationKeydown);
+  document.addEventListener("keydown", onTutorialKeydown);
 
   loadHiloSpriteAtlas()
     .then(() => {
-      queueTurn(
-        localHiloTurn([
-          { text: "¡Hola! Soy Hilo.", emotion: "happy" },
-          {
-            text: "Pregúntame sobre tu código o pídeme que te lo explique.",
-            emotion: "smile",
-          },
-          {
-            text: "En una explicación uso modo foco: resalto el código o la consola.",
-            emotion: "wink",
-          },
-          {
-            text: "Clic en mí para avanzar; en explicaciones, usa Enter.",
-            emotion: "neutral",
-          },
-        ])
-      );
+      spriteReady = true;
+      if (isHiloTutorialComplete()) {
+        queueTurn(
+          localHiloTurn([
+            { text: "¡Hola! Soy Hilo.", emotion: "happy" },
+            {
+              text: "Pregúntame sobre tu código o pídeme que te lo explique.",
+              emotion: "smile",
+            },
+          ])
+        );
+      }
     })
     .catch(() => {
+      spriteReady = true;
       applyHiloEmotion(avatar, getDefaultEmotion());
       showStaticMessage(
         "No pude cargar mi avatar, pero puedes escribirme igual.",
@@ -404,5 +485,7 @@ export function createHiloAgentController({
     onExecutionContextChange() {
       reiniciarNivelSiSinError();
     },
+    startTutorial,
+    isTutorialActive: () => tutorialActive,
   };
 }

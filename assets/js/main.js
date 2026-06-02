@@ -21,6 +21,7 @@ import {
   createOnboardingController,
   createSettingsModalController,
 } from "./setup-form.js";
+import { isHiloTutorialComplete } from "./hilo-tutorial.js";
 import {
   isOnboardingComplete,
   profileJsonForGemini,
@@ -67,6 +68,11 @@ function unlockApp() {
   updateRunButton();
 }
 
+async function maybeStartHiloTutorial() {
+  if (isHiloTutorialComplete() || !hiloAgent) return;
+  await hiloAgent.startTutorial();
+}
+
 function beginAppAfterRuntime() {
   if (!isOnboardingComplete()) {
     onboarding.show();
@@ -75,6 +81,7 @@ function beginAppAfterRuntime() {
   unlockApp();
   void geminiApi.refresh().then(() => {
     linter?.runLint();
+    void maybeStartHiloTutorial();
   });
 }
 
@@ -90,6 +97,7 @@ const onboarding = createOnboardingController({
     await syncGeminiFromForm(form);
     unlockApp();
     linter?.runLint();
+    await maybeStartHiloTutorial();
   },
 });
 
@@ -187,6 +195,12 @@ hiloAgent = createHiloAgentController({
   getPerfilJson: () => profileJsonForGemini(),
   focus: hiloFocus,
   highlight: hiloHighlight,
+  onTutorialAction: async (action) => {
+    if (!editorMode) return;
+    if (action === "mode:text") await editorMode.setMode("text");
+    else if (action === "mode:blocks") await editorMode.setMode("blocks");
+    else if (action === "mode:verbose") await editorMode.setMode("verbose");
+  },
   getContext: () =>
     buildHiloContext({
       vista: editorMode?.getMode() ?? "text",

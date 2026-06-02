@@ -1,4 +1,4 @@
-/** @typedef {'editor' | 'blocks' | 'console'} HiloFocusPanel */
+/** @typedef {'editor' | 'blocks' | 'console' | 'presentation'} HiloFocusPanel */
 
 /** Panel DOM iluminado (editor-panel agrupa texto, bloques y verboso). */
 const PANEL_DOM_ID = {
@@ -60,7 +60,9 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add("is-active"));
     appShell.classList.add("hilo-focus-active");
+    document.body.classList.remove("hilo-tutorial-presentation");
     dock.classList.add("hilo-focus-dock");
+    dock.classList.remove("hilo-tutorial-center");
 
     const editorOn = panel === "editor" || panel === "blocks";
     document
@@ -73,12 +75,31 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
     positionAtPanelCorner(panel);
   }
 
+  /** Presentación formal: pantalla oscurecida, Hilo centrado, sin panel iluminado. */
+  function enterPresentation() {
+    activePanel = "presentation";
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add("is-active"));
+    appShell.classList.add("hilo-focus-active");
+    document.body.classList.add("hilo-tutorial-presentation");
+    dock.classList.add("hilo-focus-dock", "hilo-tutorial-center");
+    clearDockPosition();
+
+    document
+      .getElementById("editor-panel")
+      ?.classList.remove("hilo-focus-illuminated");
+    document
+      .getElementById("console-panel")
+      ?.classList.remove("hilo-focus-illuminated");
+  }
+
   function exit() {
     activePanel = null;
     overlay.classList.remove("is-active");
     overlay.hidden = true;
     appShell.classList.remove("hilo-focus-active");
-    dock.classList.remove("hilo-focus-dock");
+    document.body.classList.remove("hilo-tutorial-presentation");
+    dock.classList.remove("hilo-focus-dock", "hilo-tutorial-center");
     clearDockPosition();
 
     document
@@ -90,13 +111,16 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
   }
 
   function onResize() {
-    if (activePanel) positionAtPanelCorner(activePanel);
+    if (activePanel && activePanel !== "presentation") {
+      positionAtPanelCorner(activePanel);
+    }
   }
 
   window.addEventListener("resize", onResize);
 
   return {
     enter,
+    enterPresentation,
     exit,
     /** @param {HiloFocusPanel} panel */
     positionNear: positionAtPanelCorner,
