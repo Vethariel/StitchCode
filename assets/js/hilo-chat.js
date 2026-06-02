@@ -35,6 +35,9 @@ export async function callGeminiHilo(apiKey, payloadJson) {
  *   nivelAyuda: number,
  *   apiKey: string,
  *   perfilJson: string,
+ *   tipoInteraccion?: string,
+ *   codigoForParse?: string,
+ *   outputJsonForParse?: string,
  * }} ctx
  */
 export async function sendHiloMessage(ctx) {
@@ -48,6 +51,7 @@ export async function sendHiloMessage(ctx) {
     modo: ctx.modo,
     nivelAyuda: ctx.nivelAyuda,
     perfilJson: ctx.perfilJson,
+    tipoInteraccion: ctx.tipoInteraccion ?? "conversacion",
   });
 
   if (!prep.ok) {
@@ -55,6 +59,9 @@ export async function sendHiloMessage(ctx) {
   }
 
   const responseJson = await callGeminiHilo(ctx.apiKey, prep.payload);
-  const parsed = await hiloParseResponse(JSON.stringify(responseJson));
+  const parsed = await hiloParseResponse(JSON.stringify(responseJson), {
+    codigo: ctx.codigoForParse ?? ctx.codigo,
+    outputJson: ctx.outputJsonForParse ?? JSON.stringify(ctx.output),
+  });
   return parsed;
 }

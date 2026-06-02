@@ -334,7 +334,7 @@
 }
 
 .app-shell--locked .workspace,
-.app-shell--locked .floating-dock {
+.app-shell--locked ~ .floating-dock {
   visibility: hidden;
   pointer-events: none;
 }

@@ -1,0 +1,67 @@
+/* Modo foco — poder Explicación de Hilo */
+
+.hilo-focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(5, 3, 1, 0);
+  pointer-events: none;
+  transition: background 0.35s ease, visibility 0.35s ease;
+}
+
+.hilo-focus-overlay.is-active {
+  background: rgba(5, 3, 1, 0.86);
+  pointer-events: auto;
+}
+
+.hilo-focus-overlay[hidden] {
+  display: none;
+}
+
+.hilo-focus-illuminated {
+  position: relative;
+  z-index: 210 !important;
+  box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.2);
+}
+
+/* Dock fuera de app-shell: por encima del overlay (200) y del panel iluminado (210) */
+.floating-dock.hilo-focus-dock {
+  z-index: 320;
+  transition:
+    bottom 0.35s ease,
+    right 0.35s ease;
+  max-width: min(280px, calc(100% - 24px));
+}
+
+.hilo-agent--explaining .hilo-input-wrap {
+  display: none;
+}
+
+.hilo-agent--explaining .hilo-avatar {
+  border-color: var(--palette-gold-soft);
+  box-shadow: 0 0 16px rgba(212, 168, 83, 0.3);
+}
+
+.line-numbers span.hilo-highlight-line {
+  opacity: 1;
+  color: var(--palette-gold-soft);
+  font-weight: 600;
+}
+
+.code-highlight .hl-line.hilo-highlight-line {
+  background: rgba(212, 168, 83, 0.14);
+  box-shadow: inset 3px 0 0 var(--palette-gold-soft);
+}
+
+.code-highlight .hilo-highlight-range {
+  background: rgba(212, 168, 83, 0.35);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.console-body .c-line.hilo-highlight-line {
+  background: rgba(212, 168, 83, 0.12);
+  box-shadow: inset 3px 0 0 var(--palette-gold-soft);
+  border-radius: 4px;
+}

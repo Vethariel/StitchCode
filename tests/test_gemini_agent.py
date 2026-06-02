@@ -4,7 +4,14 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT / "woven"))
 
-from gemini_agent import construir_preferencias_estudiante, normalizar_respuesta_hilo  # noqa: E402
+import json
+
+from gemini_agent import (  # noqa: E402
+    construir_payload_hilo,
+    construir_preferencias_estudiante,
+    normalizar_perfil,
+    normalizar_respuesta_hilo,
+)
 
 
 def test_normalizar_json_con_chunks_y_emociones():
@@ -15,6 +22,7 @@ def test_normalizar_json_con_chunks_y_emociones():
       ]
     }"""
     out = normalizar_respuesta_hilo(raw)
+    assert out["type"] == "conversation"
     assert len(out["chunks"]) == 2
     assert out["chunks"][0]["emotion"] == "wink"
     assert "texto_completo" in out
@@ -30,9 +38,90 @@ def test_normalizar_emocion_invalida_usa_neutral():
 def test_construir_preferencias_estudiante():
     raw = '{"tono": "Motivador", "estilo": "Con analogías", "objetivos": "Aprobar el parcial"}'
     text = construir_preferencias_estudiante(raw)
-    assert "Motivador" in text
-    assert "analogías" in text
-    assert "parcial" in text
+    assert "tono: Motivador" in text
+    assert "estilo: Con analogías" in text
+    assert "objetivos: Aprobar el parcial" in text
+
+
+def test_normalizar_perfil_aplica_defaults():
+    p = normalizar_perfil({"tono": "", "estilo": "Directo", "objetivos": ""})
+    assert p["tono"] == "amigable y cercano"
+    assert p["estilo"] == "Directo"
+    assert p["objetivos"] == "aprender a programar en Woven con buenas prácticas"
+
+
+def test_payload_gemini_incluye_parametros_perfil():
+    perfil = json.dumps(
+        {"tono": "Formal", "estilo": "Directo", "objetivos": "Aprobar examen"},
+        ensure_ascii=False,
+    )
+    payload = json.loads(
+        construir_payload_hilo(
+            "hola",
+            "[]",
+            "int x = 1",
+            "[]",
+            "[]",
+            False,
+            "woven",
+            1,
+            perfil,
+        )
+    )
+    system_text = payload["system_instruction"]["parts"][0]["text"]
+    assert "tono: Formal" in system_text
+    assert "estilo: Directo" in system_text
+    assert "objetivos: Aprobar examen" in system_text
+
+
+def test_normalizar_explicacion_con_panel():
+    raw = json.dumps(
+        {
+            "type": "explanation",
+            "chunks": [
+                {
+                    "text": "Declaras x.",
+                    "emotion": "smile",
+                    "panel": "editor",
+                    "highlight": {"line": 2},
+                },
+                {
+                    "text": "Sale 5.",
+                    "emotion": "wink",
+                    "panel": "console",
+                    "highlight": {"line": 1},
+                },
+            ],
+        },
+        ensure_ascii=False,
+    )
+    out = normalizar_respuesta_hilo(
+        raw, codigo="int x = 1\nprint(x)", output_json='["5"]'
+    )
+    assert out["type"] == "explanation"
+    assert out["chunks"][0]["panel"] == "editor"
+    assert out["chunks"][0]["highlight"]["line"] == 2
+    assert out["chunks"][1]["panel"] == "console"
+
+
+def test_payload_explicacion_incluye_modo_foco():
+    payload = json.loads(
+        construir_payload_hilo(
+            "explícame el código",
+            "[]",
+            "int x = 1",
+            '["1"]',
+            "[]",
+            False,
+            "woven",
+            1,
+            "{}",
+            "explicacion",
+        )
+    )
+    system_text = payload["system_instruction"]["parts"][0]["text"]
+    assert "PODER: EXPLICACIÓN" in system_text
+    assert 'type "explanation"' in system_text
 
 
 def test_normalizar_fallback_texto_plano():

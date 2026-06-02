@@ -14,14 +14,15 @@ import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
 import { createGeminiApiAccess } from "./gemini-api-state.js";
 import { createHiloAgentController } from "./hilo-agent-controller.js";
+import { createHiloFocusController } from "./hilo-focus.js";
+import { createHiloHighlightController } from "./hilo-highlight.js";
 import {
   createOnboardingController,
   createSettingsModalController,
 } from "./setup-form.js";
 import {
   isOnboardingComplete,
-  loadUserProfile,
-  profileForHilo,
+  profileJsonForGemini,
 } from "./user-settings.js";
 
 const codeArea = document.getElementById("code-area");
@@ -156,6 +157,19 @@ const consoleCtl = createConsoleController({
   body: document.getElementById("console-body"),
 });
 
+const hiloFocus = createHiloFocusController({
+  overlay: document.getElementById("hilo-focus-overlay"),
+  dock: document.getElementById("floating-dock"),
+  appShell: document.getElementById("app-shell"),
+});
+
+const hiloHighlight = createHiloHighlightController({
+  codeArea,
+  lineNumbers: document.getElementById("line-numbers"),
+  codeHighlight: document.getElementById("code-highlight"),
+  consoleBody: document.getElementById("console-body"),
+});
+
 hiloAgent = createHiloAgentController({
   root: document.getElementById("hilo-agent"),
   bubble: document.getElementById("hilo-bubble"),
@@ -167,7 +181,9 @@ hiloAgent = createHiloAgentController({
   sendBtn: document.getElementById("hilo-send"),
   geminiApi,
   isRuntimeReady: isReady,
-  getPerfilJson: () => JSON.stringify(profileForHilo(loadUserProfile())),
+  getPerfilJson: () => profileJsonForGemini(),
+  focus: hiloFocus,
+  highlight: hiloHighlight,
   getContext: () => {
     const mode = editorMode?.getMode() ?? "text";
     const modo =

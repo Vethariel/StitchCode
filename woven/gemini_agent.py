@@ -25,7 +25,7 @@ Reglas del JSON:
 - emotion: exactamente uno de estos valores:
   happy, smile, kiss, heart_eyes, grin, tongue, sleep, cool, laugh, wink,
   neutral, expressionless, cry, sad, worried, angry
-- El estudiante verá un fragmento a la vez y avanzará con clic; escribe como diálogo oral.
+- El estudiante verá un fragmento a la vez; escribe como diálogo oral.
 
 NIVELES DE AYUDA
 Cada problema tiene un nivel que avanza si el estudiante sigue atascado.
@@ -57,6 +57,12 @@ CONTEXTO DISPONIBLE
 Recibirás al inicio de cada conversación el estado actual del programa:
 código Woven, output de consola, errores si los hay, y el modo de vista
 (código o verboso). Úsalo siempre para personalizar tu respuesta.
+
+PARÁMETROS DE PERFIL (obligatorios en cada turno)
+Recibirás tres parámetros del estudiante definidos en el onboarding:
+tono (cómo debe hablar Hilo), estilo (cómo explicar) y objetivos
+(qué quiere lograr). Adapta el vocabulario, la longitud y el enfoque
+de cada fragmento a esos tres valores; no los ignores.
 
 LENGUAJE WOVEN — REFERENCIA COMPLETA
 
@@ -190,6 +196,33 @@ Si MODO DE VISTA es "verboso":
   Nivel 4: describe paso a paso cómo cambiar el placeholder
 """
 
+EXPLANATION_PROMPT = """
+PODER: EXPLICACIÓN (modo foco)
+El estudiante pidió entender lo que tiene en pantalla (código o consola).
+Responde con type: "explanation" y entre 2 y 6 chunks.
+
+Cada chunk DEBE incluir:
+- text, emotion (igual que en conversación)
+- panel: "editor" si hablas del código Woven; "console" si hablas de la salida
+- highlight: { "line": N } con N = número de línea (1 = primera línea del panel)
+
+Reglas de la explicación:
+- Una idea por fragmento; el highlight debe corresponder a lo que dices en ese fragmento.
+- Usa líneas reales del código y de la consola del contexto (no inventes números).
+- Si la consola está vacía o solo dice que no se ejecutó, no uses panel "console".
+- No hagas preguntas socráticas: explica con claridad según el perfil del estudiante.
+- No corrijas código salvo que el estudiante lo pida en el mensaje.
+
+Ejemplo:
+{
+  "type": "explanation",
+  "chunks": [
+    {"text": "Aquí declaras x con valor 5.", "emotion": "smile", "panel": "editor", "highlight": {"line": 2}},
+    {"text": "Al ejecutar, la consola muestra 5.", "emotion": "wink", "panel": "console", "highlight": {"line": 1}}
+  ]
+}
+"""
+
 
 def construir_contexto(codigo: str, output: list, errores: list, tiene_error: bool, modo: str) -> str:
     partes = [f"CÓDIGO WOVEN ACTUAL:\n```\n{codigo}\n```"]
@@ -205,27 +238,43 @@ def construir_contexto(codigo: str, output: list, errores: list, tiene_error: bo
     return "\n\n".join(partes)
 
 
+PERFIL_CAMPOS = ("tono", "estilo", "objetivos")
+DEFAULTS_PERFIL = {
+    "tono": "amigable y cercano",
+    "estilo": "explicaciones claras paso a paso",
+    "objetivos": "aprender a programar en Woven con buenas prácticas",
+}
+
+
+def normalizar_perfil(perfil: dict) -> dict:
+    """Parámetros de onboarding/Ajustes que Gemini debe recibir en cada turno."""
+    base = perfil if isinstance(perfil, dict) else {}
+    out = {}
+    for key in PERFIL_CAMPOS:
+        val = str(base.get(key) or "").strip()
+        out[key] = val or DEFAULTS_PERFIL[key]
+    return out
+
+
 def construir_preferencias_estudiante(perfil_json: str) -> str:
     try:
         perfil = json.loads(perfil_json) if perfil_json else {}
     except json.JSONDecodeError:
         perfil = {}
-    if not isinstance(perfil, dict):
-        perfil = {}
 
-    tono = (perfil.get("tono") or "").strip() or "amigable y cercano"
-    estilo = (perfil.get("estilo") or "").strip() or "explicaciones claras paso a paso"
-    objetivos = (
-        (perfil.get("objetivos") or "").strip()
-        or "aprender a programar en Woven con buenas prácticas"
-    )
+    p = normalizar_perfil(perfil)
 
     return (
-        "PREFERENCIAS DEL ESTUDIANTE (respeta este perfil en cada fragmento):\n"
-        f"- Tono deseado para Hilo: {tono}\n"
-        f"- Estilo de explicación: {estilo}\n"
-        f"- Objetivos de aprendizaje: {objetivos}"
+        "PARÁMETROS DE PERFIL DEL ESTUDIANTE (obligatorios; respétalos en cada fragmento):\n"
+        f"- tono: {p['tono']}\n"
+        f"- estilo: {p['estilo']}\n"
+        f"- objetivos: {p['objetivos']}"
     )
+
+
+def _es_modo_explicacion(tipo_interaccion: str) -> bool:
+    t = (tipo_interaccion or "").strip().lower()
+    return t in ("explicacion", "explanation", "explain")
 
 
 def construir_payload_hilo(
@@ -238,6 +287,7 @@ def construir_payload_hilo(
     modo: str,
     nivel_ayuda: int = 1,
     perfil_json: str = "{}",
+    tipo_interaccion: str = "conversacion",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -261,13 +311,20 @@ def construir_payload_hilo(
         }.get(nivel_ayuda, "")
 
     preferencias = construir_preferencias_estudiante(perfil_json)
+    modo_explicacion = _es_modo_explicacion(tipo_interaccion)
 
     system_completo = (
         SYSTEM_PROMPT
+        + (f"\n\n{EXPLANATION_PROMPT}" if modo_explicacion else "")
         + f"\n\n{preferencias}"
         + f"\n\nCONTEXTO DEL PROGRAMA:\n{contexto}"
-        + f"\n\nNIVEL ACTUAL: {nivel_instruccion}"
+        + ("" if modo_explicacion else f"\n\nNIVEL ACTUAL: {nivel_instruccion}")
     )
+    if modo_explicacion:
+        system_completo += (
+            "\n\nTURNO ACTUAL: el estudiante pidió una EXPLICACIÓN. "
+            'Responde solo con JSON type "explanation".'
+        )
 
     mensajes = []
     for h in historial:
@@ -297,6 +354,47 @@ EMOCIONES_VALIDAS = {
     "happy", "smile", "kiss", "heart_eyes", "grin", "tongue", "sleep", "cool",
     "laugh", "wink", "neutral", "expressionless", "cry", "sad", "worried", "angry",
 }
+PANELES_VALIDOS = frozenset({"editor", "console"})
+
+
+def _normalizar_highlight(panel: str, highlight: object, max_line: int = 999) -> dict:
+    hl = highlight if isinstance(highlight, dict) else {}
+    try:
+        line = int(hl.get("line") or 1)
+    except (TypeError, ValueError):
+        line = 1
+    line = max(1, min(line, max_line))
+    out = {"line": line}
+    if panel == "editor":
+        for key in ("start", "end"):
+            if key in hl:
+                try:
+                    out[key] = max(0, int(hl[key]))
+                except (TypeError, ValueError):
+                    pass
+    return out
+
+
+def _normalizar_chunk(item: dict, tipo: str, codigo_lineas: int, consola_lineas: int) -> dict | None:
+    text = str(item.get("text", "")).strip()
+    if not text:
+        return None
+    emo = str(item.get("emotion", "neutral")).strip().lower()
+    if emo not in EMOCIONES_VALIDAS:
+        emo = "neutral"
+    chunk = {"text": text[:120], "emotion": emo}
+    if tipo != "explanation":
+        return chunk
+
+    panel = str(item.get("panel", "editor")).strip().lower()
+    if panel not in PANELES_VALIDOS:
+        panel = "editor"
+    if panel == "console" and consola_lineas < 1:
+        panel = "editor"
+    max_line = codigo_lineas if panel == "editor" else max(consola_lineas, 1)
+    chunk["panel"] = panel
+    chunk["highlight"] = _normalizar_highlight(panel, item.get("highlight"), max_line)
+    return chunk
 
 
 def _limpiar_json_crudo(texto: str) -> str:
@@ -329,49 +427,93 @@ def _fallback_chunks(texto: str) -> list:
     return chunks[:6]
 
 
-def normalizar_respuesta_hilo(texto_modelo: str) -> dict:
+def normalizar_respuesta_hilo(
+    texto_modelo: str,
+    codigo: str = "",
+    output_json: str = "[]",
+) -> dict:
     crudo = _limpiar_json_crudo(texto_modelo)
+    codigo_lineas = max(1, len((codigo or "").split("\n")))
+    try:
+        output = json.loads(output_json) if output_json else []
+    except json.JSONDecodeError:
+        output = []
+    consola_lineas = len(output) if isinstance(output, list) else 0
+
     chunks = None
+    tipo = "conversation"
     try:
         data = json.loads(crudo)
         if isinstance(data, dict) and isinstance(data.get("chunks"), list):
+            raw_type = str(data.get("type", "conversation")).strip().lower()
+            if raw_type in ("explanation", "explicacion"):
+                tipo = "explanation"
             chunks = []
             for item in data["chunks"]:
                 if not isinstance(item, dict):
                     continue
-                text = str(item.get("text", "")).strip()
-                if not text:
-                    continue
-                emo = str(item.get("emotion", "neutral")).strip().lower()
-                if emo not in EMOCIONES_VALIDAS:
-                    emo = "neutral"
-                chunks.append({"text": text[:120], "emotion": emo})
+                norm = _normalizar_chunk(item, tipo, codigo_lineas, consola_lineas)
+                if norm:
+                    chunks.append(norm)
     except json.JSONDecodeError:
         chunks = None
 
     if not chunks:
         chunks = _fallback_chunks(crudo or texto_modelo)
+        tipo = "conversation"
 
     if len(chunks) == 1:
         extra = _fallback_chunks(texto_modelo)
         if len(extra) > 1:
             chunks = extra
 
+    if tipo == "explanation":
+        for i, ch in enumerate(chunks):
+            if "panel" not in ch:
+                ch["panel"] = "editor"
+                ch["highlight"] = {"line": min(i + 1, codigo_lineas)}
+
     texto_completo = " ".join(c["text"] for c in chunks)
-    return {"chunks": chunks, "texto_completo": texto_completo}
+    return {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
 
 
-def parsear_respuesta_hilo(response_json: str) -> str:
+def parsear_respuesta_hilo(response_json: str, codigo: str = "", output_json: str = "[]") -> str:
     data = json.loads(response_json)
     raw = data["candidates"][0]["content"]["parts"][0]["text"]
-    return json.dumps(normalizar_respuesta_hilo(raw), ensure_ascii=False)
+    return json.dumps(
+        normalizar_respuesta_hilo(raw, codigo=codigo, output_json=output_json),
+        ensure_ascii=False,
+    )
 
 
-def hilo_chat(mensaje, historial_json, codigo, output_json, errores_json, tiene_error, modo, nivel_ayuda, perfil_json="{}"):
+def hilo_chat(
+    mensaje,
+    historial_json,
+    codigo,
+    output_json,
+    errores_json,
+    tiene_error,
+    modo,
+    nivel_ayuda,
+    perfil_json="{}",
+    tipo_interaccion="conversacion",
+):
+    """
+    Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
+    tipo_interaccion: "conversacion" | "explicacion" (poder Explicación / modo foco).
+    """
     try:
         payload = construir_payload_hilo(
-            mensaje, historial_json, codigo, output_json,
-            errores_json, tiene_error, modo, nivel_ayuda, perfil_json
+            mensaje,
+            historial_json,
+            codigo,
+            output_json,
+            errores_json,
+            tiene_error,
+            modo,
+            nivel_ayuda,
+            perfil_json,
+            tipo_interaccion,
         )
         return json.dumps({
             "ok": True,

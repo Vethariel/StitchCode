@@ -208,6 +208,7 @@ export async function blocksToSource(doc) {
  *   modo: string,
  *   nivelAyuda: number,
  *   perfilJson: string,
+ *   tipoInteraccion?: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -224,16 +225,26 @@ export async function hiloPrepareMessage(args) {
       args.tieneError,
       args.modo,
       args.nivelAyuda,
-      args.perfilJson ?? "{}"
+      args.perfilJson ?? "{}",
+      args.tipoInteraccion ?? "conversacion"
     )
   );
   return JSON.parse(raw);
 }
 
-/** @param {string} responseJson */
-export async function hiloParseResponse(responseJson) {
+/**
+ * @param {string} responseJson
+ * @param {{ codigo?: string, outputJson?: string }} [ctx]
+ */
+export async function hiloParseResponse(responseJson, ctx = {}) {
   if (!parseHiloResponseFn) {
     throw new Error("Hilo aún no está listo.");
   }
-  return pyResultToString(parseHiloResponseFn(responseJson));
+  return pyResultToString(
+    parseHiloResponseFn(
+      responseJson,
+      ctx.codigo ?? "",
+      ctx.outputJson ?? "[]"
+    )
+  );
 }

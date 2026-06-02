@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="assets/css/console.css">
   <link rel="stylesheet" href="assets/css/user-settings.css">
   <link rel="stylesheet" href="assets/css/hilo-agent.css">
+  <link rel="stylesheet" href="assets/css/hilo-focus.css">
 </head>
 <body>
 
@@ -197,6 +198,13 @@
     </div>
   </div>
 
+  <div
+    id="hilo-focus-overlay"
+    class="hilo-focus-overlay"
+    hidden
+    aria-hidden="true"
+  ></div>
+
   <div id="app-shell" class="app-shell--locked" inert>
     <nav>
       <a class="logo" href="#" aria-label="Stitch Code">
@@ -281,40 +289,40 @@ print(y)</textarea>
 
       </div>
     </div>
+  </div>
 
-    <div class="floating-dock" id="floating-dock">
-      <aside class="hilo-agent" id="hilo-agent" aria-label="Hilo, tutor conversacional" data-busy="false">
-        <div class="hilo-bubble" id="hilo-bubble" role="status" aria-live="polite">
-          <p class="hilo-bubble-text" id="hilo-bubble-text"></p>
-          <p class="hilo-bubble-hint" id="hilo-bubble-hint" hidden></p>
+  <div class="floating-dock" id="floating-dock">
+    <aside class="hilo-agent" id="hilo-agent" aria-label="Hilo, tutor conversacional" data-busy="false">
+      <div class="hilo-bubble" id="hilo-bubble" role="status" aria-live="polite">
+        <p class="hilo-bubble-text" id="hilo-bubble-text"></p>
+        <p class="hilo-bubble-hint" id="hilo-bubble-hint" hidden></p>
+      </div>
+      <div class="hilo-main">
+        <button
+          type="button"
+          class="hilo-avatar"
+          id="hilo-avatar"
+          aria-label="Hilo — clic para continuar o repetir el mensaje"
+        ></button>
+        <div class="hilo-controls">
+          <form class="hilo-input-wrap" id="hilo-form">
+            <input
+              type="text"
+              class="hilo-input"
+              id="hilo-input"
+              placeholder="Pregúntale a Hilo…"
+              autocomplete="off"
+              maxlength="2000"
+            />
+            <button type="submit" class="hilo-send" id="hilo-send" title="Enviar mensaje" aria-label="Enviar">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M1 1L9 5L1 9V1Z" fill="currentColor"/>
+              </svg>
+            </button>
+          </form>
         </div>
-        <div class="hilo-main">
-          <button
-            type="button"
-            class="hilo-avatar"
-            id="hilo-avatar"
-            aria-label="Hilo — clic para continuar o repetir el mensaje"
-          ></button>
-          <div class="hilo-controls">
-            <form class="hilo-input-wrap" id="hilo-form">
-              <input
-                type="text"
-                class="hilo-input"
-                id="hilo-input"
-                placeholder="Pregúntale a Hilo…"
-                autocomplete="off"
-                maxlength="2000"
-              />
-              <button type="submit" class="hilo-send" id="hilo-send" title="Enviar mensaje" aria-label="Enviar">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                  <path d="M1 1L9 5L1 9V1Z" fill="currentColor"/>
-                </svg>
-              </button>
-            </form>
-          </div>
-        </div>
-      </aside>
-    </div>
+      </div>
+    </aside>
   </div>
 
   <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>

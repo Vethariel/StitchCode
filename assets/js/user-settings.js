@@ -72,22 +72,32 @@ export function saveUserProfile(profile) {
   );
 }
 
-/** Texto para el prompt de Hilo (valores por defecto si el usuario dejó campos vacíos). */
-export function profileForHilo(profile = loadUserProfile()) {
-  const tonoLabels = Object.fromEntries(TONO_OPTIONS.map((o) => [o.value, o.label]));
-  const estiloLabels = Object.fromEntries(ESTILO_OPTIONS.map((o) => [o.value, o.label]));
-
-  const tono =
-    tonoLabels[profile.tono] ||
-    profile.tono ||
-    "amigable y cercano (valor por defecto)";
-  const estilo =
-    estiloLabels[profile.estilo] ||
-    profile.estilo ||
-    "explicaciones claras paso a paso (valor por defecto)";
-  const objetivos =
-    profile.objetivos ||
-    "aprender a programar en Woven con buenas prácticas (sin objetivos declarados)";
-
-  return { tono, estilo, objetivos };
+/** @param {{ value: string, label: string }[]} options */
+function resolveProfileField(options, value) {
+  const v = String(value ?? "").trim();
+  if (!v) return "";
+  const hit = options.find((o) => o.value === v);
+  return hit ? hit.label : v;
 }
+
+/**
+ * Parámetros de perfil que Gemini recibe en cada mensaje de Hilo
+ * (onboarding / Ajustes → localStorage → perfilJson en hilo_chat).
+ * Campos vacíos se envían como "" y el backend aplica valores por defecto.
+ * @returns {{ tono: string, estilo: string, objetivos: string }}
+ */
+export function profileParamsForGemini(profile = loadUserProfile()) {
+  return {
+    tono: resolveProfileField(TONO_OPTIONS, profile.tono),
+    estilo: resolveProfileField(ESTILO_OPTIONS, profile.estilo),
+    objetivos: String(profile.objetivos ?? "").trim(),
+  };
+}
+
+/** JSON del perfil para el argumento perfil_json de hilo_chat. */
+export function profileJsonForGemini(profile = loadUserProfile()) {
+  return JSON.stringify(profileParamsForGemini(profile));
+}
+
+/** @deprecated Usa profileParamsForGemini */
+export const profileForHilo = profileParamsForGemini;
