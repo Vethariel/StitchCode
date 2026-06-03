@@ -373,6 +373,53 @@ Campos OBLIGATORIOS además de los del ejercicio libre:
   la app construye el panel y las instrucciones por línea desde lineas_edicion y la validación.
 - "resumen": misma idea que el objetivo, sin números de línea contradictorios.
 lineas_edicion: solo índices 1..N que existan en codigo_solucion (cuenta líneas del programa).
+
+Listas (muy frecuente en planes): usa list<int> o list<string>, corchetes [a, b], nums[i], .append(x).
+Nunca Python (lista = [], for x in lista, def). El validador rechaza sintaxis no Woven.
+"""
+
+PLAN_ESTABLISH_PROMPT = """
+PODER: PLAN DE APRENDIZAJE (eje temático)
+El estudiante pidió un PLAN estructurado para dominar un tema en Woven.
+Responde con UN solo JSON (sin markdown):
+{
+  "type": "plan",
+  "titulo": "título del plan",
+  "eje_tematico": "tema central en pocas palabras",
+  "tema_id": "slug_snake_case",
+  "tema_nombre": "nombre para logros de aprendizaje",
+  "resumen": "1-3 frases del recorrido",
+  "logro_descripcion": "qué competencias Woven consolidará al terminar TODO el plan (solo aprendizaje, sin mencionar completar ejercicios)",
+  "actividades": [
+    {
+      "id": "act_1",
+      "titulo": "nombre corto",
+      "tipo": "aprendizaje" | "ejercicio_libre" | "correccion" | "relleno" | "reflexion",
+      "objetivo": "qué debe lograr el estudiante",
+      "mensaje_inicio": "texto que el sistema enviará al iniciar esta actividad (instrucción concreta)",
+      "contexto_activo": "pistas para Hilo mientras dura la actividad (opcional)"
+    }
+  ]
+}
+
+Reglas:
+- Entre 4 y 8 actividades en orden pedagógico creciente.
+- Incluye al menos: 1 aprendizaje (concepto + ejemplo), 1 ejercicio_libre, 1 correccion o relleno, 1 reflexion.
+- mensaje_inicio debe ser autosuficiente para generar esa actividad (ejercicio, lección, etc.).
+- logro_descripcion: competencias del eje temático; NO cites títulos de actividades ni «completaste».
+- Solo sintaxis Woven en mensajes que pidan código.
+"""
+
+PLAN_ACTIVE_PROMPT = """
+PODER: PLAN DE APRENDIZAJE ACTIVO
+El estudiante sigue un PLAN con actividades en secuencia. Recibirás el estado del plan
+(actividades, cuáles completó, cuál es la actual). Capitaliza el progreso: menciona lo ya
+practicado y enlaza con la actividad actual sin adelantar las pendientes.
+
+Responde con JSON type "conversation" (o "explanation" si explicas código del ejemplo).
+- No propongas otro plan ni saltes actividades.
+- Si está en ejercicio dentro del plan, respeta también las reglas de ejercicio activo.
+- Relaciona tus respuestas con objetivo y contexto_activo de la actividad actual.
 """
 
 EXERCISE_ACTIVE_PROMPT = """
@@ -430,6 +477,14 @@ def _es_modo_ejercicio_activo(tipo_interaccion: str) -> bool:
     )
 
 
+def _es_modo_plan_activo(tipo_interaccion: str) -> bool:
+    return (tipo_interaccion or "").strip().lower() in (
+        "plan_activo",
+        "plan",
+        "modo_plan",
+    )
+
+
 def _coerce_bool(value) -> bool:
     if isinstance(value, bool):
         return value
@@ -459,6 +514,18 @@ def _normalizar_dominio_tema(raw) -> dict | None:
         nombre = tid.replace("_", " ").title()
     desc = _limpiar_descripcion_logro(desc)
     return {"id": tid, "nombre": nombre, "descripcion": desc, "icono": icono}
+
+
+def _sanitizar_codigo_woven(raw: str) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    m = re.search(r"```(?:woven|python|java|cpp)?\s*([\s\S]*?)```", s, re.I)
+    if m:
+        s = m.group(1).strip()
+    if "\\n" in s and "\n" not in s:
+        s = s.replace("\\n", "\n").replace("\\t", "\t")
+    return s.strip()
 
 
 def _limpiar_descripcion_logro(desc: str) -> str:
@@ -548,6 +615,40 @@ def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
             bloques.append(
                 "CÓDIGO DE REFERENCIA (interno — no lo copies ni lo muestres al estudiante):\n"
                 + ref
+            )
+    return contexto + "\n\n" + "\n".join(bloques)
+
+
+def _anexar_contexto_plan(contexto: str, plan_json: str) -> str:
+    try:
+        data = json.loads(plan_json) if plan_json else {}
+    except json.JSONDecodeError:
+        data = {}
+    if not isinstance(data, dict) or not data.get("titulo"):
+        return contexto
+    bloques = ["PLAN DE APRENDIZAJE ACTIVO (no cambies de eje temático):"]
+    bloques.append(f"Plan: {data.get('titulo', '')}")
+    bloques.append(f"Eje: {data.get('eje_tematico', '')}")
+    if data.get("resumen"):
+        bloques.append(f"Resumen: {data.get('resumen')}")
+    act_actual = data.get("actividad_actual")
+    if isinstance(act_actual, dict):
+        bloques.append(
+            f"Actividad ACTUAL ({act_actual.get('indice')}/{act_actual.get('total')}): "
+            f"{act_actual.get('titulo')} [{act_actual.get('tipo')}]"
+        )
+        if act_actual.get("objetivo"):
+            bloques.append(f"  Objetivo: {act_actual.get('objetivo')}")
+        if act_actual.get("contexto_activo"):
+            bloques.append(f"  Contexto: {act_actual.get('contexto_activo')}")
+    acts = data.get("actividades") or []
+    if isinstance(acts, list) and acts:
+        bloques.append("Todas las actividades:")
+        for a in acts:
+            if not isinstance(a, dict):
+                continue
+            bloques.append(
+                f"  {a.get('indice')}. [{a.get('estado', '?')}] {a.get('titulo')} ({a.get('tipo')})"
             )
     return contexto + "\n\n" + "\n".join(bloques)
 
@@ -889,7 +990,9 @@ def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
                 parrafos = [str(p).strip() for p in raw_enun if str(p).strip()]
             else:
                 parrafos = []
-            codigo = str(data.get("codigo_plantilla") or data.get("codigo") or "").strip()
+            codigo = _sanitizar_codigo_woven(
+                str(data.get("codigo_plantilla") or data.get("codigo") or "")
+            )
             criterios_raw = data.get("criterios") or []
             criterios = (
                 [str(c).strip() for c in criterios_raw if str(c).strip()]
@@ -906,9 +1009,9 @@ def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
             tipo_ejercicio = str(data.get("tipo_ejercicio") or "libre").strip().lower()
             if tipo_ejercicio not in ("libre", "correccion", "relleno"):
                 tipo_ejercicio = "libre"
-            codigo_solucion = str(
-                data.get("codigo_solucion") or data.get("codigo_referencia") or ""
-            ).strip()
+            codigo_solucion = _sanitizar_codigo_woven(
+                str(data.get("codigo_solucion") or data.get("codigo_referencia") or "")
+            )
             lineas_edicion = _normalizar_lineas_edicion(data.get("lineas_edicion"))
             if tipo_ejercicio in ("correccion", "relleno"):
                 if not codigo_solucion and codigo:
@@ -945,6 +1048,125 @@ def parsear_respuesta_ejercicio(response_json: str) -> str:
     data = json.loads(response_json)
     raw = data["candidates"][0]["content"]["parts"][0]["text"]
     return json.dumps(normalizar_respuesta_ejercicio(raw), ensure_ascii=False)
+
+
+def _normalizar_actividades_plan(raw) -> list:
+    if not isinstance(raw, list):
+        return []
+    tipos_ok = ("aprendizaje", "ejercicio_libre", "correccion", "relleno", "reflexion")
+    out = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, dict):
+            continue
+        tipo = str(item.get("tipo") or "reflexion").strip().lower()
+        if tipo == "ejercicio" or tipo == "libre":
+            tipo = "ejercicio_libre"
+        if tipo not in tipos_ok:
+            tipo = "reflexion"
+        aid = str(item.get("id") or f"act_{i + 1}").strip()[:32] or f"act_{i + 1}"
+        titulo = str(item.get("titulo") or f"Actividad {i + 1}").strip()[:120]
+        objetivo = str(item.get("objetivo") or "").strip()[:300]
+        mensaje = str(
+            item.get("mensaje_inicio") or item.get("mensaje") or objetivo or titulo
+        ).strip()[:500]
+        ctx = str(item.get("contexto_activo") or "").strip()[:300]
+        entry = {
+            "id": aid,
+            "titulo": titulo,
+            "tipo": tipo,
+            "objetivo": objetivo or titulo,
+            "mensaje_inicio": mensaje,
+        }
+        if ctx:
+            entry["contexto_activo"] = ctx
+        out.append(entry)
+    return out
+
+
+def normalizar_respuesta_plan(texto_modelo: str) -> dict:
+    crudo = _limpiar_json_crudo(texto_modelo)
+    try:
+        data = json.loads(crudo)
+        if isinstance(data, dict) and str(data.get("type", "")).lower() == "plan":
+            titulo = str(data.get("titulo", "")).strip()[:120] or "Plan de aprendizaje"
+            eje = str(data.get("eje_tematico") or titulo).strip()[:80]
+            tema_id = _slug_tema_id(str(data.get("tema_id") or eje))
+            tema_nombre = str(data.get("tema_nombre") or eje).strip()[:80] or eje
+            resumen = str(data.get("resumen", "")).strip()[:400]
+            logro = _limpiar_descripcion_logro(
+                str(data.get("logro_descripcion") or "").strip()
+            )
+            actividades = _normalizar_actividades_plan(data.get("actividades"))
+            if len(actividades) < 2:
+                raise ValueError("El plan debe tener al menos 2 actividades.")
+            return {
+                "type": "plan",
+                "titulo": titulo,
+                "eje_tematico": eje,
+                "tema_id": tema_id,
+                "tema_nombre": tema_nombre,
+                "resumen": resumen or f"Plan para aprender {eje}.",
+                "logro_descripcion": logro,
+                "actividades": actividades,
+            }
+    except json.JSONDecodeError:
+        pass
+    raise ValueError("La respuesta no incluyó un plan válido.")
+
+
+def parsear_respuesta_plan(response_json: str) -> str:
+    data = json.loads(response_json)
+    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+    return json.dumps(normalizar_respuesta_plan(raw), ensure_ascii=False)
+
+
+def construir_payload_plan(
+    mensaje: str,
+    codigo: str,
+    modo: str,
+    perfil_json: str = "{}",
+    bloques_resumen: str = "",
+) -> str:
+    contexto = construir_contexto(codigo, [], [], False, modo, bloques_resumen)
+    preferencias = construir_preferencias_estudiante(perfil_json)
+    system_completo = (
+        SYSTEM_PROMPT
+        + f"\n\n{PLAN_ESTABLISH_PROMPT}"
+        + f"\n\n{preferencias}"
+        + f"\n\nCONTEXTO (referencia del editor):\n{contexto}"
+        + "\n\nTURNO ACTUAL: el estudiante pidió un plan de aprendizaje. "
+        'Responde solo con JSON type "plan".'
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": system_completo}]},
+        "contents": [{"role": "user", "parts": [{"text": mensaje}]}],
+        "generationConfig": {
+            "temperature": 0.55,
+            "maxOutputTokens": 4096,
+            "responseMimeType": "application/json",
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def hilo_establecer_plan(
+    mensaje,
+    codigo,
+    modo,
+    perfil_json="{}",
+    bloques_resumen="",
+):
+    try:
+        payload = construir_payload_plan(
+            mensaje,
+            codigo,
+            modo,
+            perfil_json,
+            bloques_resumen,
+        )
+        return json.dumps({"ok": True, "payload": payload})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
 
 
 def hilo_establecer_ejercicio(
@@ -1013,6 +1235,7 @@ def construir_payload_hilo(
     traducciones_json: str = "{}",
     enunciado_json: str = "{}",
     paso_a_paso_json: str = "{}",
+    plan_json: str = "{}",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -1022,6 +1245,8 @@ def construir_payload_hilo(
         codigo, output, errores, tiene_error, modo, bloques_resumen
     )
     contexto = _anexar_contexto_paso_a_paso(contexto, paso_a_paso_json)
+    if _es_modo_plan_activo(tipo_interaccion):
+        contexto = _anexar_contexto_plan(contexto, plan_json)
     paso_activo = False
     try:
         paso_data = json.loads(paso_a_paso_json) if paso_a_paso_json else {}
@@ -1085,6 +1310,12 @@ def construir_payload_hilo(
         system_completo += (
             f"\n\n{EXERCISE_ACTIVE_PROMPT}"
             "\n\nTURNO ACTUAL: MODO EJERCICIO — responde con JSON type \"conversation\"."
+        )
+    elif _es_modo_plan_activo(tipo_interaccion):
+        system_completo += (
+            f"\n\n{PLAN_ACTIVE_PROMPT}"
+            "\n\nTURNO ACTUAL: MODO PLAN — responde con JSON type \"conversation\" "
+            "(o \"explanation\" si explicas el ejemplo en pantalla)."
         )
     elif paso_activo or modo_paso_a_paso:
         system_completo += (
@@ -1454,14 +1685,16 @@ def hilo_chat(
     traducciones_json="{}",
     enunciado_json="{}",
     paso_a_paso_json="{}",
+    plan_json="{}",
 ):
     """
     Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
-    tipo_interaccion: "conversacion" | "explicacion" | "explicacion_aprendizaje" | "ejercicio_activo".
+    tipo_interaccion: "conversacion" | "explicacion" | "explicacion_aprendizaje" | "ejercicio_activo" | "plan_activo".
     bloques_resumen: programa L1… cuando modo es bloques o verboso.
     traducciones_json: {python, java, cpp} para explicación de aprendizaje.
     enunciado_json: título y párrafos del ejercicio activo.
     paso_a_paso_json: traza y paso actual si el modo paso a paso del editor está activo.
+    plan_json: estado del plan de aprendizaje activo.
     """
     try:
         payload = construir_payload_hilo(
@@ -1479,6 +1712,7 @@ def hilo_chat(
             traducciones_json,
             enunciado_json,
             paso_a_paso_json,
+            plan_json,
         )
         return json.dumps({
             "ok": True,

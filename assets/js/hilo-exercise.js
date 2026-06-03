@@ -8,6 +8,13 @@ import {
   finalizeGuidedExercise,
   inferExerciseTipo,
 } from "./hilo-exercise-correction.js";
+import {
+  inferRedaccionObjetivo,
+  parseRedaccionResponse,
+  sanitizeModelWovenCode,
+  validateWovenDraft,
+} from "./hilo-draft.js";
+import { sendHiloRedaction } from "./hilo-chat.js";
 import { slugTopicId } from "./learning-achievements.js";
 import { localHiloTurn } from "./hilo-response.js";
 
@@ -41,7 +48,9 @@ export function parseExercisePayload(raw) {
   const parrafos = Array.isArray(data.enunciado)
     ? data.enunciado.map((p) => String(p).trim()).filter(Boolean)
     : [];
-  const codigo = String(data.codigo_plantilla ?? data.codigo ?? "").trim();
+  const codigo = sanitizeModelWovenCode(
+    String(data.codigo_plantilla ?? data.codigo ?? "")
+  );
   const tipoRaw = String(data.tipo_ejercicio ?? "libre").toLowerCase();
   const tipo =
     tipoRaw === "correccion" || tipoRaw === "relleno" ? tipoRaw : "libre";
@@ -82,7 +91,8 @@ export function parseExercisePayload(raw) {
     tema_id: slugTopicId(String(data.tema_id ?? temaNombre)),
     tema_nombre: temaNombre,
     tipo_ejercicio: tipo,
-    codigo_solucion: String(data.codigo_solucion ?? "").trim() || undefined,
+    codigo_solucion:
+      sanitizeModelWovenCode(String(data.codigo_solucion ?? "")) || undefined,
     lineas_edicion: lineas_edicion.length ? lineas_edicion : undefined,
   };
 }
@@ -103,6 +113,7 @@ export function parseExercisePayload(raw) {
  *   runWoven?: (code: string) => Promise<{ salida: string[], tiene_errores: boolean, diagnosticos?: { mensaje: string }[] }>,
  *   onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
  *   onExerciseModeChange?: (active: boolean) => void,
+ *   establishPreamble?: string,
  * }} opts
  */
 export async function runHiloExercise({
@@ -115,16 +126,54 @@ export async function runHiloExercise({
   runWoven,
   onEnunciado,
   onExerciseModeChange,
+  establishPreamble,
 }) {
   const ctx = getContext();
   const tipoPedido = inferExerciseTipo(mensaje);
+  const establishBase = establishPreamble
+    ? `${establishPreamble}\n\n${mensaje}`
+    : mensaje;
+
+  /**
+   * Si Gemini no devuelve codigo_solucion válido, generamos uno con redacción validada.
+   * @param {ExercisePayload} ex
+   * @param {string} detail
+   */
+  async function recoverSolutionViaRedaction(ex, detail) {
+    const prompt =
+      `Genera un programa Woven CORRECTO y corto para el ejercicio «${ex.titulo}». ` +
+      `Objetivo: ${ex.resumen || mensaje}. ` +
+      `El intento anterior falló (${detail}). ` +
+      `Usa solo sintaxis Woven (list<int> o list<string>, append, índices, print). ` +
+      `Sin Python ni Java. Debe compilar y mostrar salida en consola.`;
+    const raw = await sendHiloRedaction({
+      mensaje: prompt,
+      codigo: "",
+      modo: ctx.modo,
+      apiKey,
+      perfilJson,
+      objetivoRedaccion: inferRedaccionObjetivo(mensaje),
+      bloquesResumen: ctx.bloquesResumen ?? "",
+    });
+    const draft = parseRedaccionResponse(raw);
+    const code = sanitizeModelWovenCode(draft.codigo);
+    const validation = await validateWovenDraft(code, "ejemplo_correcto", {
+      lintWoven,
+      runWoven,
+    });
+    if (!validation.ok) {
+      throw new Error(validation.detail);
+    }
+    return code;
+  }
 
   /** @param {string} [retryDetail] */
   async function establish(retryDetail) {
     const msg =
       retryDetail != null
-        ? `${mensaje}\n\nEl código anterior falló validación: ${retryDetail}. Genera otro ejercicio completo.`
-        : mensaje;
+        ? `${establishBase}\n\nEl código anterior falló validación: ${retryDetail}. ` +
+          "Genera otro ejercicio completo con codigo_solucion Woven válido (compila y ejecuta)."
+        : establishBase;
     const prep = await hiloEstablishExercise({
       mensaje: msg,
       codigo: ctx.codigo,
@@ -160,6 +209,7 @@ export async function runHiloExercise({
       lintWoven,
       runWoven,
       retryEstablish: async (detail) => establish(detail),
+      recoverSolution: async (ex, detail) => recoverSolutionViaRedaction(ex, detail),
     });
     templateCode = guidedPkg.codigo_estudiante;
     editableLines = guidedPkg.lineas_editables;

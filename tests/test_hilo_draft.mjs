@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { inferRedaccionObjetivo } from "../assets/js/hilo-draft.js";
+import { sanitizeModelWovenCode } from "../assets/js/hilo-draft.js";
 
-test("inferRedaccionObjetivo ejemplo para corregir", () => {
+test("sanitizeModelWovenCode quita fences y \\n literales", () => {
+  const fenced = "```woven\nlist<int> x = [1]\nprint(x[0])\n```";
   assert.equal(
-    inferRedaccionObjetivo("Dame un ejemplo con errores para corregir"),
-    "ejemplo_para_corregir"
+    sanitizeModelWovenCode(fenced),
+    "list<int> x = [1]\nprint(x[0])"
   );
   assert.equal(
-    inferRedaccionObjetivo("Enséñame variables"),
-    "ejemplo_correcto"
+    sanitizeModelWovenCode("list<int> a = [1]\\nprint(a[0])"),
+    "list<int> a = [1]\nprint(a[0])"
   );
 });

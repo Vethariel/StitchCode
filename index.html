@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="assets/css/loading-screen.css">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/exercise-context.css">
+  <link rel="stylesheet" href="assets/css/plan-context.css">
   <link rel="stylesheet" href="assets/css/step-context.css">
   <link rel="stylesheet" href="assets/css/structure-graph.css">
   <link rel="stylesheet" href="assets/css/editor.css">
@@ -278,6 +279,40 @@
         >
           Salir del ejercicio
         </button>
+      </div>
+    </div>
+
+    <div
+      id="plan-context-bar"
+      class="plan-context-bar"
+      role="region"
+      aria-label="Plan de aprendizaje"
+      hidden
+    >
+      <div class="plan-context-bar-inner">
+        <span class="plan-context-indicator" aria-hidden="true"></span>
+        <p class="plan-context-text" id="plan-context-text">
+          Plan de aprendizaje — sigue las actividades en orden.
+        </p>
+        <div class="plan-context-actions">
+          <button
+            type="button"
+            class="plan-context-next"
+            id="plan-next-activity-btn"
+            disabled
+            title="Pasar a la siguiente actividad del plan"
+          >
+            Siguiente actividad
+          </button>
+          <button
+            type="button"
+            class="plan-context-exit"
+            id="exit-plan-btn"
+            title="Salir del plan"
+          >
+            Salir del plan
+          </button>
+        </div>
       </div>
     </div>
 

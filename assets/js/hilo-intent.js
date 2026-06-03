@@ -1,4 +1,4 @@
-/** @typedef {'conversation' | 'explanation' | 'learning' | 'exercise' | 'step_trace'} HiloIntent */
+/** @typedef {'conversation' | 'explanation' | 'learning' | 'exercise' | 'step_trace' | 'plan'} HiloIntent */
 
 /** Quita tildes para que los regex coincidan con "enseñame" y "enséñame" por igual. */
 function foldAccents(text) {
@@ -24,6 +24,15 @@ function foldAccents(text) {
  * - Referencia explícita al código del alumno en pantalla:
  *   "Explícame mi código", "¿Qué hace esta línea?", "No entiendo mi programa"
  */
+
+const PLAN_PATTERNS = [
+  /\bmodo\s+plan\b/i,
+  /\bplan\s+de\s+aprendizaje\b/i,
+  /\b(?:quiero|necesito|hazme|dame|crea(?:me)?|arm(?:a|e)(?:me)?)\s+un\s+plan\b/i,
+  /\bplan(?:ear)?\s+(?:para\s+)?(?:aprender|estudiar|dominar)\b/i,
+  /\b(?:ruta|itinerario|recorrido)\s+(?:de\s+)?aprendizaje\b/i,
+  /\b(?:seguir|hacer)\s+un\s+plan\s+(?:sobre|de|para)\b/i,
+];
 
 const EXERCISE_PATTERNS = [
   /\bmodo\s+ejercicio\b/i,
@@ -131,6 +140,20 @@ function detectStepTrace(message) {
 /**
  * @param {string} message
  */
+/**
+ * Plan explícito o aprendizaje de un tema nuevo (el aprendizaje va dentro del plan).
+ * @param {string} message
+ */
+function detectPlan(message) {
+  const t = message.trim();
+  if (!t) return false;
+  const n = foldAccents(t);
+  for (const re of PLAN_PATTERNS) {
+    if (re.test(n)) return true;
+  }
+  return detectLearning(t);
+}
+
 function detectExercise(message) {
   const t = message.trim();
   if (!t) return false;
@@ -197,7 +220,7 @@ export function detectHiloIntent(message) {
   const n = foldAccents(t);
 
   if (detectExercise(t)) return "exercise";
-  if (detectLearning(t)) return "learning";
+  if (detectPlan(t)) return "plan";
 
   const wantsExplain =
     EXPLANATION_PATTERNS.some((re) => re.test(n)) ||
@@ -220,6 +243,7 @@ export function detectHiloIntent(message) {
 
 /** @param {HiloIntent} intent */
 export function intentToApiTipo(intent) {
+  if (intent === "plan") return "plan";
   if (intent === "learning") return "aprendizaje";
   if (intent === "explanation") return "explicacion";
   if (intent === "exercise") return "ejercicio";
@@ -237,8 +261,14 @@ export function exerciseActiveApiTipo() {
   return "ejercicio_activo";
 }
 
+/** Tipo API con plan de aprendizaje activo. */
+export function planActiveApiTipo() {
+  return "plan_activo";
+}
+
 /** Expuesto para pruebas y depuración de triggers. */
 export {
+  detectPlan,
   detectExercise,
   detectLearning,
   detectStepTrace,

@@ -26,6 +26,13 @@ import {
   isExerciseModeActive,
   isGuidedExerciseActive,
 } from "./hilo-exercise-mode.js";
+import {
+  canAdvancePlanActivity,
+  getActivePlan,
+  getCurrentPlanActivity,
+  isCurrentPlanActivityDone,
+  isPlanModeActive,
+} from "./hilo-plan-mode.js";
 import { buildHiloContext } from "./hilo-context.js";
 import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
@@ -202,6 +209,10 @@ const sidePanel = createSidePanelController({
 const exerciseContextBar = document.getElementById("exercise-context-bar");
 const exerciseContextText = document.getElementById("exercise-context-text");
 const exitExerciseBtn = document.getElementById("exit-exercise-btn");
+const planContextBar = document.getElementById("plan-context-bar");
+const planContextText = document.getElementById("plan-context-text");
+const planNextBtn = document.getElementById("plan-next-activity-btn");
+const exitPlanBtn = document.getElementById("exit-plan-btn");
 
 /** @param {boolean} active */
 function setExerciseModeUi(active) {
@@ -231,6 +242,34 @@ function setExerciseModeUi(active) {
     }
   }
   document.body.classList.toggle("exercise-mode-active", active);
+}
+
+/** @param {boolean} active */
+function setPlanModeUi(active) {
+  if (planContextBar) {
+    planContextBar.hidden = !active;
+    planContextBar.setAttribute("aria-hidden", active ? "false" : "true");
+  }
+  if (active && planContextText) {
+    const plan = getActivePlan();
+    const act = getCurrentPlanActivity();
+    const idx = plan?.actividades?.findIndex((a) => a.id === act?.id) ?? -1;
+    const num = idx >= 0 ? idx + 1 : "?";
+    const total = plan?.actividades?.length ?? "?";
+    const done = isCurrentPlanActivityDone();
+    planContextText.innerHTML = plan
+      ? `<strong>Plan:</strong> ${escapeExerciseBarText(plan.titulo)} · ` +
+        `Actividad ${num}/${total}: ${escapeExerciseBarText(act?.titulo ?? "—")}` +
+        (done ? " · lista para avanzar" : "")
+      : "Plan de aprendizaje activo.";
+  }
+  if (planNextBtn) {
+    planNextBtn.disabled = !active || !canAdvancePlanActivity();
+  }
+  document.body.classList.toggle("plan-mode-active", active);
+  if (active) {
+    editorMode?.setModeSwitchLocked(false);
+  }
 }
 
 /** @param {string} text */
@@ -374,7 +413,7 @@ hiloAgent = createHiloAgentController({
   onFocusTranslationTab,
   onTutorialAction: async (action) => {
     if (!editorMode) return;
-    if (isExerciseModeActive()) return;
+    if (isExerciseModeActive() || isPlanModeActive()) return;
     if (action === "mode:text") await editorMode.setMode("text");
     else if (action === "mode:blocks") await editorMode.setMode("blocks");
     else if (action === "mode:verbose") await editorMode.setMode("verbose");
@@ -417,6 +456,71 @@ hiloAgent = createHiloAgentController({
     },
   },
   stepMode,
+  plan: {
+    onEnunciado: (data) => sidePanel.setEnunciado(data),
+    onPlanModeChange: (active) => {
+      setPlanModeUi(active);
+      if (active) {
+        stepMode?.exit();
+      }
+    },
+    onTopicMastery: (topic) => {
+      try {
+        sidePanel.recordTopicMastery(topic);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        consoleCtl.appendLine(`Logro: ${msg}`, "info");
+      }
+    },
+    lintWoven: (code) => linter.runLintOnCode(code),
+    runWoven: async (code) => {
+      const prev = editor.getCode();
+      editor.setCode(code);
+      await linter.runLint();
+      if (linter.tieneErroresBloqueantes()) {
+        editor.setCode(prev);
+        return { salida: [], tiene_errores: true, diagnosticos: linter.getDiagnosticos() };
+      }
+      const result = await runWoven(code);
+      editor.setCode(prev);
+      return result;
+    },
+    applyExample: async (code) => {
+      await applyCodeToEditor(code);
+      if (!linter.tieneErroresBloqueantes()) {
+        consoleShowsLintErrors = false;
+        consoleCtl.clear();
+        const runningLine = consoleCtl.appendLine("▶ Ejecutando ejemplo…", "info");
+        try {
+          const result = await runWoven(code);
+          consoleCtl.removeLine(runningLine);
+          if (!result.salida.length) {
+            consoleCtl.appendLine("Ejemplo sin salida en consola.", "muted");
+          } else {
+            consoleCtl.appendOutputLines(result.salida);
+          }
+          lastRunOutput = result.salida ?? [];
+          lastRunHadError = !!result.tiene_errores;
+        } catch (err) {
+          consoleCtl.removeLine(runningLine);
+          lastRunHadError = true;
+          lastRunOutput = [];
+        }
+        hiloAgent?.onExecutionContextChange();
+      }
+    },
+    translateAll: translateWovenAll,
+    onTranslations: (trans) => sidePanel.setTranslations(trans),
+    applyTemplate: async (code, opts) => {
+      await applyCodeToEditor(code);
+      editor.setExerciseEditableLines(opts?.editableLines ?? null);
+      blocksCtl.setExerciseEditableLines(opts?.editableLines ?? null);
+    },
+    onExerciseModeChange: (active) => {
+      setExerciseModeUi(active);
+      if (active) setPlanModeUi(isPlanModeActive());
+    },
+  },
   exercise: {
     onEnunciado: (data) => sidePanel.setEnunciado(data),
     onExerciseModeChange: (active) => {
@@ -622,6 +726,16 @@ exitExerciseBtn?.addEventListener("click", () => {
     editorMode?.setModeSwitchLocked(false);
   }
   setExerciseModeUi(false);
+});
+
+exitPlanBtn?.addEventListener("click", () => {
+  hiloAgent?.exitPlanMode();
+  setPlanModeUi(false);
+  setExerciseModeUi(false);
+});
+
+planNextBtn?.addEventListener("click", () => {
+  void hiloAgent?.goToNextPlanActivity();
 });
 
 clearBtn.addEventListener("click", () => {

@@ -44,6 +44,10 @@ let parseHiloRedactFn = null;
 let hiloEstablishExerciseFn = null;
 /** @type {import("pyodide").PyProxy | null} */
 let parseHiloExerciseFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let hiloEstablishPlanFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let parseHiloPlanFn = null;
 /** @type {((source: string, language: string) => import("pyodide").PyProxy) | null} */
 let translateWovenFn = null;
 /** @type {((source: string) => import("pyodide").PyProxy) | null} */
@@ -130,7 +134,7 @@ from pedagogical_lint import lint_woven_pedagogico
 from pedagogical_runtime import run_woven_pedagogico
 from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
-from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion, hilo_establecer_ejercicio, parsear_respuesta_ejercicio
+from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion, hilo_establecer_ejercicio, parsear_respuesta_ejercicio, hilo_establecer_plan, parsear_respuesta_plan
 from translator_visitor import translate_woven
 from tracing_visitor import trace_woven
 `);
@@ -145,6 +149,8 @@ from tracing_visitor import trace_woven
     parseHiloRedactFn = pyodide.globals.get("parsear_respuesta_redaccion");
     hiloEstablishExerciseFn = pyodide.globals.get("hilo_establecer_ejercicio");
     parseHiloExerciseFn = pyodide.globals.get("parsear_respuesta_ejercicio");
+    hiloEstablishPlanFn = pyodide.globals.get("hilo_establecer_plan");
+    parseHiloPlanFn = pyodide.globals.get("parsear_respuesta_plan");
     translateWovenFn = pyodide.globals.get("translate_woven");
     traceWovenFn = pyodide.globals.get("trace_woven");
     setStatus("ready", "Listo");
@@ -160,6 +166,8 @@ from tracing_visitor import trace_woven
     parseHiloRedactFn = null;
     hiloEstablishExerciseFn = null;
     parseHiloExerciseFn = null;
+    hiloEstablishPlanFn = null;
+    parseHiloPlanFn = null;
     translateWovenFn = null;
     traceWovenFn = null;
     const message = err instanceof Error ? err.message : String(err);
@@ -242,6 +250,7 @@ export async function blocksToSource(doc) {
  *   traduccionesJson?: string,
  *   enunciadoJson?: string,
  *   pasoAPasoJson?: string,
+ *   planJson?: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -263,7 +272,8 @@ export async function hiloPrepareMessage(args) {
       args.bloquesResumen ?? "",
       args.traduccionesJson ?? "{}",
       args.enunciadoJson ?? "{}",
-      args.pasoAPasoJson ?? "{}"
+      args.pasoAPasoJson ?? "{}",
+      args.planJson ?? "{}"
     )
   );
   return JSON.parse(raw);
@@ -361,6 +371,39 @@ export async function hiloParseExercise(responseJson) {
     throw new Error("Hilo aún no está listo.");
   }
   return pyResultToString(parseHiloExerciseFn(JSON.stringify(responseJson)));
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   codigo: string,
+ *   modo: string,
+ *   perfilJson: string,
+ *   bloquesResumen?: string,
+ * }} args
+ */
+export async function hiloEstablishPlan(args) {
+  if (!hiloEstablishPlanFn) {
+    return { ok: false, error: "Hilo aún no está listo." };
+  }
+  const raw = pyResultToString(
+    hiloEstablishPlanFn(
+      args.mensaje,
+      args.codigo,
+      args.modo,
+      args.perfilJson ?? "{}",
+      args.bloquesResumen ?? ""
+    )
+  );
+  return JSON.parse(raw);
+}
+
+/** @param {object} responseJson */
+export async function hiloParsePlan(responseJson) {
+  if (!parseHiloPlanFn) {
+    throw new Error("Hilo aún no está listo.");
+  }
+  return pyResultToString(parseHiloPlanFn(JSON.stringify(responseJson)));
 }
 
 /**

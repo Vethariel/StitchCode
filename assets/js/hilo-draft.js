@@ -20,6 +20,21 @@
  * @param {string} mensaje
  * @returns {RedaccionObjetivo}
  */
+/**
+ * Extrae código Woven plano desde respuestas del modelo (fences, \\n literales).
+ * @param {string} raw
+ * @returns {string}
+ */
+export function sanitizeModelWovenCode(raw) {
+  let s = String(raw ?? "").trim();
+  const fence = s.match(/```(?:woven|python|java|cpp)?\s*([\s\S]*?)```/i);
+  if (fence) s = fence[1].trim();
+  if (s.includes("\\n") && !s.includes("\n")) {
+    s = s.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+  }
+  return s.trim();
+}
+
 export function inferRedaccionObjetivo(mensaje) {
   const t = mensaje.toLowerCase();
   if (

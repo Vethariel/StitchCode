@@ -1,4 +1,6 @@
-import { validateWovenDraft } from "./hilo-draft.js";
+import { sanitizeModelWovenCode, validateWovenDraft } from "./hilo-draft.js";
+
+const GUIDED_VALIDATION_MAX_ATTEMPTS = 3;
 
 /** @typedef {'vacio' | 'incorrecto'} SlotModo */
 /** @typedef {{
@@ -291,6 +293,10 @@ export function buildLineasDetalle(solution, slots, tipo) {
  *   lintWoven: (code: string) => Promise<{ parse_ok: boolean, errores?: { mensaje: string }[] }>,
  *   runWoven: (code: string) => Promise<{ salida: string[], tiene_errores: boolean, diagnosticos?: { mensaje: string }[] }>,
  *   retryEstablish?: (detail: string) => Promise<import("./hilo-exercise.js").ExercisePayload>,
+ *   recoverSolution?: (
+ *     exercise: import("./hilo-exercise.js").ExercisePayload,
+ *     detail: string
+ *   ) => Promise<string>,
  * }} runtime
  * @returns {Promise<GuidedExercisePackage>}
  */
@@ -298,32 +304,61 @@ export async function finalizeGuidedExercise(exercise, runtime) {
   const tipo =
     exercise.tipo_ejercicio === "relleno" ? "relleno" : "correccion";
 
-  let solution = exercise.codigo_solucion?.trim() || "";
-  let rawSlots = normalizeLineasEdicion(
-    solution,
-    exercise.lineas_edicion ?? []
-  );
+  /** @type {import("./hilo-exercise.js").ExercisePayload} */
+  let current = { ...exercise };
+  let solution = "";
+  let rawSlots = [];
+  /** @type {Awaited<ReturnType<typeof validateWovenDraft>>} */
+  let validation = { ok: false, reason: "sintaxis", detail: "" };
 
-  if (!rawSlots.length && solution) {
-    rawSlots = defaultLineasEdicion(solution, tipo);
-  }
-
-  let validation = await validateWovenDraft(solution, "ejemplo_correcto", runtime);
-
-  if (!validation.ok && runtime.retryEstablish) {
-    const retry = await runtime.retryEstablish(validation.detail);
-    solution = retry.codigo_solucion?.trim() || retry.codigo_plantilla || solution;
+  for (let attempt = 0; attempt < GUIDED_VALIDATION_MAX_ATTEMPTS; attempt++) {
+    solution = sanitizeModelWovenCode(current.codigo_solucion?.trim() || "");
+    if (!solution) {
+      solution = sanitizeModelWovenCode(current.codigo_plantilla?.trim() || "");
+    }
     rawSlots = normalizeLineasEdicion(
       solution,
-      retry.lineas_edicion?.length
-        ? retry.lineas_edicion
-        : defaultLineasEdicion(solution, tipo)
+      current.lineas_edicion ?? []
     );
+    if (!rawSlots.length && solution) {
+      rawSlots = defaultLineasEdicion(solution, tipo);
+    }
+
     validation = await validateWovenDraft(solution, "ejemplo_correcto", runtime);
+    if (validation.ok) break;
+
+    if (attempt < GUIDED_VALIDATION_MAX_ATTEMPTS - 1 && runtime.retryEstablish) {
+      current = await runtime.retryEstablish(validation.detail);
+      continue;
+    }
+  }
+
+  if (!validation.ok && runtime.recoverSolution) {
+    try {
+      solution = sanitizeModelWovenCode(
+        await runtime.recoverSolution(current, validation.detail)
+      );
+      rawSlots = normalizeLineasEdicion(
+        solution,
+        current.lineas_edicion?.length
+          ? current.lineas_edicion
+          : defaultLineasEdicion(solution, tipo)
+      );
+      validation = await validateWovenDraft(solution, "ejemplo_correcto", runtime);
+      if (validation.ok) {
+        current = { ...current, codigo_solucion: solution };
+      }
+    } catch {
+      /* se reporta el error original abajo */
+    }
   }
 
   if (!validation.ok) {
-    throw new Error(`No pude validar el ejercicio: ${validation.detail}`);
+    const hint =
+      validation.reason === "sintaxis"
+        ? `${validation.detail} Revisa que el ejercicio use list<int>/list<string>, append e índices en Woven.`
+        : validation.detail;
+    throw new Error(`No pude validar el ejercicio: ${hint}`);
   }
 
   const slots = enforceSlotsForTipo(solution, rawSlots, tipo);
@@ -338,9 +373,9 @@ export async function finalizeGuidedExercise(exercise, runtime) {
   /** @type {GuidedExercisePackage} */
   const pkg = {
     tipo,
-    titulo: exercise.titulo,
-    resumen: exercise.resumen,
-    criterios: [...(exercise.criterios ?? [])],
+    titulo: current.titulo,
+    resumen: current.resumen,
+    criterios: [...(current.criterios ?? [])],
     codigo_referencia: solution,
     codigo_estudiante: built.code,
     lineas_editables: built.editableLines,
