@@ -61,6 +61,11 @@
   pointer-events: auto;
 }
 
+.hilo-bubble-text .hilo-emphasis {
+  color: var(--palette-gold-soft);
+  font-weight: 600;
+}
+
 .hilo-bubble-text {
   margin: 0;
   font-size: var(--text-sm);

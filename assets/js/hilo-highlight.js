@@ -1,4 +1,4 @@
-/** @typedef {'editor' | 'blocks' | 'console'} HiloPanelId */
+/** @typedef {'editor' | 'blocks' | 'console' | 'python' | 'java' | 'cpp'} HiloPanelId */
 /** @typedef {'text' | 'blocks' | 'verbose'} EditorVista */
 /** @typedef {{ line: number, start?: number, end?: number }} HiloHighlightRange */
 
@@ -11,6 +11,8 @@
  *   blocksDocument: HTMLElement,
  *   consoleBody: HTMLElement,
  *   getVista: () => EditorVista,
+ *   onTranslationHighlight?: (lang: 'python' | 'java' | 'cpp', line: number) => void,
+ *   clearTranslationHighlights?: () => void,
  * }} els
  */
 export function createHiloHighlightController({
@@ -20,6 +22,8 @@ export function createHiloHighlightController({
   blocksDocument,
   consoleBody,
   getVista,
+  onTranslationHighlight,
+  clearTranslationHighlights,
 }) {
   function clearEditor() {
     lineNumbers
@@ -46,6 +50,7 @@ export function createHiloHighlightController({
     clearEditor();
     clearBlocks();
     clearConsole();
+    clearTranslationHighlights?.();
   }
 
   /** @param {number} line 1-based */
@@ -104,6 +109,14 @@ export function createHiloHighlightController({
     }
 
     const line = chunk.highlight?.line ?? 1;
+
+    if (panel === "python" || panel === "java" || panel === "cpp") {
+      clearEditor();
+      clearBlocks();
+      clearConsole();
+      onTranslationHighlight?.(panel, line);
+      return;
+    }
 
     if (panel === "console") {
       applyConsole(line);

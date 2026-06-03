@@ -17,6 +17,7 @@ const INTERPRETER_FILES = [
   "verbose_visitor.py",
   "verbose_inverse.py",
   "gemini_agent.py",
+  "translator_visitor.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
@@ -37,6 +38,8 @@ let hiloRedactFn = null;
 let parseHiloResponseFn = null;
 /** @type {import("pyodide").PyProxy | null} */
 let parseHiloRedactFn = null;
+/** @type {((source: string, language: string) => import("pyodide").PyProxy) | null} */
+let translateWovenFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -120,6 +123,7 @@ from pedagogical_runtime import run_woven_pedagogico
 from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
 from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion
+from translator_visitor import translate_woven
 `);
 
     runWovenFn = pyodide.globals.get("run_woven_pedagogico");
@@ -130,6 +134,7 @@ from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parse
     hiloRedactFn = pyodide.globals.get("hilo_redactar");
     parseHiloResponseFn = pyodide.globals.get("parsear_respuesta_hilo");
     parseHiloRedactFn = pyodide.globals.get("parsear_respuesta_redaccion");
+    translateWovenFn = pyodide.globals.get("translate_woven");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
@@ -141,6 +146,7 @@ from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parse
     hiloRedactFn = null;
     parseHiloResponseFn = null;
     parseHiloRedactFn = null;
+    translateWovenFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
@@ -261,7 +267,8 @@ export async function hiloParseResponse(responseJson, ctx = {}) {
       ctx.codigo ?? "",
       ctx.outputJson ?? "[]",
       ctx.bloquesResumen ?? "",
-      ctx.modo ?? "texto"
+      ctx.modo ?? "texto",
+      ctx.traduccionesJson ?? "{}"
     )
   );
 }
@@ -299,4 +306,25 @@ export async function hiloParseRedaction(responseJson) {
     throw new Error("Hilo aún no está listo.");
   }
   return pyResultToString(parseHiloRedactFn(JSON.stringify(responseJson)));
+}
+
+/**
+ * @param {string} source
+ * @param {'python' | 'java' | 'cpp'} language
+ */
+export async function translateWoven(source, language) {
+  if (!translateWovenFn) {
+    throw new Error("El traductor aún no está listo.");
+  }
+  return pyResultToString(translateWovenFn(source, language));
+}
+
+/** @param {string} source */
+export async function translateWovenAll(source) {
+  const [python, java, cpp] = await Promise.all([
+    translateWoven(source, "python"),
+    translateWoven(source, "java"),
+    translateWoven(source, "cpp"),
+  ]);
+  return { python, java, cpp };
 }

@@ -1,11 +1,16 @@
-/** @typedef {'editor' | 'blocks' | 'console' | 'presentation'} HiloFocusPanel */
+/** @typedef {'editor' | 'blocks' | 'console' | 'python' | 'java' | 'cpp' | 'presentation'} HiloFocusPanel */
 
 /** Panel DOM iluminado (editor-panel agrupa texto, bloques y verboso). */
 const PANEL_DOM_ID = {
   editor: "editor-panel",
   blocks: "editor-panel",
   console: "console-panel",
+  python: "right-panel",
+  java: "right-panel",
+  cpp: "right-panel",
 };
+
+const TRANSLATION_PANELS = new Set(["python", "java", "cpp"]);
 
 /** Margen respecto a la esquina inferior derecha del panel iluminado. */
 const PANEL_CORNER_MARGIN = 12;
@@ -17,9 +22,15 @@ const PANEL_CORNER_MARGIN = 12;
  *   overlay: HTMLElement,
  *   dock: HTMLElement,
  *   appShell: HTMLElement,
+ *   onTranslationPanel?: (panel: 'python' | 'java' | 'cpp') => void,
  * }} els
  */
-export function createHiloFocusController({ overlay, dock, appShell }) {
+export function createHiloFocusController({
+  overlay,
+  dock,
+  appShell,
+  onTranslationPanel,
+}) {
   /** @type {HiloFocusPanel | null} */
   let activePanel = null;
 
@@ -91,6 +102,9 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
     document
       .getElementById("console-panel")
       ?.classList.remove("hilo-focus-illuminated");
+    document
+      .getElementById("right-panel")
+      ?.classList.remove("hilo-focus-illuminated");
   }
 
   function exit() {
@@ -107,6 +121,9 @@ export function createHiloFocusController({ overlay, dock, appShell }) {
       ?.classList.remove("hilo-focus-illuminated");
     document
       .getElementById("console-panel")
+      ?.classList.remove("hilo-focus-illuminated");
+    document
+      .getElementById("right-panel")
       ?.classList.remove("hilo-focus-illuminated");
   }
 

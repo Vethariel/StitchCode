@@ -62,6 +62,9 @@ import {
  *       diagnosticos?: { mensaje: string }[],
  *     }>,
  *     applyExample: (code: string) => Promise<void>,
+ *     translateAll: (code: string) => Promise<{ python: string, java: string, cpp: string }>,
+ *     onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
+ *     onTranslations?: (trans: { python: string, java: string, cpp: string }) => void,
  *   },
  * }} opts
  */
@@ -92,6 +95,19 @@ export function createHiloAgentController({
   let busy = false;
   let tutorialActive = false;
   let spriteReady = false;
+  /** @type {HiloTurn | null} */
+  let pendingFollowUpTurn = null;
+
+  function formatBubbleHtml(text) {
+    const safe = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return safe.replace(
+      /\*\*(.+?)\*\*/g,
+      '<strong class="hilo-emphasis">$1</strong>'
+    );
+  }
 
   function isExplaining() {
     return activeTurn?.type === "explanation";
@@ -176,7 +192,11 @@ export function createHiloAgentController({
 
     activeTurn.index = index;
     applyHiloEmotion(avatar, chunk.emotion);
-    bubbleText.textContent = chunk.text;
+    if (chunk.text.includes("**")) {
+      bubbleText.innerHTML = formatBubbleHtml(chunk.text);
+    } else {
+      bubbleText.textContent = chunk.text;
+    }
     bubble.classList.add("show");
     root.dataset.hiloChunk = String(index + 1);
 
@@ -345,6 +365,11 @@ export function createHiloAgentController({
       endExplanationFocus();
       activeTurn.explanationComplete = true;
       updateBubbleHint();
+      if (pendingFollowUpTurn) {
+        const next = pendingFollowUpTurn;
+        pendingFollowUpTurn = null;
+        queueTurn(next);
+      }
       return;
     }
 
@@ -419,7 +444,7 @@ export function createHiloAgentController({
       }
       bubbleText.textContent = "Preparo un ejemplo para enseñarte…";
       try {
-        const { turn } = await runHiloLearning({
+        const { wovenTurn, languagesTurn } = await runHiloLearning({
           mensaje,
           apiKey,
           perfilJson: getPerfilJson(),
@@ -427,30 +452,54 @@ export function createHiloAgentController({
           lintWoven: learning.lintWoven,
           runWoven: learning.runWoven,
           applyExample: learning.applyExample,
+          translateAll: learning.translateAll,
+          onEnunciado: learning.onEnunciado,
+          onTranslations: learning.onTranslations,
           onPhase: (phase) => {
             if (phase === "redaccion") {
               bubbleText.textContent = "Escribo un ejemplo en Woven…";
             } else if (phase === "validacion") {
               bubbleText.textContent = "Compruebo que el ejemplo funciona…";
+            } else if (phase === "traduccion") {
+              bubbleText.textContent = "Genero traducciones a otros lenguajes…";
             } else if (phase === "explicacion") {
-              bubbleText.textContent = "Te explico el concepto…";
+              bubbleText.textContent = "Te explico el concepto en Woven…";
+              setEmotionState("explaining");
+            } else if (phase === "explicacion_lenguajes") {
+              bubbleText.textContent = "Comparo Python, Java y C++…";
               setEmotionState("explaining");
             }
           },
         });
 
         historial.push({ role: "user", content: mensaje });
-        historial.push({ role: "model", content: turn.texto_completo });
+        historial.push({
+          role: "model",
+          content: `${wovenTurn.texto_completo} ${languagesTurn.texto_completo}`,
+        });
 
         const defaultPanel = defaultExplanationPanel(getContext().vista);
-        queueTurn({
-          ...turn,
+        const langDefault = (c, i) => ({
+          ...c,
+          panel: c.panel ?? defaultPanel,
+          highlight: c.highlight ?? { line: i + 1 },
+        });
+        const langChunks = languagesTurn.chunks.map((c, i) => ({
+          ...c,
+          panel: c.panel ?? "python",
+          highlight: c.highlight ?? { line: i + 1 },
+        }));
+
+        pendingFollowUpTurn = {
+          ...languagesTurn,
           type: "explanation",
-          chunks: turn.chunks.map((c, i) => ({
-            ...c,
-            panel: c.panel ?? defaultPanel,
-            highlight: c.highlight ?? { line: i + 1 },
-          })),
+          chunks: langChunks,
+        };
+
+        queueTurn({
+          ...wovenTurn,
+          type: "explanation",
+          chunks: wovenTurn.chunks.map(langDefault),
         });
       } catch (err) {
         setEmotionState("error");

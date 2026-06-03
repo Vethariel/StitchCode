@@ -5,7 +5,9 @@ import {
   runWoven,
   parseBlocks,
   setBridgeHandlers,
+  translateWovenAll,
 } from "./bridge/pyodide-bridge.js";
+import { createSidePanelController } from "./side-panel-controller.js";
 import { createBlocksController } from "./blocks-controller.js";
 import { createEditorController } from "./editor-controller.js";
 import { createEditorModeController } from "./editor-mode-controller.js";
@@ -167,10 +169,23 @@ const consoleCtl = createConsoleController({
   body: document.getElementById("console-body"),
 });
 
+const sidePanel = createSidePanelController({
+  panel: document.getElementById("right-panel"),
+  navToggleBtn: document.getElementById("side-panel-toggle-btn"),
+  generateBtn: document.getElementById("generate-translations-btn"),
+  translateAll: translateWovenAll,
+  getSource: () => editor.getCode(),
+  isRuntimeReady: isReady,
+});
+
 const hiloFocus = createHiloFocusController({
   overlay: document.getElementById("hilo-focus-overlay"),
   dock: document.getElementById("floating-dock"),
   appShell: document.getElementById("app-shell"),
+  onTranslationPanel: (panel) => {
+    sidePanel.setOpen(true);
+    sidePanel.setActiveTab(panel);
+  },
 });
 
 const hiloHighlight = createHiloHighlightController({
@@ -180,6 +195,9 @@ const hiloHighlight = createHiloHighlightController({
   blocksDocument: document.getElementById("blocks-document"),
   consoleBody: document.getElementById("console-body"),
   getVista: () => editorMode?.getMode() ?? "text",
+  onTranslationHighlight: (lang, line) =>
+    sidePanel.applyTranslationHighlight(lang, line),
+  clearTranslationHighlights: () => sidePanel.clearTranslationHighlights(),
 });
 
 hiloAgent = createHiloAgentController({
@@ -205,6 +223,9 @@ hiloAgent = createHiloAgentController({
   learning: {
     lintWoven,
     runWoven,
+    translateAll: translateWovenAll,
+    onEnunciado: (data) => sidePanel.setEnunciado(data),
+    onTranslations: (trans) => sidePanel.setTranslations(trans),
     applyExample: async (code) => {
       editor.setCode(code);
       const vista = editorMode?.getMode() ?? "text";
@@ -392,6 +413,7 @@ setBridgeHandlers({
   onStatus: (text, state) => {
     runtimeLoader.setPhase(text, state);
     if (state === "ready") {
+      sidePanel.syncGenerateButton();
       beginAppAfterRuntime();
     } else {
       updateRunButton();

@@ -184,6 +184,65 @@ def test_normalizar_respuesta_redaccion():
     assert out["objetivo"] == "ejemplo_correcto"
 
 
+def test_normalizar_explicacion_paneles_traduccion():
+    raw = json.dumps(
+        {
+            "type": "explanation",
+            "chunks": [
+                {
+                    "text": "En Python usa range.",
+                    "emotion": "smile",
+                    "panel": "python",
+                    "highlight": {"line": 2},
+                },
+                {
+                    "text": "En Java van las llaves.",
+                    "emotion": "wink",
+                    "panel": "java",
+                    "highlight": {"line": 4},
+                },
+            ],
+        }
+    )
+    trad = json.dumps(
+        {
+            "python": "for i in range(3):\n  pass",
+            "java": "for (int i = 0; i < 3; i++) {\n}\n",
+            "cpp": "for (int i = 0; i < 3; i++) {}",
+        }
+    )
+    out = normalizar_respuesta_hilo(
+        raw,
+        traducciones_json=trad,
+        modo_vista="texto",
+    )
+    assert out["type"] == "explanation"
+    assert out["chunks"][0]["panel"] == "python"
+    assert out["chunks"][0]["highlight"]["line"] == 2
+    assert out["chunks"][1]["panel"] == "java"
+    assert out["chunks"][1]["highlight"]["line"] <= 3
+
+
+def test_payload_explicacion_lenguajes_incluye_prompt_traducciones():
+    payload = json.loads(
+        construir_payload_hilo(
+            "compara lenguajes",
+            "[]",
+            "int x = 1",
+            "[]",
+            "[]",
+            False,
+            "woven",
+            1,
+            "{}",
+            "explicacion_lenguajes",
+        )
+    )
+    system_text = payload["system_instruction"]["parts"][0]["text"]
+    assert "COMPARACIÓN DE LENGUAJES" in system_text
+    assert '"python"' in system_text
+
+
 def test_normalizar_fallback_texto_plano():
     raw = "Primera frase. Segunda frase."
     out = normalizar_respuesta_hilo(raw)

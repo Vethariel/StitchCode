@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="assets/css/hilo-agent.css">
   <link rel="stylesheet" href="assets/css/hilo-focus.css">
   <link rel="stylesheet" href="assets/css/hilo-tutorial.css">
+  <link rel="stylesheet" href="assets/css/side-panel.css">
 </head>
 <body>
 
@@ -221,6 +222,27 @@
       <div class="nav-sep"></div>
       <div class="lang-pill"><span class="lang-dot"></span>Woven</div>
       <div class="nav-spacer" aria-hidden="true"></div>
+      <div class="nav-side-actions">
+        <button
+          type="button"
+          class="nav-btn"
+          id="generate-translations-btn"
+          disabled
+          title="Traducir el código actual a Python, Java y C++"
+        >
+          Generar traducciones
+        </button>
+        <button
+          type="button"
+          class="nav-btn"
+          id="side-panel-toggle-btn"
+          aria-expanded="false"
+          aria-controls="right-panel"
+          title="Mostrar u ocultar panel lateral"
+        >
+          Panel
+        </button>
+      </div>
       <button type="button" class="nav-settings-btn" id="settings-open-btn" hidden>Ajustes</button>
     </nav>
 
@@ -289,6 +311,73 @@ print(y)</textarea>
         </section>
 
       </div>
+
+      <aside class="right-panel" id="right-panel" aria-label="Panel de aprendizaje">
+        <div class="right-inner">
+          <div class="right-tabs" role="tablist" aria-label="Secciones del panel lateral">
+            <button type="button" class="r-tab active" data-tab="enunciado" role="tab" aria-selected="true">
+              <span class="r-tab-dot" style="background:var(--pastel-orange)"></span>
+              Enunciado
+            </button>
+            <button type="button" class="r-tab disabled" data-tab="python" role="tab" aria-selected="false" disabled>
+              <span class="r-tab-dot" style="background:var(--pastel-blue)"></span>
+              Python
+            </button>
+            <button type="button" class="r-tab disabled" data-tab="java" role="tab" aria-selected="false" disabled>
+              <span class="r-tab-dot" style="background:var(--pastel-orange)"></span>
+              Java
+            </button>
+            <button type="button" class="r-tab disabled" data-tab="cpp" role="tab" aria-selected="false" disabled>
+              <span class="r-tab-dot" style="background:var(--pastel-purple)"></span>
+              C++
+            </button>
+            <button type="button" class="r-tab" data-tab="logros" role="tab" aria-selected="false">
+              <span class="r-tab-dot" style="background:var(--pastel-yellow)"></span>
+              Logros
+            </button>
+          </div>
+          <div class="right-tab-panels">
+            <div class="right-content active" data-tab-panel="enunciado" role="tabpanel">
+              <span class="ex-tag" id="ex-tag" hidden>Aprendizaje</span>
+              <div class="ex-title" id="ex-title">Panel de aprendizaje</div>
+              <div class="ex-body" id="ex-body">
+                <p>Pide a Hilo que te enseñe un concepto o genera traducciones del código actual para comparar lenguajes.</p>
+              </div>
+            </div>
+            <div class="right-content" data-tab-panel="python" role="tabpanel" hidden>
+              <div class="trans-header">
+                <span class="trans-lang-badge python">Python</span>
+              </div>
+              <p class="trans-note">Equivalente en Python del ejemplo Woven:</p>
+              <div class="trans-scroll" id="trans-python-view" aria-label="Traducción Python">
+                <div class="trans-rows" id="trans-python"></div>
+              </div>
+            </div>
+            <div class="right-content" data-tab-panel="java" role="tabpanel" hidden>
+              <div class="trans-header">
+                <span class="trans-lang-badge java">Java</span>
+              </div>
+              <p class="trans-note">Equivalente en Java del ejemplo Woven:</p>
+              <div class="trans-scroll" id="trans-java-view" aria-label="Traducción Java">
+                <div class="trans-rows" id="trans-java"></div>
+              </div>
+            </div>
+            <div class="right-content" data-tab-panel="cpp" role="tabpanel" hidden>
+              <div class="trans-header">
+                <span class="trans-lang-badge cpp">C++</span>
+              </div>
+              <p class="trans-note">Equivalente en C++ del ejemplo Woven:</p>
+              <div class="trans-scroll" id="trans-cpp-view" aria-label="Traducción C++">
+                <div class="trans-rows" id="trans-cpp"></div>
+              </div>
+            </div>
+            <div class="right-content" data-tab-panel="logros" role="tabpanel" hidden>
+              <div class="logros-heading">Logros de aprendizaje</div>
+              <div id="logros-list"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 

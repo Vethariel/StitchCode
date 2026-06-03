@@ -228,6 +228,31 @@ Ejemplo (modo bloques):
 }
 """
 
+EXPLANATION_LANGUAGES_PROMPT = """
+PODER: COMPARACIÓN DE LENGUAJES (panel lateral)
+El ejemplo Woven ya fue explicado. Ahora explica particularidades de Python, Java y C++
+respecto al MISMO concepto, usando las traducciones del contexto.
+
+Responde con type: "explanation" y entre 2 y 6 chunks.
+Cada chunk DEBE usar panel: "python", "java" o "cpp" (no editor ni consola).
+- highlight: { "line": N } — línea en el código traducido de ese panel (1 = primera).
+
+Reglas:
+- Una idea por fragmento; alterna lenguajes cuando compares.
+- Resalta diferencias reales (tipos, sintaxis, main, indentación, etc.) del concepto actual.
+- No repitas la explicación línea a línea del Woven; enfócate en lo distintivo de cada lenguaje.
+- El texto puede usar **negritas** para términos clave (se mostrarán resaltados).
+
+Ejemplo:
+{
+  "type": "explanation",
+  "chunks": [
+    {"text": "En **Python** el bucle usa `range` y la indentación define el bloque.", "emotion": "smile", "panel": "python", "highlight": {"line": 2}},
+    {"text": "En **Java** hace falta tipo explícito en el `for` y llaves `{}`.", "emotion": "wink", "panel": "java", "highlight": {"line": 3}}
+  ]
+}
+"""
+
 REDACTION_PROMPT = """
 PODER: REDACCIÓN
 Genera un programa Woven en texto plano según el pedido del estudiante.
@@ -329,6 +354,13 @@ def construir_preferencias_estudiante(perfil_json: str) -> str:
 def _es_modo_explicacion(tipo_interaccion: str) -> bool:
     t = (tipo_interaccion or "").strip().lower()
     return t in ("explicacion", "explanation", "explain")
+
+
+def _es_modo_explicacion_lenguajes(tipo_interaccion: str) -> bool:
+    return (tipo_interaccion or "").strip().lower() in (
+        "explicacion_lenguajes",
+        "explicacion_lenguaje",
+    )
 
 
 def construir_payload_redaccion(
@@ -466,11 +498,18 @@ def construir_payload_hilo(
         }.get(nivel_ayuda, "")
 
     preferencias = construir_preferencias_estudiante(perfil_json)
-    modo_explicacion = _es_modo_explicacion(tipo_interaccion)
+    modo_lenguajes = _es_modo_explicacion_lenguajes(tipo_interaccion)
+    modo_explicacion = _es_modo_explicacion(tipo_interaccion) and not modo_lenguajes
+
+    explicacion_extra = ""
+    if modo_lenguajes:
+        explicacion_extra = EXPLANATION_LANGUAGES_PROMPT
+    elif modo_explicacion:
+        explicacion_extra = EXPLANATION_PROMPT
 
     system_completo = (
         SYSTEM_PROMPT
-        + (f"\n\n{EXPLANATION_PROMPT}" if modo_explicacion else "")
+        + (f"\n\n{explicacion_extra}" if explicacion_extra else "")
         + f"\n\n{preferencias}"
         + f"\n\nCONTEXTO DEL PROGRAMA:\n{contexto}"
         + ("" if modo_explicacion else f"\n\nNIVEL ACTUAL: {nivel_instruccion}")
@@ -509,7 +548,8 @@ EMOCIONES_VALIDAS = {
     "happy", "smile", "kiss", "heart_eyes", "grin", "tongue", "sleep", "cool",
     "laugh", "wink", "neutral", "expressionless", "cry", "sad", "worried", "angry",
 }
-PANELES_VALIDOS = frozenset({"editor", "blocks", "console"})
+PANELES_VALIDOS = frozenset({"editor", "blocks", "console", "python", "java", "cpp"})
+PANELES_TRADUCCION = frozenset({"python", "java", "cpp"})
 
 
 def _normalizar_highlight(panel: str, highlight: object, max_line: int = 999) -> dict:
@@ -537,6 +577,11 @@ def _contar_lineas_bloques(bloques_resumen: str) -> int:
     return max(count, 1)
 
 
+def _lineas_traduccion(traducciones: dict, lang: str) -> int:
+    texto = str(traducciones.get(lang) or "")
+    return max(1, len(texto.split("\n")) if texto else 1)
+
+
 def _normalizar_chunk(
     item: dict,
     tipo: str,
@@ -544,6 +589,7 @@ def _normalizar_chunk(
     consola_lineas: int,
     bloques_lineas: int,
     modo_vista: str,
+    traducciones: dict | None = None,
 ) -> dict | None:
     text = str(item.get("text", "")).strip()
     if not text:
@@ -556,15 +602,21 @@ def _normalizar_chunk(
         return chunk
 
     panel = str(item.get("panel", "editor")).strip().lower()
+    traducciones = traducciones if isinstance(traducciones, dict) else {}
     if panel not in PANELES_VALIDOS:
         panel = "editor"
-    if modo_vista in ("bloques", "verboso") and panel == "editor":
+    if panel in PANELES_TRADUCCION:
+        max_line = _lineas_traduccion(traducciones, panel)
+    elif modo_vista in ("bloques", "verboso") and panel == "editor":
         panel = "blocks"
-    if modo_vista == "texto" and panel == "blocks":
+        max_line = bloques_lineas
+    elif modo_vista == "texto" and panel == "blocks":
         panel = "editor"
-    if panel == "console" and consola_lineas < 1:
+        max_line = codigo_lineas
+    elif panel == "console" and consola_lineas < 1:
         panel = "blocks" if modo_vista in ("bloques", "verboso") else "editor"
-    if panel == "blocks":
+        max_line = bloques_lineas if panel == "blocks" else codigo_lineas
+    elif panel == "blocks":
         max_line = bloques_lineas
     elif panel == "console":
         max_line = max(consola_lineas, 1)
@@ -611,6 +663,7 @@ def normalizar_respuesta_hilo(
     output_json: str = "[]",
     bloques_resumen: str = "",
     modo_vista: str = "texto",
+    traducciones_json: str = "{}",
 ) -> dict:
     crudo = _limpiar_json_crudo(texto_modelo)
     codigo_lineas = max(1, len((codigo or "").split("\n")))
@@ -621,6 +674,12 @@ def normalizar_respuesta_hilo(
     consola_lineas = len(output) if isinstance(output, list) else 0
     modo_norm = (modo_vista or "texto").strip().lower()
     bloques_lineas = _contar_lineas_bloques(bloques_resumen)
+    try:
+        traducciones = json.loads(traducciones_json) if traducciones_json else {}
+    except json.JSONDecodeError:
+        traducciones = {}
+    if not isinstance(traducciones, dict):
+        traducciones = {}
 
     chunks = None
     tipo = "conversation"
@@ -641,6 +700,7 @@ def normalizar_respuesta_hilo(
                     consola_lineas,
                     bloques_lineas,
                     modo_norm,
+                    traducciones,
                 )
                 if norm:
                     chunks.append(norm)
@@ -657,12 +717,23 @@ def normalizar_respuesta_hilo(
             chunks = extra
 
     if tipo == "explanation":
-        default_panel = "blocks" if modo_norm in ("bloques", "verboso") else "editor"
-        default_max = bloques_lineas if default_panel == "blocks" else codigo_lineas
+        usa_traducciones = bool(traducciones) and any(
+            traducciones.get(k) for k in ("python", "java", "cpp")
+        )
+        if usa_traducciones:
+            default_panel = "python"
+            default_max = _lineas_traduccion(traducciones, "python")
+        else:
+            default_panel = "blocks" if modo_norm in ("bloques", "verboso") else "editor"
+            default_max = bloques_lineas if default_panel == "blocks" else codigo_lineas
         for i, ch in enumerate(chunks):
             if "panel" not in ch:
                 ch["panel"] = default_panel
                 ch["highlight"] = {"line": min(i + 1, default_max)}
+            elif ch.get("panel") in PANELES_TRADUCCION and "highlight" not in ch:
+                ch["highlight"] = {
+                    "line": min(i + 1, _lineas_traduccion(traducciones, ch["panel"]))
+                }
 
     texto_completo = " ".join(c["text"] for c in chunks)
     return {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
@@ -674,6 +745,7 @@ def parsear_respuesta_hilo(
     output_json: str = "[]",
     bloques_resumen: str = "",
     modo_vista: str = "texto",
+    traducciones_json: str = "{}",
 ) -> str:
     data = json.loads(response_json)
     raw = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -684,6 +756,7 @@ def parsear_respuesta_hilo(
             output_json=output_json,
             bloques_resumen=bloques_resumen,
             modo_vista=modo_vista,
+            traducciones_json=traducciones_json,
         ),
         ensure_ascii=False,
     )

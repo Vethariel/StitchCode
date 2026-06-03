@@ -1,7 +1,7 @@
 import { normalizeSpriteEmotion } from "./hilo-emotions.js";
 
 /** @typedef {{ line: number, start?: number, end?: number }} HiloHighlight */
-/** @typedef {'editor' | 'blocks' | 'console'} HiloPanel */
+/** @typedef {'editor' | 'blocks' | 'console' | 'python' | 'java' | 'cpp'} HiloPanel */
 /** @typedef {{
  *   text: string,
  *   emotion: string,
