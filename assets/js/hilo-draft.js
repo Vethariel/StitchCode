@@ -35,16 +35,49 @@ export function sanitizeModelWovenCode(raw) {
   return s.trim();
 }
 
-export function inferRedaccionObjetivo(mensaje) {
+/**
+ * @param {{ mensaje: string, forceCorrecto?: boolean }} opts
+ * @returns {RedaccionObjetivo}
+ */
+export function inferRedaccionObjetivo(mensaje, opts = {}) {
+  if (opts.forceCorrecto) return "ejemplo_correcto";
   const t = mensaje.toLowerCase();
   if (
-    /\b(?:corregir|corrige|con\s+errores?|para\s+corregir|ejemplo\s+incorrecto|arreglar|falla\s+a\s+prop[oó]sito)\b/i.test(
+    /\b(?:corregir|corrige|con\s+errores?|para\s+corregir|ejemplo\s+incorrecto|falla\s+a\s+prop[oó]sito)\b/i.test(
       t
     )
   ) {
     return "ejemplo_para_corregir";
   }
   return "ejemplo_correcto";
+}
+
+/**
+ * @param {{ parse_ok?: boolean, diagnosticos?: { mensaje?: string, texto?: string }[], errores?: { mensaje?: string }[] }} lint
+ */
+export function lintMessagesFromResult(lint) {
+  const items = lint.diagnosticos ?? lint.errores ?? [];
+  return items
+    .map((e) => e.mensaje || e.texto || "")
+    .filter(Boolean)
+    .join("; ");
+}
+
+/** Ejemplo mínimo válido cuando el modelo insiste con sintaxis inválida (listas). */
+export function fallbackWovenExampleForTopic(mensaje) {
+  const t = mensaje.toLowerCase();
+  if (/\blistas?\b|\barrays?\b|\bappend\b|\b[ií]ndice/i.test(t)) {
+    return (
+      'list<string> tareas = ["Estudiar", "Practicar"]\n' +
+      "print(tareas[0])\n" +
+      'tareas.append("Repasar")\n' +
+      "print(tareas[2])"
+    );
+  }
+  if (/\bbucles?\b|\bfor\b|\biteraci/i.test(t)) {
+    return "for int i = 0; i < 3; i++:\n    print(i)";
+  }
+  return 'list<int> nums = [10, 20]\nprint(nums[0])';
 }
 
 /**
@@ -57,7 +90,7 @@ export function parseRedaccionResponse(raw) {
     data.objetivo === "ejemplo_para_corregir"
       ? "ejemplo_para_corregir"
       : "ejemplo_correcto";
-  const codigo = String(data.codigo ?? "").trim();
+  const codigo = sanitizeModelWovenCode(String(data.codigo ?? ""));
   if (!codigo) {
     throw new Error("Hilo no devolvió código Woven en la redacción.");
   }
@@ -80,17 +113,22 @@ export function parseRedaccionResponse(raw) {
  * @returns {Promise<DraftValidation>}
  */
 export async function validateWovenDraft(codigo, objetivo, { lintWoven, runWoven }) {
-  const lint = await lintWoven(codigo);
+  const clean = sanitizeModelWovenCode(codigo);
+  const lint = await lintWoven(clean);
   if (!lint.parse_ok) {
-    const msgs = (lint.errores ?? []).map((e) => e.mensaje).join("; ");
+    const msgs = lintMessagesFromResult(lint);
     return {
       ok: false,
       reason: "sintaxis",
-      detail: msgs || "El programa no tiene sintaxis Woven válida.",
+      detail:
+        msgs ||
+        (lint.tiene_errores
+          ? "El programa no tiene sintaxis Woven válida."
+          : "El motor Woven no está listo. Espera a que cargue el intérprete e inténtalo de nuevo."),
     };
   }
 
-  const run = await runWoven(codigo);
+  const run = await runWoven(clean);
   if (run.tiene_errores) {
     const msgs = (run.diagnosticos ?? []).map((d) => d.mensaje).join("; ");
     return {

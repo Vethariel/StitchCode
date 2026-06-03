@@ -1,4 +1,12 @@
-import { inferRedaccionObjetivo, parseRedaccionResponse, validateWovenDraft } from "./hilo-draft.js";
+import {
+  fallbackWovenExampleForTopic,
+  inferRedaccionObjetivo,
+  parseRedaccionResponse,
+  sanitizeModelWovenCode,
+  validateWovenDraft,
+} from "./hilo-draft.js";
+
+const LEARNING_DRAFT_MAX_ATTEMPTS = 4;
 import { sendHiloMessage, sendHiloRedaction } from "./hilo-chat.js";
 import { parseHiloTurn } from "./hilo-response.js";
 
@@ -25,6 +33,8 @@ import { parseHiloTurn } from "./hilo-response.js";
  *   onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
  *   onTranslations?: (trans: { python: string, java: string, cpp: string }) => void,
  *   onPhase?: (phase: 'redaccion' | 'validacion' | 'traduccion' | 'explicacion', detail?: string) => void,
+ *   forceEjemploCorrecto?: boolean,
+ *   redactionPreamble?: string,
  * }} opts
  */
 export async function runHiloLearning({
@@ -39,16 +49,39 @@ export async function runHiloLearning({
   onEnunciado,
   onTranslations,
   onPhase,
+  forceEjemploCorrecto = false,
+  redactionPreamble,
 }) {
-  const objetivo = inferRedaccionObjetivo(mensaje);
+  const objetivo = inferRedaccionObjetivo(mensaje, {
+    forceCorrecto: forceEjemploCorrecto,
+  });
   const ctx0 = getContext();
 
   onPhase?.("redaccion");
 
+  /**
+   * @param {string} userPrompt
+   * @param {string} [retryDetail]
+   */
+  function buildRedactionPrompt(userPrompt, retryDetail) {
+    const wovenRules =
+      "Solo sintaxis Woven (nunca Python). Para listas: list<int> o list<string>, [a, b], x[i], .append(valor). " +
+      "Debe compilar y ejecutar con print.";
+    const parts = [
+      redactionPreamble,
+      wovenRules,
+      userPrompt,
+      retryDetail
+        ? `El intento anterior falló: ${retryDetail}. Genera otro programa Woven válido.`
+        : "",
+    ];
+    return parts.filter(Boolean).join("\n\n");
+  }
+
   /** @param {string} prompt */
   async function requestDraft(prompt) {
     const raw = await sendHiloRedaction({
-      mensaje: prompt,
+      mensaje: buildRedactionPrompt(prompt),
       codigo: ctx0.codigo,
       modo: ctx0.modo,
       apiKey,
@@ -56,29 +89,52 @@ export async function runHiloLearning({
       objetivoRedaccion: objetivo,
       bloquesResumen: ctx0.bloquesResumen,
     });
-    return parseRedaccionResponse(raw);
+    const draft = parseRedaccionResponse(raw);
+    draft.codigo = sanitizeModelWovenCode(draft.codigo);
+    return draft;
   }
 
-  let draft = await requestDraft(
-    `Prepara un ejemplo Woven para enseñar: ${mensaje}. Objetivo: ${objetivo}.`
-  );
+  const basePrompt = `Prepara un ejemplo Woven corto para enseñar: ${mensaje}`;
+
+  /** @type {import("./hilo-draft.js").RedaccionResult} */
+  let draft = await requestDraft(basePrompt);
 
   onPhase?.("validacion");
 
+  /** @type {import("./hilo-draft.js").DraftValidation} */
   let validation = await validateWovenDraft(draft.codigo, draft.objetivo, {
     lintWoven,
     runWoven,
   });
 
-  if (!validation.ok && objetivo === "ejemplo_correcto") {
+  for (let attempt = 1; attempt < LEARNING_DRAFT_MAX_ATTEMPTS && !validation.ok; attempt++) {
+    if (objetivo !== "ejemplo_correcto") break;
     draft = await requestDraft(
-      `El código anterior no fue válido (${validation.detail}). ` +
-        `Genera otro ejemplo Woven correcto para: ${mensaje}.`
+      `${basePrompt}. Objetivo: ${objetivo}.`,
+      validation.detail
     );
     validation = await validateWovenDraft(draft.codigo, draft.objetivo, {
       lintWoven,
       runWoven,
     });
+  }
+
+  if (!validation.ok && objetivo === "ejemplo_correcto") {
+    const fallback = sanitizeModelWovenCode(
+      fallbackWovenExampleForTopic(mensaje)
+    );
+    validation = await validateWovenDraft(fallback, objetivo, {
+      lintWoven,
+      runWoven,
+    });
+    if (validation.ok) {
+      draft = {
+        type: "redaccion",
+        codigo: fallback,
+        objetivo,
+        resumen: draft.resumen || "Ejemplo de respaldo para el tema.",
+      };
+    }
   }
 
   if (!validation.ok) {

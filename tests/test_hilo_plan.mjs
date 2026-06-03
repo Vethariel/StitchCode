@@ -6,8 +6,10 @@ import {
   canAdvancePlanActivity,
   deactivatePlanMode,
   getPlanContextJson,
+  isLastPlanActivity,
   isPlanModeActive,
   markCurrentPlanActivityComplete,
+  setPlanActivityIndex,
 } from "../assets/js/hilo-plan-mode.js";
 import { detectHiloIntent } from "../assets/js/hilo-intent.js";
 
@@ -84,6 +86,42 @@ test("plan mode: siguiente actividad tras completar", () => {
   assert.equal(ctx.actividades[1].estado, "pendiente");
   deactivatePlanMode();
   assert.equal(isPlanModeActive(), false);
+});
+
+test("ultima actividad permite Terminar plan al completar", () => {
+  const plan = parsePlanPayload(
+    JSON.stringify({
+      type: "plan",
+      titulo: "T",
+      eje_tematico: "x",
+      tema_id: "x",
+      tema_nombre: "X",
+      resumen: "r",
+      logro_descripcion: "d",
+      actividades: [
+        {
+          id: "1",
+          titulo: "A",
+          tipo: "aprendizaje",
+          objetivo: "o",
+          mensaje_inicio: "m",
+        },
+        {
+          id: "2",
+          titulo: "Reflexión",
+          tipo: "reflexion",
+          objetivo: "o2",
+          mensaje_inicio: "m2",
+        },
+      ],
+    })
+  );
+  activatePlanMode(plan);
+  setPlanActivityIndex(1);
+  markCurrentPlanActivityComplete();
+  assert.equal(isLastPlanActivity(), true);
+  assert.equal(canAdvancePlanActivity(), true);
+  deactivatePlanMode();
 });
 
 test("buildPlanEnunciado lista actividades", () => {

@@ -322,6 +322,7 @@ Reglas del código:
 - Programa corto, claro, acorde al perfil del estudiante.
 - Sin markdown ni texto fuera del JSON; codigo es texto plano con saltos de línea.
 - Debe ser ejecutable: evita errores de sintaxis y de tipos.
+- Listas: list<int> nums = [1, 2]; print(nums[0]); list<string> con .append(x). Nunca Python (lista=[], for x in lista).
 """
 
 OBJETIVOS_REDACCION_VALIDOS = frozenset({"ejemplo_correcto", "ejemplo_para_corregir"})
@@ -876,7 +877,7 @@ def normalizar_respuesta_redaccion(texto_modelo: str) -> dict:
     try:
         data = json.loads(crudo)
         if isinstance(data, dict):
-            codigo = str(data.get("codigo", "")).strip()
+            codigo = _sanitizar_codigo_woven(str(data.get("codigo", "")))
             objetivo = str(data.get("objetivo", "ejemplo_correcto")).strip().lower()
             if objetivo not in OBJETIVOS_REDACCION_VALIDOS:
                 objetivo = "ejemplo_correcto"

@@ -67,7 +67,14 @@ export function createLinterController({ getCode, isReady, lintFn, onUpdate }) {
     if (!isReady()) {
       return {
         parse_ok: false,
-        diagnosticos: [],
+        diagnosticos: [
+          {
+            nivel: "error",
+            linea: 1,
+            mensaje: "Motor Woven no listo",
+            texto: "El intérprete aún está cargando. Espera unos segundos.",
+          },
+        ],
         tiene_errores: true,
         tiene_advertencias: false,
       };

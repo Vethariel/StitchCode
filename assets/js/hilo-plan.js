@@ -103,7 +103,7 @@ export function buildPlanEnunciado(plan) {
   });
   paragraphs.push(
     "",
-    "Completa cada actividad en orden. Cuando termines una, usa «Siguiente actividad»."
+    "Completa cada actividad en orden. Entre actividades usa «Siguiente actividad»; en la última, «Terminar plan»."
   );
   return { tag: "Plan", title: plan.titulo, paragraphs };
 }
@@ -187,6 +187,11 @@ export async function startPlanActivityAt(index, deps) {
       onEnunciado: deps.learning.onEnunciado,
       onTranslations: deps.learning.onTranslations,
       onPhase: deps.learning.onPhase,
+      forceEjemploCorrecto: true,
+      redactionPreamble:
+        `Actividad de aprendizaje del plan «${plan.titulo}» (eje: ${plan.eje_tematico}). ` +
+        `Título: ${act.titulo}. ` +
+        (act.contexto_activo ? `Contexto: ${act.contexto_activo}` : ""),
     });
     pushPlanHistorial({ role: "user", content: `[Plan · ${act.titulo}] ${mensaje}` });
     pushPlanHistorial({ role: "model", content: turn.texto_completo });
@@ -229,7 +234,7 @@ export async function startPlanActivityAt(index, deps) {
         emotion: "smile",
       },
       {
-        text: "Cuando quieras profundizar, escríbeme; al terminar pulsa «Siguiente actividad».",
+        text: "Cuando quieras profundizar, escríbeme; al terminar pulsa «Terminar plan» en la barra verde.",
         emotion: "happy",
       },
     ]),

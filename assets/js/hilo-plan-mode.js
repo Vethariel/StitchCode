@@ -64,9 +64,9 @@ export function isCurrentPlanActivityDone() {
   return completedActivityIds.has(act.id);
 }
 
-/** @returns {boolean} */
+/** @returns {boolean} Habilita el botón (siguiente actividad o terminar plan en la última). */
 export function canAdvancePlanActivity() {
-  return isPlanModeActive() && isCurrentPlanActivityDone() && !isLastPlanActivity();
+  return isPlanModeActive() && isCurrentPlanActivityDone();
 }
 
 /** @returns {boolean} */

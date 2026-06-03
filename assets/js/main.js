@@ -31,6 +31,7 @@ import {
   getActivePlan,
   getCurrentPlanActivity,
   isCurrentPlanActivityDone,
+  isLastPlanActivity,
   isPlanModeActive,
 } from "./hilo-plan-mode.js";
 import { buildHiloContext } from "./hilo-context.js";
@@ -257,14 +258,25 @@ function setPlanModeUi(active) {
     const num = idx >= 0 ? idx + 1 : "?";
     const total = plan?.actividades?.length ?? "?";
     const done = isCurrentPlanActivityDone();
+    const last = isLastPlanActivity();
     planContextText.innerHTML = plan
       ? `<strong>Plan:</strong> ${escapeExerciseBarText(plan.titulo)} · ` +
         `Actividad ${num}/${total}: ${escapeExerciseBarText(act?.titulo ?? "—")}` +
-        (done ? " · lista para avanzar" : "")
+        (done
+          ? last
+            ? " · pulsa Terminar plan para el logro"
+            : " · lista para avanzar"
+          : "")
       : "Plan de aprendizaje activo.";
   }
   if (planNextBtn) {
-    planNextBtn.disabled = !active || !canAdvancePlanActivity();
+    const canAdvance = active && canAdvancePlanActivity();
+    planNextBtn.disabled = !canAdvance;
+    const finishing = active && isLastPlanActivity();
+    planNextBtn.textContent = finishing ? "Terminar plan" : "Siguiente actividad";
+    planNextBtn.title = finishing
+      ? "Cierra el plan y registra tu logro de aprendizaje"
+      : "Pasar a la siguiente actividad del plan";
   }
   document.body.classList.toggle("plan-mode-active", active);
   if (active) {
@@ -472,19 +484,8 @@ hiloAgent = createHiloAgentController({
         consoleCtl.appendLine(`Logro: ${msg}`, "info");
       }
     },
-    lintWoven: (code) => linter.runLintOnCode(code),
-    runWoven: async (code) => {
-      const prev = editor.getCode();
-      editor.setCode(code);
-      await linter.runLint();
-      if (linter.tieneErroresBloqueantes()) {
-        editor.setCode(prev);
-        return { salida: [], tiene_errores: true, diagnosticos: linter.getDiagnosticos() };
-      }
-      const result = await runWoven(code);
-      editor.setCode(prev);
-      return result;
-    },
+    lintWoven,
+    runWoven,
     applyExample: async (code) => {
       await applyCodeToEditor(code);
       if (!linter.tieneErroresBloqueantes()) {
