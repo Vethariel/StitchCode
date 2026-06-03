@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseHiloTurn } from "../assets/js/hilo-response.js";
 
+test("parseHiloTurn marca completado sin dominio_tema", () => {
+  const raw = JSON.stringify({
+    type: "conversation",
+    ejercicio_completado: true,
+    chunks: [{ text: "¡Listo!", emotion: "happy" }],
+  });
+  const turn = parseHiloTurn(raw);
+  assert.equal(turn.ejercicioCompletado, true);
+  assert.equal(turn.dominioTema, undefined);
+});
+
 test("parseHiloTurn lee ejercicio completado y dominio tema", () => {
   const raw = JSON.stringify({
     type: "conversation",

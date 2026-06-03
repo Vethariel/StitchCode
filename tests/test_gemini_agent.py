@@ -361,6 +361,23 @@ def test_normalizar_respuesta_ejercicio_completado():
     assert out["dominio_tema"]["nombre"] == "Bucles for"
 
 
+def test_normalizar_completado_sin_dominio_usa_fallback():
+    raw = json.dumps(
+        {
+            "type": "conversation",
+            "ejercicio_completado": True,
+            "dominio_tema": None,
+            "chunks": [
+                {"text": "¡Bien!", "emotion": "happy"},
+                {"text": "Cumpliste el reto.", "emotion": "grin"},
+            ],
+        }
+    )
+    out = normalizar_respuesta_hilo(raw)
+    assert out["ejercicio_completado"] is True
+    assert out["dominio_tema"]["id"] == "ejercicio_completado"
+
+
 def test_normalizar_ejercicio_no_completado_sin_dominio():
     raw = json.dumps(
         {

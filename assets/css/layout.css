@@ -89,10 +89,19 @@ nav {
   }
 }
 
+/* ── APP SHELL (nav + barra ejercicio opcional + workspace) ── */
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
 /* ── WORKSPACE ── */
 .workspace {
   display: flex;
-  height: calc(100vh - var(--navbar-h));
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

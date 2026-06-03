@@ -17,6 +17,10 @@ import { initResizeController } from "./resize-controller.js";
 import { createRuntimeLoader } from "./runtime-loader.js";
 import { createGeminiApiAccess } from "./gemini-api-state.js";
 import { createHiloAgentController } from "./hilo-agent-controller.js";
+import {
+  deactivateExerciseMode,
+  getActiveExercise,
+} from "./hilo-exercise-mode.js";
 import { buildHiloContext } from "./hilo-context.js";
 import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
@@ -178,7 +182,37 @@ const sidePanel = createSidePanelController({
   isRuntimeReady: isReady,
 });
 
+const exerciseContextBar = document.getElementById("exercise-context-bar");
+const exerciseContextText = document.getElementById("exercise-context-text");
 const exitExerciseBtn = document.getElementById("exit-exercise-btn");
+
+/** @param {boolean} active */
+function setExerciseModeUi(active) {
+  if (exerciseContextBar) {
+    exerciseContextBar.hidden = !active;
+    exerciseContextBar.setAttribute("aria-hidden", active ? "false" : "true");
+  }
+  if (active && exerciseContextText) {
+    const ex = getActiveExercise();
+    if (ex?.titulo) {
+      exerciseContextText.innerHTML =
+        `<strong>Ejercicio:</strong> ${escapeExerciseBarText(ex.titulo)} — ` +
+        "Hilo te guía con el enunciado del panel. Pulsa Run para recibir feedback.";
+    } else {
+      exerciseContextText.textContent =
+        "Modo ejercicio — Hilo vigila tus ejecuciones según el enunciado del panel lateral.";
+    }
+  }
+  document.body.classList.toggle("exercise-mode-active", active);
+}
+
+/** @param {string} text */
+function escapeExerciseBarText(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 /** @param {string} code */
 async function applyCodeToEditor(code) {
@@ -293,10 +327,7 @@ hiloAgent = createHiloAgentController({
   },
   exercise: {
     onEnunciado: (data) => sidePanel.setEnunciado(data),
-    onExerciseModeChange: (active) => {
-      if (exitExerciseBtn) exitExerciseBtn.hidden = !active;
-      document.body.classList.toggle("exercise-mode-active", active);
-    },
+    onExerciseModeChange: (active) => setExerciseModeUi(active),
     onTopicMastery: (topic) => {
       try {
         sidePanel.recordTopicMastery(topic);
@@ -322,6 +353,7 @@ hiloAgent = createHiloAgentController({
       errores: linter?.textosErrores() ?? [],
       tieneError:
         (linter?.tieneErroresBloqueantes() ?? false) || lastRunHadError,
+      lastRunHadError,
       bloquesResumen: editorMode?.isBlockMode()
         ? blocksCtl.getProgramSummary()
         : "",
@@ -429,7 +461,12 @@ async function handleRun() {
 runBtn.addEventListener("click", handleRun);
 
 exitExerciseBtn?.addEventListener("click", () => {
-  hiloAgent?.exitExerciseMode();
+  if (hiloAgent) {
+    hiloAgent.exitExerciseMode();
+  } else {
+    deactivateExerciseMode();
+  }
+  setExerciseModeUi(false);
 });
 
 clearBtn.addEventListener("click", () => {

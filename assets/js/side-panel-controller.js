@@ -1,4 +1,5 @@
 import {
+  formatExerciseCountLabel,
   grantTopicAchievement,
   loadLearningAchievements,
 } from "./learning-achievements.js";
@@ -215,9 +216,12 @@ export function createSidePanelController({
    * @returns {{ achievement: import("./learning-achievements.js").LearningAchievement, isNew: boolean }}
    */
   function recordTopicMastery(topic) {
-    const { list, achievement, isNew } = grantTopicAchievement(topic, achievements);
+    const { list, achievement, isNew, isUpdate } = grantTopicAchievement(
+      topic,
+      achievements
+    );
     achievements = list;
-    if (isNew && achievement) freshAchievementId = achievement.id;
+    if ((isNew || isUpdate) && achievement) freshAchievementId = achievement.id;
     renderLogros();
     setActiveTab("logros");
     if (!open) setOpen(true);
@@ -243,11 +247,15 @@ export function createSidePanelController({
     logrosRoot.innerHTML = sorted
       .map((a) => {
         const earned = !!a.earned;
+        const countLabel = earned
+          ? formatExerciseCountLabel(a.exerciseCount ?? 1)
+          : "";
         return `
         <div class="logro${a.id === freshAchievementId ? " logro--fresh" : ""}" data-achievement="${a.id}">
           <div class="logro-icon ${earned ? "earned" : "locked"}">${a.icon}</div>
           <div class="logro-info">
             <div class="logro-name${earned ? "" : " locked"}">${escapeHtml(a.name)}</div>
+            ${countLabel ? `<div class="logro-count">${escapeHtml(countLabel)}</div>` : ""}
             <div class="logro-desc">${escapeHtml(a.desc)}</div>
             <div class="logro-bar-wrap">
               <div class="logro-bar" style="width:${a.progress}%;${earned ? "" : " background: var(--palette-linen-muted);"}"></div>

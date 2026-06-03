@@ -498,9 +498,8 @@ export function createHiloAgentController({
     advanceTurn();
   }
 
-  /** Solo desactiva el modo ejercicio (navbar, estado global). */
+  /** Desactiva el modo ejercicio y notifica a la UI (navbar) vía main.js. */
   function deactivateExerciseModeUi() {
-    if (!isExerciseModeActive()) return;
     deactivateExerciseMode();
     exercise?.onExerciseModeChange?.(false);
   }
@@ -526,12 +525,21 @@ export function createHiloAgentController({
 
   /**
    * @param {import("./hilo-response.js").HiloTurn} turn
-   * @param {{ tieneError: boolean, errores: string[] }} ctx
+   * @param {{ tieneError?: boolean, lastRunHadError?: boolean, errores?: string[] }} ctx
+   * @param {{ afterRun?: boolean }} [opts]
    */
-  function resolveExerciseCompletion(turn, ctx) {
-    if (!turn.ejercicioCompletado || !isExerciseModeActive()) return null;
-    if (ctx.tieneError || (ctx.errores?.length ?? 0) > 0) return null;
+  function shouldAcceptExerciseCompletion(turn, ctx, { afterRun = false } = {}) {
+    if (!turn.ejercicioCompletado || !isExerciseModeActive()) return false;
+    if (afterRun) {
+      return !ctx.lastRunHadError;
+    }
+    return !ctx.tieneError;
+  }
 
+  /**
+   * @param {import("./hilo-response.js").HiloTurn} turn
+   */
+  function buildTopicFromExerciseTurn(turn) {
     const active = getActiveExercise();
     const dominio = turn.dominioTema;
     const id = slugTopicId(
@@ -546,11 +554,18 @@ export function createHiloAgentController({
       dominio?.descripcion?.trim() ||
       `Completaste el ejercicio «${active?.titulo ?? name}».`;
     const icon = dominio?.icono || "🏆";
-
     return { id, name, desc, icon };
   }
 
-  function finishExerciseSuccess(topic) {
+  /**
+   * @param {import("./hilo-response.js").HiloTurn} turn
+   * @param {{ tieneError?: boolean, lastRunHadError?: boolean, errores?: string[] }} ctx
+   * @param {{ afterRun?: boolean }} [opts]
+   */
+  function tryCompleteExercise(turn, ctx, { afterRun = false } = {}) {
+    if (!shouldAcceptExerciseCompletion(turn, ctx, { afterRun })) return;
+
+    const topic = buildTopicFromExerciseTurn(turn);
     deactivateExerciseModeUi();
     try {
       exercise?.onTopicMastery?.(topic);
@@ -597,8 +612,6 @@ export function createHiloAgentController({
       };
     }
 
-    const topicMastery = resolveExerciseCompletion(turn, ctx);
-
     if (!silentRun) {
       historial.push({ role: "user", content: mensaje });
     } else {
@@ -611,10 +624,8 @@ export function createHiloAgentController({
     if (turn.type !== "explanation") {
       avanzarNivel();
     }
-    if (topicMastery) {
-      finishExerciseSuccess(topicMastery);
-    }
     queueTurn(turn);
+    tryCompleteExercise(turn, ctx, { afterRun: silentRun });
   }
 
   async function onAfterRun() {

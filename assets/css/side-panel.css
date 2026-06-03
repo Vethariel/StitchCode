@@ -297,6 +297,15 @@
   color: var(--palette-linen-muted);
 }
 
+.logro-count {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--palette-gold-soft, var(--palette-accent));
+  margin-bottom: 3px;
+}
+
 .logro-desc {
   font-size: var(--text-xs);
   color: var(--palette-linen-muted);
@@ -351,6 +360,10 @@
   flex-shrink: 0;
 }
 
+.nav-btn[hidden] {
+  display: none !important;
+}
+
 .nav-btn {
   background: rgba(var(--rgb-accent), 0.08);
   border: 1px solid rgba(var(--rgb-accent), 0.18);
@@ -375,22 +388,6 @@
 .nav-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.nav-btn--exercise-exit {
-  background: rgba(var(--rgb-accent), 0.22);
-  border-color: rgba(var(--rgb-accent), 0.45);
-  color: var(--terra-gold, var(--color-accent));
-  font-weight: 600;
-}
-
-.nav-btn--exercise-exit:hover:not(:disabled) {
-  background: rgba(var(--rgb-accent), 0.32);
-  color: var(--color-text);
-}
-
-body.exercise-mode-active .nav-btn--exercise-exit {
-  box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.35);
 }
 
 .nav-btn.active {

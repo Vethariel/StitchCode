@@ -8,6 +8,7 @@
  *   output: string[],
  *   errores: string[],
  *   tieneError: boolean,
+ *   lastRunHadError?: boolean,
  *   bloquesResumen?: string,
  * }} input
  */
@@ -17,6 +18,7 @@ export function buildHiloContext({
   output,
   errores,
   tieneError,
+  lastRunHadError = false,
   bloquesResumen = "",
 }) {
   const modo =
@@ -27,6 +29,7 @@ export function buildHiloContext({
     output,
     errores,
     tieneError,
+    lastRunHadError,
     modo,
     vista,
     bloquesResumen: vista === "text" ? "" : bloquesResumen,

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="assets/css/tokens.css">
   <link rel="stylesheet" href="assets/css/loading-screen.css">
   <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/exercise-context.css">
   <link rel="stylesheet" href="assets/css/editor.css">
   <link rel="stylesheet" href="assets/css/editor-diagnostics.css">
   <link rel="stylesheet" href="assets/css/editor-syntax.css">
@@ -225,15 +226,6 @@
       <div class="nav-side-actions">
         <button
           type="button"
-          class="nav-btn nav-btn--exercise-exit"
-          id="exit-exercise-btn"
-          hidden
-          title="Desactivar modo ejercicio y dejar de recibir guía automática tras Run"
-        >
-          Salir del ejercicio
-        </button>
-        <button
-          type="button"
           class="nav-btn"
           id="generate-translations-btn"
           disabled
@@ -254,6 +246,29 @@
       </div>
       <button type="button" class="nav-settings-btn" id="settings-open-btn" hidden>Ajustes</button>
     </nav>
+
+    <div
+      id="exercise-context-bar"
+      class="exercise-context-bar"
+      role="region"
+      aria-label="Modo ejercicio"
+      hidden
+    >
+      <div class="exercise-context-bar-inner">
+        <span class="exercise-context-indicator" aria-hidden="true"></span>
+        <p class="exercise-context-text" id="exercise-context-text">
+          Modo ejercicio — Hilo vigila tus ejecuciones según el enunciado del panel lateral.
+        </p>
+        <button
+          type="button"
+          class="exercise-context-exit"
+          id="exit-exercise-btn"
+          title="Desactivar modo ejercicio"
+        >
+          Salir del ejercicio
+        </button>
+      </div>
+    </div>
 
     <div class="workspace">
       <div class="main-col">

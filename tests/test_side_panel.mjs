@@ -7,7 +7,7 @@ import {
   LEARNING_ACHIEVEMENTS_STORAGE_KEY,
 } from "../assets/js/learning-achievements.js";
 
-test("grantTopicAchievement no duplica tema ya ganado", () => {
+test("grantTopicAchievement incrementa ejercicios del mismo tema", () => {
   const store = new Map();
   const ls = {
     getItem: (k) => store.get(k) ?? null,
@@ -26,12 +26,19 @@ test("grantTopicAchievement no duplica tema ya ganado", () => {
       desc: "Dominas bucles",
     });
     const second = grantTopicAchievement(
-      { id: "bucles", name: "Bucles", desc: "Otra vez" },
+      { id: "bucles", name: "Bucles", desc: "Segundo reto con while." },
       first.list
     );
-    assert.equal(first.isNew, true);
-    assert.equal(second.isNew, false);
+    const third = grantTopicAchievement(
+      { id: "bucles", name: "Bucles", desc: "Tercer ejercicio de patrones." },
+      second.list
+    );
+    assert.equal(first.achievement?.exerciseCount, 1);
+    assert.equal(second.achievement?.exerciseCount, 2);
+    assert.equal(third.achievement?.exerciseCount, 3);
     assert.equal(loadLearningAchievements().length, 1);
+    assert.match(third.achievement?.desc ?? "", /while/);
+    assert.match(third.achievement?.desc ?? "", /patrones/);
   } finally {
     globalThis.localStorage = prev;
     store.delete(LEARNING_ACHIEVEMENTS_STORAGE_KEY);

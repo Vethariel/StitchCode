@@ -354,6 +354,16 @@ def _es_modo_ejercicio_activo(tipo_interaccion: str) -> bool:
     )
 
 
+def _coerce_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "si", "sí")
+    return False
+
+
 def _slug_tema_id(raw: str) -> str:
     s = re.sub(r"[^a-z0-9_]+", "_", (raw or "").strip().lower())
     s = re.sub(r"_+", "_", s).strip("_")
@@ -1096,11 +1106,16 @@ def normalizar_respuesta_hilo(
     try:
         data_eval = json.loads(crudo)
         if isinstance(data_eval, dict):
-            completado = bool(data_eval.get("ejercicio_completado"))
+            completado = _coerce_bool(data_eval.get("ejercicio_completado"))
             dominio = _normalizar_dominio_tema(data_eval.get("dominio_tema"))
-            if completado and dominio:
+            if completado:
                 resultado["ejercicio_completado"] = True
-                resultado["dominio_tema"] = dominio
+                resultado["dominio_tema"] = dominio or {
+                    "id": "ejercicio_completado",
+                    "nombre": "Ejercicio completado",
+                    "descripcion": "Completaste el ejercicio en Woven.",
+                    "icono": "🏆",
+                }
             else:
                 resultado["ejercicio_completado"] = False
     except json.JSONDecodeError:

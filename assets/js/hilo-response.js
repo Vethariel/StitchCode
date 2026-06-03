@@ -87,15 +87,20 @@ export function parseHiloTurn(raw) {
       data.texto_completo ?? chunks.map((c) => c.text).join(" "),
   };
 
-  if (data.ejercicio_completado && data.dominio_tema) {
-    const t = data.dominio_tema;
+  const completado =
+    data.ejercicio_completado === true ||
+    String(data.ejercicio_completado).toLowerCase() === "true";
+  if (completado) {
     turn.ejercicioCompletado = true;
-    turn.dominioTema = {
-      id: String(t.id ?? "").trim(),
-      nombre: String(t.nombre ?? "").trim(),
-      descripcion: String(t.descripcion ?? "").trim(),
-      icono: String(t.icono ?? "🏆").trim() || "🏆",
-    };
+    const t = data.dominio_tema;
+    if (t && typeof t === "object") {
+      turn.dominioTema = {
+        id: String(t.id ?? "").trim(),
+        nombre: String(t.nombre ?? "").trim(),
+        descripcion: String(t.descripcion ?? "").trim(),
+        icono: String(t.icono ?? "🏆").trim() || "🏆",
+      };
+    }
   }
 
   return turn;
