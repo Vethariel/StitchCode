@@ -1,6 +1,6 @@
 import {
-  DEFAULT_LEARNING_ACHIEVEMENTS,
-  unlockAchievement,
+  grantTopicAchievement,
+  loadLearningAchievements,
 } from "./learning-achievements.js";
 
 /** @typedef {'enunciado' | 'python' | 'java' | 'cpp' | 'logros'} SidePanelTab */
@@ -93,7 +93,9 @@ export function createSidePanelController({
   let open = false;
   let hasTranslations = false;
   /** @type {import("./learning-achievements.js").LearningAchievement[]} */
-  let achievements = DEFAULT_LEARNING_ACHIEVEMENTS.map((a) => ({ ...a }));
+  let achievements = loadLearningAchievements();
+  /** @type {string | null} */
+  let freshAchievementId = null;
 
   function setOpen(next) {
     open = next;
@@ -204,17 +206,45 @@ export function createSidePanelController({
     renderTranslationBlock(transJava, trans.java);
     renderTranslationBlock(transCpp, trans.cpp);
     updateTabButtons(activeTab);
-    achievements = unlockAchievement("traductor", achievements);
     renderLogros();
+  }
+
+  /**
+   * Registra dominio de un tema tras completar un ejercicio.
+   * @param {{ id: string, name: string, desc: string, icon?: string }} topic
+   * @returns {{ achievement: import("./learning-achievements.js").LearningAchievement, isNew: boolean }}
+   */
+  function recordTopicMastery(topic) {
+    const { list, achievement, isNew } = grantTopicAchievement(topic, achievements);
+    achievements = list;
+    if (isNew && achievement) freshAchievementId = achievement.id;
+    renderLogros();
+    setActiveTab("logros");
+    if (!open) setOpen(true);
+    if (!achievement) {
+      throw new Error("No se pudo registrar el logro de aprendizaje.");
+    }
+    return { achievement, isNew };
   }
 
   function renderLogros() {
     if (!logrosRoot) return;
-    logrosRoot.innerHTML = achievements
+    if (!achievements.length) {
+      logrosRoot.innerHTML = `
+        <p class="logros-empty">
+          Aún no hay temas en dominio. Completa ejercicios con Hilo para que aparezcan aquí.
+        </p>`;
+      return;
+    }
+    const sorted = [...achievements].sort((a, b) => {
+      if (!!a.earned !== !!b.earned) return a.earned ? -1 : 1;
+      return (b.earnedAt ?? "").localeCompare(a.earnedAt ?? "");
+    });
+    logrosRoot.innerHTML = sorted
       .map((a) => {
         const earned = !!a.earned;
         return `
-        <div class="logro" data-achievement="${a.id}">
+        <div class="logro${a.id === freshAchievementId ? " logro--fresh" : ""}" data-achievement="${a.id}">
           <div class="logro-icon ${earned ? "earned" : "locked"}">${a.icon}</div>
           <div class="logro-info">
             <div class="logro-name${earned ? "" : " locked"}">${escapeHtml(a.name)}</div>
@@ -276,6 +306,7 @@ export function createSidePanelController({
     setActiveTab,
     setEnunciado,
     setTranslations,
+    recordTopicMastery,
     generateFromEditor,
     applyTranslationHighlight,
     clearTranslationHighlights,

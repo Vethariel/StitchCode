@@ -5,6 +5,8 @@
  *   enunciado: string[],
  *   criterios: string[],
  *   resumen: string,
+ *   tema_id?: string,
+ *   tema_nombre?: string,
  * }} ExerciseEnunciado
  */
 
@@ -35,6 +37,8 @@ export function activateExerciseMode(data) {
     enunciado: [...data.enunciado],
     criterios: [...(data.criterios ?? [])],
     resumen: data.resumen ?? "",
+    tema_id: data.tema_id,
+    tema_nombre: data.tema_nombre,
   };
 }
 

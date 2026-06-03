@@ -2,6 +2,25 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseHiloTurn } from "../assets/js/hilo-response.js";
 
+test("parseHiloTurn lee ejercicio completado y dominio tema", () => {
+  const raw = JSON.stringify({
+    type: "conversation",
+    ejercicio_completado: true,
+    dominio_tema: {
+      id: "listas",
+      nombre: "Listas",
+      descripcion: "Dominas listas en Woven",
+      icono: "📋",
+    },
+    chunks: [{ text: "¡Excelente!", emotion: "heart_eyes" }],
+    texto_completo: "¡Excelente!",
+  });
+  const turn = parseHiloTurn(raw);
+  assert.equal(turn.ejercicioCompletado, true);
+  assert.equal(turn.dominioTema?.id, "listas");
+  assert.equal(turn.dominioTema?.nombre, "Listas");
+});
+
 test("parseHiloTurn lee chunks y emociones", () => {
   const raw = JSON.stringify({
     chunks: [

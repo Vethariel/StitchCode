@@ -14,6 +14,7 @@ from gemini_agent import (  # noqa: E402
     normalizar_perfil,
     normalizar_respuesta_ejercicio,
     normalizar_respuesta_hilo,
+    _normalizar_dominio_tema,
     normalizar_respuesta_redaccion,
 )
 
@@ -297,6 +298,7 @@ def test_normalizar_respuesta_ejercicio():
     out = normalizar_respuesta_ejercicio(raw)
     assert out["type"] == "ejercicio"
     assert out["titulo"] == "Suma acumulada"
+    assert "tema_id" in out
     assert len(out["enunciado"]) == 2
     assert "n = 5" in out["codigo_plantilla"]
     assert out["criterios"][0].startswith("Imprime")
@@ -333,6 +335,53 @@ def test_payload_ejercicio_activo_incluye_enunciado():
     assert "Reto listas" in system_text
     assert "Crea una lista" in system_text
     assert 'type "conversation"' in system_text
+
+
+def test_normalizar_respuesta_ejercicio_completado():
+    raw = json.dumps(
+        {
+            "type": "conversation",
+            "ejercicio_completado": True,
+            "dominio_tema": {
+                "id": "Bucles For",
+                "nombre": "Bucles for",
+                "descripcion": "Dominas iteración con for",
+                "icono": "🔁",
+            },
+            "chunks": [
+                {"text": "¡Lo lograste!", "emotion": "heart_eyes"},
+                {"text": "Cumpliste todos los criterios.", "emotion": "happy"},
+            ],
+        },
+        ensure_ascii=False,
+    )
+    out = normalizar_respuesta_hilo(raw)
+    assert out["ejercicio_completado"] is True
+    assert out["dominio_tema"]["id"] == "bucles_for"
+    assert out["dominio_tema"]["nombre"] == "Bucles for"
+
+
+def test_normalizar_ejercicio_no_completado_sin_dominio():
+    raw = json.dumps(
+        {
+            "type": "conversation",
+            "ejercicio_completado": False,
+            "dominio_tema": None,
+            "chunks": [
+                {"text": "Casi.", "emotion": "wink"},
+                {"text": "Falta la salida esperada.", "emotion": "neutral"},
+            ],
+        }
+    )
+    out = normalizar_respuesta_hilo(raw)
+    assert out.get("ejercicio_completado") is False
+    assert "dominio_tema" not in out or out.get("dominio_tema") is None
+
+
+def test_normalizar_dominio_tema_slug():
+    tema = _normalizar_dominio_tema({"id": "Listas Woven!", "nombre": "Listas"})
+    assert tema is not None
+    assert tema["id"] == "listas_woven"
 
 
 def test_anexar_enunciado_ejercicio():

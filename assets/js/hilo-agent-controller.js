@@ -13,9 +13,11 @@ import { runHiloLearning } from "./hilo-learning.js";
 import { runHiloExercise } from "./hilo-exercise.js";
 import {
   deactivateExerciseMode,
+  getActiveExercise,
   getExerciseEnunciadoJson,
   isExerciseModeActive,
 } from "./hilo-exercise-mode.js";
+import { slugTopicId } from "./learning-achievements.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
   getHiloTutorialScript,
@@ -82,6 +84,7 @@ import {
  *     applyTemplate: (code: string) => Promise<void>,
  *     onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
  *     onExerciseModeChange?: (active: boolean) => void,
+ *     onTopicMastery?: (topic: { id: string, name: string, desc: string, icon?: string }) => void,
  *   },
  * }} opts
  */
@@ -495,18 +498,67 @@ export function createHiloAgentController({
     advanceTurn();
   }
 
-  function exitExerciseMode() {
+  /** Solo desactiva el modo ejercicio (navbar, estado global). */
+  function deactivateExerciseModeUi() {
     if (!isExerciseModeActive()) return;
     deactivateExerciseMode();
     exercise?.onExerciseModeChange?.(false);
+  }
+
+  /**
+   * Sale del modo ejercicio. Si keepConversation es true, deja el turno activo
+   * (p. ej. celebración tras completar el reto).
+   */
+  function exitExerciseMode({ announce = true, keepConversation = false } = {}) {
+    deactivateExerciseModeUi();
+    if (keepConversation) return;
     endExplanationFocus();
     activeTurn = null;
     setExplainingUi(false);
     setEmotionState("idle");
-    showStaticMessage(
-      "Saliste del modo ejercicio. Puedes seguir programando con normalidad.",
-      "smile"
+    if (announce) {
+      showStaticMessage(
+        "Saliste del modo ejercicio. Puedes seguir programando con normalidad.",
+        "smile"
+      );
+    }
+  }
+
+  /**
+   * @param {import("./hilo-response.js").HiloTurn} turn
+   * @param {{ tieneError: boolean, errores: string[] }} ctx
+   */
+  function resolveExerciseCompletion(turn, ctx) {
+    if (!turn.ejercicioCompletado || !isExerciseModeActive()) return null;
+    if (ctx.tieneError || (ctx.errores?.length ?? 0) > 0) return null;
+
+    const active = getActiveExercise();
+    const dominio = turn.dominioTema;
+    const id = slugTopicId(
+      dominio?.id || active?.tema_id || dominio?.nombre || active?.titulo || "tema_woven"
     );
+    const name =
+      dominio?.nombre?.trim() ||
+      active?.tema_nombre?.trim() ||
+      active?.titulo?.trim() ||
+      "Tema Woven";
+    const desc =
+      dominio?.descripcion?.trim() ||
+      `Completaste el ejercicio «${active?.titulo ?? name}».`;
+    const icon = dominio?.icono || "🏆";
+
+    return { id, name, desc, icon };
+  }
+
+  function finishExerciseSuccess(topic) {
+    deactivateExerciseModeUi();
+    try {
+      exercise?.onTopicMastery?.(topic);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Logro de aprendizaje:", msg);
+    }
+    setEmotionState("happy");
   }
 
   async function sendExerciseAwareMessage(mensaje, { silentRun = false } = {}) {
@@ -545,6 +597,8 @@ export function createHiloAgentController({
       };
     }
 
+    const topicMastery = resolveExerciseCompletion(turn, ctx);
+
     if (!silentRun) {
       historial.push({ role: "user", content: mensaje });
     } else {
@@ -556,6 +610,9 @@ export function createHiloAgentController({
     historial.push({ role: "model", content: turn.texto_completo });
     if (turn.type !== "explanation") {
       avanzarNivel();
+    }
+    if (topicMastery) {
+      finishExerciseSuccess(topicMastery);
     }
     queueTurn(turn);
   }
@@ -579,8 +636,9 @@ export function createHiloAgentController({
     bubbleText.textContent = "Reviso tu ejecución en el ejercicio…";
     try {
       await sendExerciseAwareMessage(
-        "Acabo de pulsar Run. Revisa mi código actual y la salida o errores de la consola. " +
-          "Guíame con el mismo ejercicio sin darme la solución completa.",
+        "Acabo de pulsar Run. Evalúa con rigor si mi programa cumple TODOS los criterios del " +
+          "enunciado (código y salida en consola). Si los cumple, pon ejercicio_completado en true " +
+          "y dominio_tema; si no, guíame sin dar la solución completa.",
         { silentRun: true }
       );
     } catch (err) {

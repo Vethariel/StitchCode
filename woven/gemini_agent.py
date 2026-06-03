@@ -294,7 +294,9 @@ Responde SOLO con JSON válido:
   "enunciado": ["párrafo 1 del enunciado", "párrafo 2 opcional"],
   "codigo_plantilla": "programa Woven inicial para el editor",
   "criterios": ["criterio verificable 1", "criterio 2"],
-  "resumen": "frase breve del objetivo pedagógico"
+  "resumen": "frase breve del objetivo pedagógico",
+  "tema_id": "slug_del_tema",
+  "tema_nombre": "nombre legible del tema para logros"
 }
 
 Reglas:
@@ -302,6 +304,8 @@ Reglas:
 - codigo_plantilla: esqueleto ejecutable (declaraciones, comentarios // con pistas, huecos con valores iniciales).
   No entregues la solución final; deja trabajo al estudiante.
 - criterios: 2 a 5 ítems observables (salida esperada, estructuras obligatorias, etc.).
+- tema_id: slug snake_case del concepto principal (ej. listas, bucles_for, condicionales).
+- tema_nombre: etiqueta corta para el panel de logros (ej. «Listas en Woven»).
 - Solo sintaxis Woven; sin markdown fuera del JSON.
 """
 
@@ -310,14 +314,35 @@ PODER: MODO EJERCICIO ACTIVO
 El estudiante está resolviendo UN ejercicio fijo. Recibirás el ENUNCIADO del panel lateral
 y su código actual. Debes apoyar SIEMPRE en función de ese mismo ejercicio (no cambies de tema).
 
-Responde con JSON type "conversation" y entre 2 y 5 chunks (frases cortas, emoción cada una).
+Responde con JSON válido (sin markdown):
+{
+  "type": "conversation",
+  "ejercicio_completado": false,
+  "dominio_tema": null,
+  "chunks": [
+    {"text": "frase corta", "emotion": "smile"}
+  ]
+}
 
-Reglas:
-- Relaciona cada respuesta con el enunciado y el código en pantalla.
-- Si acaba de ejecutar (Run), comenta salida o errores sin regalar la solución completa.
-- Usa niveles de ayuda del SYSTEM_PROMPT cuando haya errores; en exploración exitosa celebra y sugiere siguiente paso.
+Reglas de chunks: entre 2 y 5 frases; emoción válida del SYSTEM_PROMPT.
+
+Reglas generales:
+- Relaciona cada respuesta con el enunciado, criterios de éxito y el código en pantalla.
+- Si acaba de ejecutar (Run), revisa salida y errores. Sin regalar la solución completa si aún no cumple.
+- Usa niveles de ayuda del SYSTEM_PROMPT cuando haya errores.
 - Si pide explicación de una línea, explica solo esa parte en el marco del ejercicio.
 - No propongas otro ejercicio ni reescribas el enunciado.
+
+Evaluación al revisar una ejecución (Run):
+- Compara código y salida de consola con TODOS los criterios del enunciado.
+- Pon ejercicio_completado en true SOLO si el programa ejecutó sin fallar el objetivo y cumple
+  cada criterio observable (salida, estructuras obligatorias, etc.). Si falta algo, debe ser false.
+- Si ejercicio_completado es true:
+  * Los chunks deben celebrar el logro (emociones alegres: happy, heart_eyes, grin, kiss).
+  * Incluye dominio_tema con el tema que el estudiante demostró dominar:
+    {"id": "slug_snake_case", "nombre": "Nombre corto del tema", "descripcion": "Qué domina ahora (1 frase)", "icono": "emoji"}
+    El id debe ser estable (ej. bucles_for, listas_woven, condicionales, funciones, clases_poo).
+- Si ejercicio_completado es false: dominio_tema debe ser null.
 """
 
 
@@ -327,6 +352,28 @@ def _es_modo_ejercicio_activo(tipo_interaccion: str) -> bool:
         "ejercicio",
         "modo_ejercicio",
     )
+
+
+def _slug_tema_id(raw: str) -> str:
+    s = re.sub(r"[^a-z0-9_]+", "_", (raw or "").strip().lower())
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s[:48] or "tema_woven"
+
+
+def _normalizar_dominio_tema(raw) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    tid = _slug_tema_id(str(raw.get("id") or raw.get("tema_id") or ""))
+    nombre = str(raw.get("nombre") or raw.get("name") or raw.get("tema_nombre") or "").strip()[
+        :80
+    ]
+    desc = str(raw.get("descripcion") or raw.get("desc") or "").strip()[:200]
+    icono = str(raw.get("icono") or raw.get("icon") or "🏆").strip()[:4] or "🏆"
+    if not nombre:
+        nombre = tid.replace("_", " ").title()
+    if not desc:
+        desc = f"Dominio demostrado en ejercicio: {nombre}."
+    return {"id": tid, "nombre": nombre, "descripcion": desc, "icono": icono}
 
 
 def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
@@ -593,6 +640,8 @@ def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
                 else []
             )
             resumen = str(data.get("resumen", "")).strip()[:200]
+            tema_id = _slug_tema_id(str(data.get("tema_id") or ""))
+            tema_nombre = str(data.get("tema_nombre") or "").strip()[:80]
             if not titulo and parrafos:
                 titulo = parrafos[0][:80]
             if not parrafos and titulo:
@@ -606,6 +655,8 @@ def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
                 "codigo_plantilla": codigo,
                 "criterios": criterios,
                 "resumen": resumen,
+                "tema_id": tema_id,
+                "tema_nombre": tema_nombre or titulo or "Tema Woven",
             }
     except json.JSONDecodeError:
         pass
@@ -1041,7 +1092,20 @@ def normalizar_respuesta_hilo(
                 ch["highlight"] = {"line": 1}
 
     texto_completo = " ".join(c["text"] for c in chunks)
-    return {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
+    resultado = {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
+    try:
+        data_eval = json.loads(crudo)
+        if isinstance(data_eval, dict):
+            completado = bool(data_eval.get("ejercicio_completado"))
+            dominio = _normalizar_dominio_tema(data_eval.get("dominio_tema"))
+            if completado and dominio:
+                resultado["ejercicio_completado"] = True
+                resultado["dominio_tema"] = dominio
+            else:
+                resultado["ejercicio_completado"] = False
+    except json.JSONDecodeError:
+        resultado["ejercicio_completado"] = False
+    return resultado
 
 
 def parsear_respuesta_hilo(

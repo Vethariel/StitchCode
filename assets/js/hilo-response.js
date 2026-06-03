@@ -9,9 +9,17 @@ import { normalizeSpriteEmotion } from "./hilo-emotions.js";
  *   highlight?: HiloHighlight,
  * }} HiloChunk */
 /** @typedef {{
+ *   id: string,
+ *   nombre: string,
+ *   descripcion: string,
+ *   icono: string,
+ * }} HiloTopicAchievement */
+/** @typedef {{
  *   type: 'conversation' | 'explanation',
  *   chunks: HiloChunk[],
  *   texto_completo: string,
+ *   ejercicioCompletado?: boolean,
+ *   dominioTema?: HiloTopicAchievement | null,
  * }} HiloTurn */
 
 /**
@@ -71,12 +79,26 @@ export function parseHiloTurn(raw) {
       ? "explanation"
       : "conversation";
 
-  return {
+  /** @type {HiloTurn} */
+  const turn = {
     type,
     chunks,
     texto_completo:
       data.texto_completo ?? chunks.map((c) => c.text).join(" "),
   };
+
+  if (data.ejercicio_completado && data.dominio_tema) {
+    const t = data.dominio_tema;
+    turn.ejercicioCompletado = true;
+    turn.dominioTema = {
+      id: String(t.id ?? "").trim(),
+      nombre: String(t.nombre ?? "").trim(),
+      descripcion: String(t.descripcion ?? "").trim(),
+      icono: String(t.icono ?? "🏆").trim() || "🏆",
+    };
+  }
+
+  return turn;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   hiloParseExercise,
 } from "./bridge/pyodide-bridge.js";
 import { activateExerciseMode } from "./hilo-exercise-mode.js";
+import { slugTopicId } from "./learning-achievements.js";
 import { localHiloTurn } from "./hilo-response.js";
 
 /**
@@ -13,6 +14,8 @@ import { localHiloTurn } from "./hilo-response.js";
  *   codigo_plantilla: string,
  *   criterios: string[],
  *   resumen: string,
+ *   tema_id: string,
+ *   tema_nombre: string,
  * }} ExercisePayload
  */
 
@@ -32,14 +35,18 @@ export function parseExercisePayload(raw) {
   if (!codigo) {
     throw new Error("El ejercicio no incluyó código inicial.");
   }
+  const titulo = String(data.titulo ?? "Ejercicio").trim() || "Ejercicio";
+  const temaNombre = String(data.tema_nombre ?? titulo).trim() || titulo;
   return {
-    titulo: String(data.titulo ?? "Ejercicio").trim() || "Ejercicio",
-    enunciado: parrafos.length ? parrafos : [String(data.titulo ?? "Ejercicio")],
+    titulo,
+    enunciado: parrafos.length ? parrafos : [titulo],
     codigo_plantilla: codigo,
     criterios: Array.isArray(data.criterios)
       ? data.criterios.map((c) => String(c).trim()).filter(Boolean)
       : [],
     resumen: String(data.resumen ?? "").trim(),
+    tema_id: slugTopicId(String(data.tema_id ?? temaNombre)),
+    tema_nombre: temaNombre,
   };
 }
 
@@ -103,6 +110,8 @@ export async function runHiloExercise({
     enunciado: exercise.enunciado,
     criterios: exercise.criterios,
     resumen: exercise.resumen,
+    tema_id: exercise.tema_id,
+    tema_nombre: exercise.tema_nombre,
   });
   onExerciseModeChange?.(true);
 

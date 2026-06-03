@@ -297,6 +297,14 @@ hiloAgent = createHiloAgentController({
       if (exitExerciseBtn) exitExerciseBtn.hidden = !active;
       document.body.classList.toggle("exercise-mode-active", active);
     },
+    onTopicMastery: (topic) => {
+      try {
+        sidePanel.recordTopicMastery(topic);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        consoleCtl.appendLine(`Logro: ${msg}`, "info");
+      }
+    },
     applyTemplate: async (code) => {
       await applyCodeToEditor(code);
       consoleShowsLintErrors = false;
