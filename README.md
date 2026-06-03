@@ -8,6 +8,8 @@ La idea central no es empezar por “escribir más código”, sino por **leer, 
 La metáfora del proyecto es el **tejido**: cada instrucción es un hilo, cada bloque es un patrón, y comprender cómo se entrelazan permite detectar errores y construir soluciones con intención.  
 La premisa pedagógica es que la IA debe actuar como tutor de pensamiento computacional: guía, pregunta, da pistas progresivas y evita reemplazar el razonamiento del estudiante.
 
+**Hilo** es el tutor conversacional de la plataforma. Tras una configuración inicial (tono, estilo y clave de Gemini opcional), un **tutorial guiado** recorre editor, consola, panel lateral y los “poderes” que puedes pedir por chat: planes de estudio, ejercicios, explicaciones sobre tu código y ejecución paso a paso.
+
 ---
 
 ## 2) Woven — el lenguaje
@@ -74,57 +76,101 @@ Woven.g4 (ANTLR4)
     -> tracing_visitor.py
     -> verbose_visitor.py + verbose_inverse.py
     -> linter_visitor.py
-    -> gemini_agent.py
-    -> index.html (Pyodide + JS)
+    -> gemini_agent.py (Hilo: prompts, planes, ejercicios, chat)
+    -> index.html + assets/js/ (Pyodide + UI + tutor)
 ```
 
-**Rol de cada módulo (1 línea):**
+**Backend Python (Pyodide):**
 
-- `Woven.g4`: especificación formal del lenguaje.
-- `WovenLexer.py` / `WovenParser.py`: lexer/parser ANTLR generados para Python.
-- `interpreter_visitor.py`: ejecución del AST Woven con tipos, scopes y OOP.
-- `translator_visitor.py`: traducción de Woven a Python, Java y C++.
-- `tracing_visitor.py`: traza de ejecución paso a paso en eventos JSON.
-- `verbose_visitor.py`: representación semántica en bloques legibles.
-- `verbose_inverse.py`: reconstrucción de Woven desde bloques.
-- `linter_visitor.py`: análisis estático (errores y warnings).
-- `gemini_agent.py`: orquestación del tutor Hilo (prompt + payload/parsing Gemini).
-- `index.html`: app web estática (Pyodide + UI + consola + vistas + chat).
+| Módulo | Rol |
+|---|---|
+| `Woven.g4` | Especificación formal del lenguaje |
+| `WovenLexer.py` / `WovenParser.py` | Lexer/parser ANTLR generados |
+| `interpreter_visitor.py` | Ejecución del AST con tipos, scopes y OOP |
+| `translator_visitor.py` | Traducción a Python, Java y C++ |
+| `tracing_visitor.py` | Traza de ejecución paso a paso (eventos JSON) |
+| `verbose_visitor.py` / `verbose_inverse.py` | Bloques legibles ↔ Woven |
+| `linter_visitor.py` | Análisis estático (errores y warnings) |
+| `gemini_agent.py` | Tutor Hilo: prompts pedagógicos, planes, ejercicios, redacción y chat |
+
+**Frontend (`assets/js/`):**
+
+| Área | Módulos principales |
+|---|---|
+| Runtime | `runtime-loader.js`, bridge Pyodide |
+| Editor | `editor-controller.js`, `editor-mode-controller.js`, `blocks-controller.js`, `woven-highlighter.js` |
+| Consola y linter | `console-controller.js`, `linter-controller.js` |
+| Paso a paso | `step-trace.js`, `step-mode-controller.js`, `structure-graph.js` |
+| Panel lateral | `side-panel-controller.js`, traducciones y enunciados |
+| Hilo | `hilo-agent-controller.js`, `hilo-intent.js`, `hilo-chat.js`, `hilo-response.js` |
+| Poderes | `hilo-plan.js`, `hilo-plan-mode.js`, `hilo-learning.js`, `hilo-exercise.js`, `hilo-exercise-correction.js`, `hilo-exercise-mode.js` |
+| Tutor UX | `hilo-tutorial.js`, `hilo-focus.js`, `hilo-sprite.js`, `hilo-emotions.js` |
+| Progreso | `learning-achievements.js` (`localStorage`) |
+| Orquestación | `main.js`, `user-settings.js`, `setup-form.js` |
 
 ---
 
 ## 4) Lo implementado
 
-### Lenguaje
+### Lenguaje Woven
 
 - Gramática formal ANTLR4 con indentación significativa.
 - Tipos primitivos, funciones, clases, herencia simple, listas tipadas.
 - String interpolado, operadores lógicos, `for` estilo C.
 - `new` obligatorio para objetos, `self` explícito.
 
-### Backend Python en Pyodide
+### Motor en el navegador (Pyodide)
 
 - Intérprete con scopes, herencia y polimorfismo.
 - Validación de tipos en listas con subtipado.
 - Traductor a Python, Java y C++.
 - Tracer con eventos JSON de ejecución.
 - Visitor verboso en español + generador inverso.
-- Linter estático con errores/warnings.
-- Agente Gemini (Hilo) con prompt pedagógico y niveles de ayuda.
+- Linter estático con diagnósticos.
+- Agente Gemini (Hilo) con prompts por poder y niveles de ayuda.
 
-### Frontend
+### Editor y ejecución
 
-- Editor Woven con ejecución vía Pyodide.
-- Consola con distinción de stdout/stderr/errores.
-- Tres paneles de traducción simultánea.
-- Switch entre vista Woven y vista verbosa en bloques.
-- Panel de linter con diagnóstico en tiempo real (debounce).
-- Chat con Hilo y niveles de ayuda progresivos.
+- Tres modos de vista: **Texto** (Woven), **Bloques** (piezas encajables) y **Verboso** (lenguaje natural).
+- Ejecución con **Run** / Ctrl+Enter; consola con stdout, stderr y errores.
+- Linter en tiempo real (debounce) y resaltado de sintaxis.
+- Comodidades de edición en modo texto (indentación, pares, Tab).
 
-### Calidad
+### Panel lateral
 
-- Suite de tests con pytest: lexer, parser, intérprete, translator, tracer, verbose y linter.
-- Más de 80 tests pasando.
+- Pestaña **Enunciado**: instrucciones del plan, ejercicio o lección activa.
+- Pestañas **Python / Java / C++**: traducciones del código actual o de la lección.
+- Pestaña **Logros**: competencias dominadas (descripciones de dominio, no solo “completaste el reto”).
+
+### Barra superior
+
+- **Paso a paso**: recorre la traza línea a línea con variables, consola y grafo de estructuras.
+- **Generar traducciones** del editor actual.
+- **Panel**: mostrar u ocultar el lateral.
+
+### Hilo — tutor y poderes
+
+| Poder | Cómo activarlo (ejemplos) | Qué hace |
+|---|---|---|
+| **Plan** | «Quiero aprender sobre listas», «hazme un plan para bucles» | Itinerario con actividades: aprendizaje, ejercicio libre, corrección, relleno y reflexión. Barra de plan, avance por actividad, logro al terminar. |
+| **Aprendizaje** (dentro del plan o suelto absorbido por plan) | «Enséñame de recursión», «¿Qué es una lista?» | Ejemplo Woven validado, explicación, traducciones y enunciado en el panel. |
+| **Ejercicio** | «Dame un ejercicio», «corregir el código», «completar huecos» | Modo ejercicio: vigila **Run**, enunciado alineado. Tipos: **libre**, **corrección** (líneas incorrectas) y **relleno** (huecos). Bloqueo de líneas no editables. |
+| **Explicación** | «Explícame mi código», «qué hace esta línea» | Foco en editor o consola con pistas progresivas (sin solución completa de golpe). |
+| **Paso a paso** | «modo paso a paso», «línea por línea» | Traza de ejecución interactiva (no es chat narrativo). |
+
+Otros comportamientos de Hilo:
+
+- Detección de intención en cliente (`hilo-intent.js`) antes de llamar a Gemini.
+- Validación y saneado de borradores Woven (`hilo-draft.js`) con reintentos y recuperación.
+- Paquete único para ejercicios guiados (`hilo-exercise-correction.js`): enunciado, líneas editables y salida esperada alineados.
+- Chat con historial de plan (`planHistorial`) y contexto JSON en turnos activos.
+- Tutorial post-setup (~20 pasos): editor, consola, panel, poderes y demo de traducciones.
+- Configuración persistente: tono, estilo pedagógico y API key de Gemini (opcional; sin clave, respuestas locales limitadas).
+
+### Calidad y pruebas
+
+- **Python:** `pytest` sobre lexer, parser, intérprete, traductor, tracer, verbose, linter y agente (~274 tests).
+- **Frontend:** `node --test` sobre intención, planes, ejercicios, tutorial, logros, panel, traza y más (~65 tests en 14 archivos `.mjs`).
 
 ---
 
@@ -132,23 +178,22 @@ Woven.g4 (ANTLR4)
 
 ### Alta prioridad
 
-- Edición de placeholders en modo verboso (bloques editables estilo Scratch).
-- Visualizador paso a paso con tabla de variables y árbol de llamadas.
-- Generación de ejercicios por IA con validación automática.
+- Edición completa de placeholders en modo verboso (bloques editables estilo Scratch, más allá de la vista actual).
+- Persistencia del plan a medias entre sesiones (`localStorage` o backend).
+- Herramientas estructuradas para Hilo en runtime: `get_trace`, `get_step`, `get_variables`, `get_structure` (hoy el paso a paso usa la traza del cliente).
 
 ### Media prioridad
 
-- Grafo de estructuras de datos sincronizado con la traza.
-- Historial de ejercicios en `localStorage` para adaptar dificultad.
-- Tools para Hilo: `get_trace`, `get_step`, `get_variables`, `get_structure`.
-- Modo de diagnóstico de errores con ejercicios intencionalmente rotos.
+- Historial de ejercicios para adaptar dificultad (más allá de logros por tema).
+- Reflexión guiada más rica al cerrar un plan (chat antes de «Terminar plan»).
+- Sincronización más profunda del grafo de estructuras con programas grandes.
 
 ### Baja prioridad / futuro
 
 - Capa de bajo nivel (registros/memoria).
 - Más estructuras (pilas, colas, árboles).
 - Backend serverless para el agente con LangGraph.
-- Memoria persistente entre sesiones.
+- Memoria persistente entre sesiones en servidor (perfil longitudinal del alumno).
 
 ---
 
@@ -156,7 +201,9 @@ Woven.g4 (ANTLR4)
 
 ### Requisitos
 
-- [uv](https://docs.astral.sh/uv/) (gestiona Python, dependencias y scripts del repo)
+- [uv](https://docs.astral.sh/uv/) (Python, dependencias y scripts del repo)
+- [Node.js](https://nodejs.org/) 18+ (tests del frontend en `tests/*.mjs`)
+- Clave de [Google AI Studio](https://aistudio.google.com/apikey) (opcional; necesaria para respuestas de Hilo con Gemini en el navegador)
 
 ### Inicio rápido (clonar y compilar)
 
@@ -164,13 +211,12 @@ Woven.g4 (ANTLR4)
 git clone <repo-url> StitchCode && cd StitchCode
 uv sync --all-groups
 make test
+node --test tests/*.mjs
 ```
 
 Si modificaste `woven/Woven.g4`, regenera el parser con `make generate` antes de correr tests.
 
 ### 1) Instalar dependencias
-
-Desde la raíz del proyecto:
 
 ```bash
 uv sync --all-groups
@@ -190,7 +236,7 @@ Tras cambiar `woven/Woven.g4`:
 make generate
 ```
 
-Equivalente directo con uv:
+Equivalente directo:
 
 ```bash
 cd woven && uv run antlr4 -Dlanguage=Python3 -visitor Woven.g4
@@ -200,22 +246,34 @@ cd woven && uv run antlr4 -Dlanguage=Python3 -visitor Woven.g4
 
 ### 3) Correr tests
 
+Backend (Python):
+
 ```bash
 make test
 ```
 
-O con uv directamente:
+O:
 
 ```bash
 uv run pytest -q
 ```
 
+Frontend (Node):
+
+```bash
+node --test tests/*.mjs
+```
+
+Ejemplos por área:
+
 ```bash
 uv run pytest -q tests/test_lexer.py tests/test_parser.py tests/test_interpreter.py
 uv run pytest -q tests/test_translator.py tests/test_tracer.py tests/test_verbose.py tests/test_linter.py
+uv run pytest -q tests/test_gemini_agent.py
+node --test tests/test_hilo_plan.mjs tests/test_hilo_tutorial.mjs tests/test_learning_achievements.mjs
 ```
 
-### 4) Abrir frontend (estático)
+### 4) Abrir la aplicación
 
 El frontend requiere un servidor local (Pyodide y `fetch` de `woven/*.py`):
 
@@ -223,7 +281,23 @@ El frontend requiere un servidor local (Pyodide y `fetch` de `woven/*.py`):
 python -m http.server 8000
 ```
 
-Abrir `http://localhost:8000/` (raíz del repo). Los prototipos viven en `refs/`.
+Abrir `http://localhost:8000/`. Completa el asistente de configuración; al entrar, Hilo inicia el tutorial (si no lo completaste antes).
+
+Para repetir el tutorial en el navegador:
+
+```js
+localStorage.removeItem('stitch_hilo_tutorial_complete')
+```
+
+Los prototipos históricos de UI viven en `refs/`.
+
+### 5) Sprites de Hilo (opcional)
+
+Si cambias los frames del avatar:
+
+```bash
+make hilo-frames
+```
 
 ---
 
@@ -231,37 +305,60 @@ Abrir `http://localhost:8000/` (raíz del repo). Los prototipos viven en `refs/`
 
 ```text
 StitchCode/
+├── LICENSE                         # Propiedad de Vethariel — todos los derechos reservados
 ├── pyproject.toml                  # Dependencias y configuración (uv)
-├── uv.lock                         # Lockfile reproducible
-├── Makefile                        # Atajos: sync, generate, test
-├── .python-version                 # Versión de Python para uv
-├── index.html                      # App (navbar, editor, consola, Pyodide)
+├── uv.lock
+├── Makefile                        # sync, generate, test, hilo-frames
+├── .python-version
+├── index.html                      # App: setup, editor, consola, panel, Hilo
 ├── assets/
-│   ├── css/                        # Estilos (tokens, layout, editor, consola)
-│   └── js/                         # Módulos ES (bridge, controladores, main)
+│   ├── css/                        # Layout, editor, consola, plan, Hilo, tutorial
+│   └── js/                         # Módulos ES (ver tabla en §3)
 ├── refs/
-│   ├── stitch-code.html            # Prototipo UI / vibe
-│   └── index.html                  # Prototipo Pyodide completo
+│   ├── stitch-code.html            # Prototipo UI
+│   └── index.html                  # Prototipo Pyodide
+├── scripts/
+│   └── build_hilo_frames.py        # Generación de sprites del tutor
 ├── woven/
-│   ├── Woven.g4                    # Gramática formal de Woven (ANTLR4)
-│   ├── WovenLexer.py               # Lexer generado
-│   ├── WovenParser.py              # Parser generado
-│   ├── WovenVisitor.py             # Visitor base generado
-│   ├── interpreter_visitor.py      # Intérprete runtime de Woven
-│   ├── translator_visitor.py       # Traductor a Python/Java/C++
-│   ├── tracing_visitor.py          # Trazas de ejecución JSON
-│   ├── verbose_visitor.py          # Conversión AST -> bloques legibles
-│   ├── verbose_inverse.py          # Conversión bloques -> código Woven
-│   ├── linter_visitor.py           # Linter estático con diagnósticos
-│   ├── gemini_agent.py             # Tutor Hilo (prompt + payload/parsing Gemini)
-│   └── example.wv                  # Ejemplo de programa Woven
+│   ├── Woven.g4
+│   ├── WovenLexer.py / WovenParser.py / WovenVisitor.py
+│   ├── interpreter_visitor.py
+│   ├── translator_visitor.py
+│   ├── tracing_visitor.py
+│   ├── verbose_visitor.py
+│   ├── verbose_inverse.py
+│   ├── linter_visitor.py
+│   ├── gemini_agent.py             # Hilo: chat, plan, ejercicio, redacción
+│   └── example.wv
 └── tests/
-    ├── test_lexer.py               # Pruebas del lexer
-    ├── test_parser.py              # Pruebas del parser
-    ├── test_interpreter.py         # Pruebas del intérprete
-    ├── test_translator.py          # Pruebas del traductor
-    ├── test_tracer.py              # Pruebas del tracer
-    ├── test_verbose.py             # Pruebas visitor verboso + inverso
-    └── test_linter.py              # Pruebas del linter
+    ├── test_*.py                   # Motor Woven y agente
+    └── test_*.mjs                  # Hilo, panel, editor, logros, tutorial
 ```
 
+---
+
+## 8) Uso rápido de Hilo (referencia)
+
+| Objetivo | Ejemplo en el chat |
+|---|---|
+| Plan de estudio | «Quiero aprender sobre funciones» |
+| Ejercicio libre | «Dame un ejercicio sobre condicionales» |
+| Corregir código | «Ejercicio de corrección sobre bucles» |
+| Completar huecos | «Rellenar líneas en un programa de listas» |
+| Lección puntual | «Enséñame qué es la recursión» |
+| Tu código | «Explícame la línea 5» / «No entiendo mi programa» |
+| Traza | «Modo paso a paso» o botón **Paso a paso** en la barra |
+
+Con **Gemini** configurado, Hilo genera enunciados, código de ejemplo y planes validados contra el linter Woven en el cliente. Sin clave, parte del flujo usa respuestas locales o mensajes que indican configurar la API en **Ajustes**.
+
+---
+
+## 9) Licencia
+
+Copyright © 2026 **Vethariel**. Todos los derechos reservados.
+
+El proyecto es **propiedad de Vethariel**. No está bajo una licencia de código abierto permisiva: la copia, distribución, uso comercial o creación de obras derivadas requiere **autorización expresa** del propietario.
+
+Uso local permitido para aprendizaje personal y evaluación según los términos del archivo [LICENSE](LICENSE).
+
+Para permisos de uso, distribución o licencias alternativas, contacta a **Vethariel**.

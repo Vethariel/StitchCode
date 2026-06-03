@@ -1,0 +1,2079 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stitch Code — Presentación</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Epilogue:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0e0905;
+      --terra: #2a1a0e;
+      --accent: #c4703a;
+      --accent-glow: rgba(196, 112, 58, 0.45);
+      --gold: #d4a853;
+      --gold-soft: #e8c878;
+      --linen: #f2e8dc;
+      --linen-dim: #c8b89a;
+      --linen-muted: #8a7060;
+      --moss: #5a8a40;
+      --moss-glow: rgba(90, 138, 64, 0.35);
+      --console-green: #7fb069;
+      --pastel-orange: #f5c9a0;
+      --pastel-blue: #a8c8e8;
+      --pastel-purple: #c8b8e8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: "Epilogue", system-ui, sans-serif;
+      background: var(--ink);
+      color: var(--linen);
+    }
+
+    /* Textura y rejilla de telar */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.04;
+      background-image:
+        linear-gradient(90deg, var(--linen) 1px, transparent 1px),
+        linear-gradient(var(--linen) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    }
+
+    .deck { height: 100%; position: relative; z-index: 1; }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: clamp(2rem, 5vw, 4rem) clamp(2rem, 6vw, 5rem);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(16px) scale(0.992);
+      transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.5s;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 90% 70% at 100% 0%, rgba(196, 112, 58, 0.14), transparent 50%),
+        radial-gradient(ellipse 60% 50% at 0% 100%, var(--moss-glow), transparent 45%),
+        linear-gradient(155deg, var(--ink) 0%, var(--terra) 50%, #14100a 100%);
+    }
+
+    .slide.is-active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+      z-index: 2;
+    }
+
+    .slide.is-active .reveal { animation: revealUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+    .slide.is-active .reveal:nth-child(1) { animation-delay: 0.05s; }
+    .slide.is-active .reveal:nth-child(2) { animation-delay: 0.12s; }
+    .slide.is-active .reveal:nth-child(3) { animation-delay: 0.19s; }
+    .slide.is-active .reveal:nth-child(4) { animation-delay: 0.26s; }
+    .slide.is-active .reveal:nth-child(5) { animation-delay: 0.33s; }
+    .slide.is-active .reveal:nth-child(6) { animation-delay: 0.4s; }
+    .slide.is-active .stagger > * { animation: revealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+    .slide.is-active .stagger > *:nth-child(1) { animation-delay: 0.08s; }
+    .slide.is-active .stagger > *:nth-child(2) { animation-delay: 0.14s; }
+    .slide.is-active .stagger > *:nth-child(3) { animation-delay: 0.2s; }
+    .slide.is-active .stagger > *:nth-child(4) { animation-delay: 0.26s; }
+    .slide.is-active .stagger > *:nth-child(5) { animation-delay: 0.32s; }
+    .slide.is-active .stagger > *:nth-child(6) { animation-delay: 0.38s; }
+
+    @keyframes revealUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes threadFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.5; }
+      50% { transform: translateY(-8px) rotate(1deg); opacity: 0.85; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(1.05); }
+    }
+
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -40; }
+    }
+
+    .slide--reflective {
+      background:
+        radial-gradient(circle at 20% 30%, rgba(212, 168, 83, 0.18), transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(196, 112, 58, 0.1), transparent 35%),
+        linear-gradient(180deg, #100a06 0%, var(--terra) 100%);
+    }
+
+    .slide--section {
+      justify-content: flex-end;
+      padding-bottom: clamp(3rem, 8vh, 5rem);
+    }
+
+    .slide--section .section-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -58%);
+      font-family: "Fraunces", serif;
+      font-size: clamp(8rem, 22vw, 14rem);
+      font-weight: 600;
+      color: rgba(196, 112, 58, 0.07);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .slide--cover .slide-content { position: relative; z-index: 2; }
+
+    /* Decoración global por slide */
+    .slide-bg-threads {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .slide-bg-threads svg {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+
+    .thread-path-anim {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-dasharray: 8 6;
+      animation: dashFlow 12s linear infinite;
+      opacity: 0.4;
+    }
+
+    .thread-path-anim--gold {
+      stroke: var(--gold);
+      opacity: 0.32;
+    }
+
+    .thread-path-anim--moss {
+      stroke: var(--console-green);
+      opacity: 0.28;
+    }
+
+    .thread-path-anim--slow {
+      animation-duration: 18s;
+    }
+
+    .threads--faint .thread-path-anim {
+      opacity: 0.2;
+      stroke-width: 1.1;
+    }
+
+    .threads--faint .thread-path-anim--gold {
+      opacity: 0.26;
+    }
+
+    .threads--left svg {
+      left: 0;
+      right: auto;
+      width: 55%;
+    }
+
+    .threads--wave svg {
+      width: 100%;
+      height: 55%;
+      top: 18%;
+    }
+
+    .threads--duo svg {
+      opacity: 0.95;
+    }
+
+    .threads--arc svg {
+      width: 70%;
+      height: 70%;
+      top: 15%;
+      right: 0;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      pointer-events: none;
+      animation: pulseGlow 6s ease-in-out infinite;
+    }
+
+    .orb--accent { width: 280px; height: 280px; background: var(--accent-glow); top: -80px; right: 10%; }
+    .orb--gold { width: 200px; height: 200px; background: rgba(212, 168, 83, 0.2); bottom: 10%; left: 5%; animation-delay: -2s; }
+    .orb--moss { width: 160px; height: 160px; background: var(--moss-glow); bottom: 20%; right: 25%; animation-delay: -4s; }
+
+    .stitch-border {
+      position: absolute;
+      left: clamp(1.5rem, 4vw, 3rem);
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: min(60vh, 320px);
+      background: repeating-linear-gradient(
+        180deg,
+        var(--accent) 0 8px,
+        transparent 8px 14px,
+        var(--gold) 14px 18px,
+        transparent 18px 24px
+      );
+      border-radius: 2px;
+      opacity: 0.7;
+    }
+
+    .slide-content { position: relative; z-index: 2; max-width: 56rem; }
+
+    .slide-layout {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2rem 3rem;
+      align-items: center;
+      width: 100%;
+      max-width: 62rem;
+    }
+
+    @media (max-width: 900px) {
+      .slide-layout { grid-template-columns: 1fr; }
+      .visual-panel { max-width: 100% !important; }
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.85rem;
+      padding: 0.35rem 0.75rem;
+      background: rgba(212, 168, 83, 0.1);
+      border: 1px solid rgba(212, 168, 83, 0.25);
+      border-radius: 100px;
+    }
+
+    .kicker-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .kicker--reflective {
+      color: var(--linen-dim);
+      background: rgba(242, 232, 220, 0.05);
+      border-color: rgba(200, 184, 154, 0.15);
+    }
+
+    h1, h2 {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      margin-bottom: 0.6rem;
+      max-width: 14ch;
+    }
+
+    h1 em { font-style: italic; color: var(--accent); }
+
+    h2 {
+      font-size: clamp(1.55rem, 3.6vw, 2.45rem);
+      margin-bottom: 1.1rem;
+      max-width: 20ch;
+    }
+
+    .subtitle {
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      color: var(--linen-dim);
+      max-width: 38ch;
+      line-height: 1.6;
+    }
+
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .logo-mark svg { width: 52px; height: 52px; filter: drop-shadow(0 4px 12px rgba(196, 112, 58, 0.35)); }
+
+    .authors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 2rem;
+    }
+
+    .author-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.9rem 0.5rem 0.5rem;
+      background: rgba(242, 232, 220, 0.08);
+      border: 1px solid rgba(200, 184, 154, 0.2);
+      border-radius: 100px;
+      font-size: 0.88rem;
+      color: var(--linen);
+      backdrop-filter: blur(8px);
+      transition: transform 0.25s ease, border-color 0.25s;
+    }
+
+    .author-chip:hover { transform: translateY(-2px); border-color: rgba(196, 112, 58, 0.45); }
+
+    .author-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--ink);
+      flex-shrink: 0;
+    }
+
+    .author-avatar--1 { background: linear-gradient(135deg, var(--pastel-orange), var(--accent)); }
+    .author-avatar--2 { background: linear-gradient(135deg, var(--pastel-blue), var(--moss)); }
+    .author-avatar--3 { background: linear-gradient(135deg, var(--pastel-purple), var(--gold)); }
+
+    .reflective-lead {
+      font-family: "Fraunces", Georgia, serif;
+      font-size: clamp(1.3rem, 3vw, 1.95rem);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1.4;
+      max-width: 26ch;
+      color: var(--linen);
+      margin-bottom: 1.25rem;
+    }
+
+    .reflective-body {
+      font-size: clamp(0.98rem, 1.9vw, 1.12rem);
+      line-height: 1.65;
+      max-width: 48ch;
+      color: var(--linen-dim);
+    }
+
+    .reflective-body strong { color: var(--linen); font-weight: 500; }
+
+    /* Contraste rejido / tejido */
+    .weave-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      max-width: 22rem;
+    }
+
+    .weave-card {
+      padding: 1.25rem 1rem;
+      border-radius: 12px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .weave-card--tangled {
+      background: linear-gradient(145deg, rgba(224, 112, 112, 0.12), rgba(42, 26, 14, 0.8));
+      border: 1px solid rgba(224, 112, 112, 0.25);
+    }
+
+    .weave-card--woven {
+      background: linear-gradient(145deg, rgba(127, 176, 105, 0.15), rgba(42, 26, 14, 0.8));
+      border: 1px solid rgba(127, 176, 105, 0.3);
+    }
+
+    .weave-card svg { width: 64px; height: 64px; margin: 0 auto 0.6rem; display: block; }
+
+    .weave-card span {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .weave-card--tangled span { color: #e07070; }
+    .weave-card--woven span { color: var(--console-green); }
+
+    .visual-panel {
+      position: relative;
+      max-width: 280px;
+    }
+
+    .mock-window {
+      background: rgba(16, 12, 8, 0.85);
+      border: 1px solid rgba(196, 112, 58, 0.3);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(242, 232, 220, 0.05) inset;
+    }
+
+    .mock-titlebar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.5rem 0.75rem;
+      background: rgba(26, 16, 8, 0.9);
+      border-bottom: 1px solid rgba(200, 184, 154, 0.1);
+    }
+
+    .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .mock-dot--r { background: #e07070; }
+    .mock-dot--y { background: var(--gold); }
+    .mock-dot--g { background: var(--console-green); }
+
+    .mock-body {
+      padding: 0.85rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      line-height: 1.5;
+      color: var(--console-green);
+    }
+
+    .mock-body .kw { color: var(--pastel-blue); }
+    .mock-body .ty { color: var(--gold); }
+    .mock-body .cm { color: var(--linen-muted); }
+
+    .hilo-float {
+      position: absolute;
+      bottom: -12px;
+      right: -12px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, var(--gold-soft), var(--accent));
+      border: 2px solid rgba(242, 232, 220, 0.3);
+      box-shadow: 0 8px 24px rgba(196, 112, 58, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      animation: threadFloat 4s ease-in-out infinite;
+    }
+
+    ul, ol {
+      font-size: clamp(0.92rem, 1.7vw, 1.05rem);
+      line-height: 1.55;
+      max-width: 54ch;
+      padding-left: 0;
+      list-style: none;
+      color: var(--linen-dim);
+    }
+
+    ul li, ol li {
+      margin-bottom: 0.65rem;
+      padding-left: 1.75rem;
+      position: relative;
+    }
+
+    ul li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: var(--accent);
+      transform: rotate(45deg);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    ol { counter-reset: obj; }
+    ol li { counter-increment: obj; }
+    ol li::before {
+      content: counter(obj);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1.35rem;
+      height: 1.35rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--ink);
+      background: var(--gold);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 1.25rem;
+      max-width: 56rem;
+    }
+
+    @media (max-width: 720px) { .two-col, .weave-compare { grid-template-columns: 1fr; } }
+
+    .card {
+      background: linear-gradient(145deg, rgba(242, 232, 220, 0.08), rgba(242, 232, 220, 0.02));
+      border: 1px solid rgba(200, 184, 154, 0.18);
+      border-radius: 14px;
+      padding: 1.15rem 1.2rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--gold));
+      opacity: 0.6;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.65rem;
+      font-size: 1.1rem;
+    }
+
+    .card-icon--scratch { background: rgba(245, 201, 160, 0.2); }
+    .card-icon--its { background: rgba(168, 200, 232, 0.2); }
+    .card-icon--lang { background: rgba(200, 184, 232, 0.2); }
+    .card-icon--stitch { background: rgba(196, 112, 58, 0.25); }
+
+    .card h3 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gold);
+      margin-bottom: 0.45rem;
+      font-weight: 600;
+    }
+
+    .card ul { font-size: 0.86rem; max-width: none; }
+    .card ul li { padding-left: 1rem; margin-bottom: 0.3rem; }
+    .card ul li::before { width: 5px; height: 5px; top: 0.5em; border-radius: 50%; transform: none; }
+
+    /* Diagrama de arquitectura visual */
+    .arch-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 38rem;
+      margin: 0.75rem 0 1rem;
+    }
+
+    .arch-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .arch-node {
+      padding: 0.65rem 0.5rem;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 500;
+      border: 1px solid;
+      line-height: 1.3;
+    }
+
+    .arch-node small { display: block; font-size: 0.62rem; opacity: 0.75; font-weight: 400; margin-top: 0.2rem; }
+
+    .arch-node--editor { background: rgba(245, 201, 160, 0.12); border-color: rgba(245, 201, 160, 0.35); color: var(--pastel-orange); }
+    .arch-node--motor { background: rgba(127, 176, 105, 0.12); border-color: rgba(127, 176, 105, 0.35); color: var(--console-green); }
+    .arch-node--hilo { background: rgba(196, 112, 58, 0.15); border-color: rgba(196, 112, 58, 0.4); color: var(--accent); }
+    .arch-node--panel { grid-column: 1 / -1; background: rgba(168, 200, 232, 0.1); border-color: rgba(168, 200, 232, 0.3); color: var(--pastel-blue); }
+
+    .arch-connector {
+      height: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--linen-muted);
+      font-size: 0.65rem;
+    }
+
+    /* Poderes como chips */
+    .power-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+      max-width: 52rem;
+    }
+
+    .power-tile {
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(200, 184, 154, 0.15);
+      background: rgba(16, 12, 8, 0.5);
+      transition: transform 0.25s ease, border-color 0.25s;
+    }
+
+    .power-tile:hover { transform: scale(1.03); border-color: var(--accent); }
+
+    .power-tile-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.4rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+    }
+
+    .power-tile strong {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--linen);
+      margin-bottom: 0.35rem;
+    }
+
+    .power-tile p {
+      font-size: 0.72rem;
+      line-height: 1.4;
+      color: var(--linen-muted);
+      margin: 0;
+    }
+
+    /* Stats */
+    .stat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1rem 0 1.25rem;
+    }
+
+    .stat-badge {
+      flex: 1;
+      min-width: 120px;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      text-align: center;
+      border: 1px solid;
+    }
+
+    .stat-badge--big {
+      background: linear-gradient(135deg, rgba(196, 112, 58, 0.2), rgba(196, 112, 58, 0.05));
+      border-color: rgba(196, 112, 58, 0.35);
+    }
+
+    .stat-badge--py {
+      background: linear-gradient(135deg, rgba(127, 176, 105, 0.15), transparent);
+      border-color: rgba(127, 176, 105, 0.3);
+    }
+
+    .stat-badge--js {
+      background: linear-gradient(135deg, rgba(168, 200, 232, 0.12), transparent);
+      border-color: rgba(168, 200, 232, 0.3);
+    }
+
+    .stat-num {
+      font-family: "Fraunces", serif;
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--gold);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--linen-muted);
+      margin-top: 0.35rem;
+    }
+
+    .stack-lanes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      max-width: 54rem;
+    }
+
+    @media (max-width: 720px) { .stack-lanes { grid-template-columns: 1fr; } }
+
+    .stack-lane {
+      padding: 1.25rem;
+      border-radius: 14px;
+      border: 1px dashed rgba(200, 184, 154, 0.2);
+      background: rgba(16, 12, 8, 0.4);
+    }
+
+    .stack-lane h4 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .stack-lane--py h4 { color: var(--console-green); }
+    .stack-lane--fe h4 { color: var(--pastel-blue); }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+
+    .tag {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      background: rgba(242, 232, 220, 0.08);
+      border: 1px solid rgba(200, 184, 154, 0.15);
+      color: var(--linen-dim);
+    }
+
+    table {
+      width: 100%;
+      max-width: 52rem;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.84rem;
+      margin-top: 0.5rem;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(200, 184, 154, 0.12);
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid rgba(200, 184, 154, 0.08);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: rgba(242, 232, 220, 0.03); }
+
+    th {
+      background: rgba(196, 112, 58, 0.15);
+      color: var(--gold);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    td { color: var(--linen-dim); }
+    td strong { color: var(--linen); }
+
+    .refs { font-size: 0.8rem; max-width: 52rem; }
+    .refs li {
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 0.5rem;
+      background: rgba(242, 232, 220, 0.04);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+    }
+    .refs li::before { display: none; }
+
+    .quote-block {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      border-left: 4px solid var(--gold);
+      background: rgba(212, 168, 83, 0.08);
+      border-radius: 0 10px 10px 0;
+      font-family: "Fraunces", serif;
+      font-style: italic;
+      color: var(--linen-dim);
+      max-width: 40ch;
+    }
+
+    /* Pruebas — mismo centrado y ritmo que el resto del deck */
+    .slide--tests {
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    .slide--tests .slide-content {
+      max-width: 56rem;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .slide--tests h2 {
+      max-width: none;
+      margin-bottom: 1rem;
+    }
+
+    .slide--tests .slide-intro {
+      font-size: clamp(0.92rem, 1.7vw, 1.02rem);
+      color: var(--linen-dim);
+      line-height: 1.55;
+      margin-bottom: 1.1rem;
+      max-width: 50ch;
+    }
+
+    @media (max-height: 780px) {
+      .slide--tests .slide-content {
+        transform: scale(0.94);
+        transform-origin: center center;
+      }
+    }
+
+    @media (max-height: 680px) {
+      .slide--tests .slide-content {
+        transform: scale(0.88);
+      }
+    }
+
+    .pkg-overview {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      max-width: 56rem;
+    }
+
+    @media (max-width: 800px) { .pkg-overview { grid-template-columns: 1fr; } }
+
+    .pkg-lane {
+      padding: 1rem 1.1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(200, 184, 154, 0.18);
+      background: linear-gradient(145deg, rgba(242, 232, 220, 0.08), rgba(242, 232, 220, 0.02));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pkg-lane::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--gold));
+      opacity: 0.55;
+    }
+
+    .pkg-lane h3 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .pkg-lane--py h3 { color: var(--console-green); }
+    .pkg-lane--js h3 { color: var(--pastel-blue); }
+
+    .pkg-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--linen-dim);
+    }
+
+    .pkg-list li {
+      padding: 0.35rem 0;
+      padding-left: 0;
+      margin: 0;
+      border-bottom: 1px solid rgba(200, 184, 154, 0.06);
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .pkg-list li::before { display: none; }
+
+    .pkg-list code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.68rem;
+      color: var(--linen);
+    }
+
+    .pkg-count {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.65rem;
+      color: var(--gold);
+      flex-shrink: 0;
+    }
+
+    .test-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+    }
+
+    @media (max-width: 900px) { .test-grid { grid-template-columns: 1fr; } }
+
+    .test-card {
+      background: linear-gradient(145deg, rgba(242, 232, 220, 0.07), rgba(16, 12, 8, 0.5));
+      border: 1px solid rgba(200, 184, 154, 0.18);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 0.72rem;
+    }
+
+    .test-card--wide { grid-column: 1 / -1; }
+
+    .test-card__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.45rem 0.65rem;
+      background: rgba(196, 112, 58, 0.1);
+      border-bottom: 1px solid rgba(200, 184, 154, 0.12);
+    }
+
+    .test-card__file {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.62rem;
+      color: var(--gold);
+    }
+
+    .test-card__name {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.6rem;
+      color: var(--linen-muted);
+      text-align: right;
+    }
+
+    .test-card__code {
+      padding: 0.5rem 0.65rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.6rem;
+      line-height: 1.45;
+      color: #b8dba8;
+      white-space: pre-wrap;
+      border-bottom: 1px solid rgba(200, 184, 154, 0.06);
+    }
+
+    .test-card__code .err { color: #e07070; }
+    .test-card__code .kw { color: var(--pastel-blue); }
+    .test-card__code .cm { color: var(--linen-muted); }
+
+    .test-card__assert {
+      padding: 0.45rem 0.65rem;
+      color: var(--console-green);
+      font-size: 0.62rem;
+      line-height: 1.4;
+    }
+
+    .test-card__assert::before {
+      content: "✓ ";
+      font-weight: 700;
+    }
+
+    .section-num {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.85rem;
+      color: var(--accent);
+      letter-spacing: 0.2em;
+      margin-bottom: 0.5rem;
+    }
+
+    .nav-hint {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.5rem;
+      font-size: 0.68rem;
+      color: var(--linen-muted);
+      z-index: 20;
+    }
+
+    .progress-wrap {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: rgba(200, 184, 154, 0.1);
+      z-index: 20;
+    }
+
+    .progress {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--gold));
+      transition: width 0.4s ease;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .slide-counter {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 1.5rem;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--linen-muted);
+      z-index: 20;
+      padding: 0.35rem 0.65rem;
+      background: rgba(16, 12, 8, 0.7);
+      border-radius: 6px;
+      border: 1px solid rgba(200, 184, 154, 0.12);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .slide, .reveal, .stagger > *, .thread-path-anim, .orb, .hilo-pres-avatar { animation: none !important; transition-duration: 0.01ms; }
+    }
+
+    .index-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+      max-width: 48rem;
+    }
+
+    @media (max-width: 640px) { .index-grid { grid-template-columns: 1fr; } }
+
+    .index-card {
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(200, 184, 154, 0.18);
+      background: linear-gradient(145deg, rgba(242, 232, 220, 0.08), rgba(242, 232, 220, 0.02));
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      color: inherit;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .index-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(196, 112, 58, 0.45);
+    }
+
+    .index-card strong {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--linen);
+      margin-bottom: 0.2rem;
+    }
+
+    .index-card span {
+      font-size: 0.72rem;
+      color: var(--linen-muted);
+    }
+
+    /* Hilo — mismo lenguaje visual que el chat (burbuja + avatar circular) */
+    .slide-body-with-hilo {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem 2rem;
+      align-items: end;
+      max-width: 58rem;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    .slide--with-hilo-corner {
+      position: relative;
+    }
+
+    .hilo-aside {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+      width: min(220px, 32vw);
+    }
+
+    .hilo-aside--corner {
+      position: absolute;
+      right: clamp(2rem, 6vw, 5rem);
+      bottom: clamp(2rem, 5vh, 4rem);
+      z-index: 3;
+    }
+
+    /* Slide 16 — stack implementación: Hilo un poco más a la derecha */
+    .slide--impl .slide-body-with-hilo {
+      gap: 1.5rem 2.75rem;
+    }
+
+    .slide--impl .slide-body-with-hilo .hilo-aside {
+      margin-right: -0.75rem;
+      margin-left: 0.5rem;
+    }
+
+    /* Slide cierre — centrar bloque principal (Hilo no empuja el contenido abajo) */
+    .slide--cierre {
+      justify-content: center;
+      align-items: stretch;
+    }
+
+    .slide--cierre .slide-cover-center {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 56rem;
+      transform: translateY(-4vh);
+    }
+
+    .slide--cierre .hilo-aside--corner {
+      right: clamp(1.5rem, 4vw, 3.5rem);
+      bottom: clamp(2rem, 5vh, 3.5rem);
+    }
+
+    .hilo-pres-bubble {
+      position: relative;
+      max-width: 100%;
+      padding: 10px 12px 8px;
+      background: var(--ink);
+      border: 1px solid rgba(196, 112, 58, 0.26);
+      border-radius: 12px 12px 12px 2px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .hilo-pres-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      right: 18px;
+      width: 9px;
+      height: 9px;
+      background: var(--ink);
+      border-right: 1px solid rgba(196, 112, 58, 0.26);
+      border-bottom: 1px solid rgba(196, 112, 58, 0.26);
+      transform: rotate(45deg);
+    }
+
+    .hilo-pres-bubble-text {
+      margin: 0;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--linen-dim);
+      text-align: left;
+    }
+
+    .hilo-pres-bubble-text em {
+      color: var(--gold-soft);
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .hilo-pres-avatar {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid rgba(196, 112, 58, 0.36);
+      background: #fff;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+      animation: hilo-pres-idle 3.2s ease-in-out infinite;
+    }
+
+    @keyframes hilo-pres-idle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .hilo-pres-sprite {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: center center;
+    }
+
+    @media (max-width: 820px) {
+      .slide-body-with-hilo {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      .hilo-aside { justify-self: end; width: min(200px, 88vw); }
+      .slide--impl .slide-body-with-hilo .hilo-aside {
+        margin-right: 0;
+        margin-left: 0;
+      }
+      .hilo-aside--corner {
+        position: static;
+        margin-top: 1.25rem;
+        align-self: flex-end;
+      }
+      .slide--cierre .slide-cover-center {
+        transform: none;
+      }
+    }
+
+    .test-grid--stars {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    @media print {
+      html, body { overflow: visible; height: auto; }
+      .slide { position: relative; opacity: 1 !important; visibility: visible !important; transform: none !important; page-break-after: always; min-height: 100vh; }
+      .nav-hint, .progress-wrap, .slide-counter { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck" id="deck" aria-live="polite">
+
+    <!-- Portada -->
+    <section class="slide slide--cover is-active" data-slide>
+      <div class="slide-bg-threads" aria-hidden="true">
+        <div class="orb orb--accent"></div>
+        <div class="orb orb--gold"></div>
+        <svg viewBox="0 0 800 600" preserveAspectRatio="xMaxYMid slice">
+          <path class="thread-path-anim" d="M720 40 Q580 120 520 80 Q380 20 340 160 Q300 320 420 380 Q540 440 500 560"/>
+          <path class="thread-path-anim" d="M760 120 Q640 200 560 180" style="animation-delay: -4s; opacity: 0.25"/>
+          <path class="thread-path-anim" d="M680 300 Q520 340 480 420 Q440 500 580 520" style="animation-delay: -8s; opacity: 0.2"/>
+        </svg>
+      </div>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-content">
+        <div class="logo-mark reveal">
+          <svg viewBox="0 0 28 28" aria-hidden="true">
+            <circle cx="14" cy="14" r="13" fill="#2a1a0e" stroke="#c4703a" stroke-width="1"/>
+            <ellipse cx="19.5" cy="7" rx="2.2" ry="1" fill="#c4703a" transform="rotate(-42 19.5 7)"/>
+            <path d="M18.5 8.8 Q16 12.5 12.5 10.8 Q9 9 8.5 12.8 Q8 16.5 11 18.2 Q14 19.8 13.2 23.2" fill="none" stroke="#d4884e" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <p class="kicker" style="margin:0"><span class="kicker-dot"></span> Presentación breve</p>
+        </div>
+        <h1 class="reveal">Stitch <em>Code</em></h1>
+        <p class="subtitle reveal">Entorno educativo con lenguaje Woven y tutor Hilo para leer, ejecutar y comprender programas con intención.</p>
+        <div class="authors reveal stagger">
+          <div class="author-chip"><span class="author-avatar author-avatar--1">JV</span> Juan Vergara</div>
+          <div class="author-chip"><span class="author-avatar author-avatar--2">NF</span> Nael Fontaine</div>
+          <div class="author-chip"><span class="author-avatar author-avatar--3">DG</span> Daniel Gracia</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Índice -->
+    <section class="slide slide--with-hilo-corner" data-slide data-section="indice">
+      <div class="slide-bg-threads" data-thread="duo" aria-hidden="true"></div>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-content">
+        <p class="kicker reveal"><span class="kicker-dot"></span> Recorrido</p>
+        <h2 class="reveal">Índice</h2>
+        <p class="subtitle reveal" style="margin-bottom: 1.25rem;">Teclas <strong>1–7</strong> saltan a cada sección. Demo en vivo: <a href="https://vethariel.github.io/StitchCode/" style="color:var(--gold-soft)">vethariel.github.io/StitchCode</a></p>
+        <div class="index-grid reveal stagger">
+          <button type="button" class="index-card" data-goto="narrativa"><strong>1 · Narrativa</strong><span>Tejido, rejido y tutor Hilo</span></button>
+          <button type="button" class="index-card" data-goto="intro"><strong>2 · Introducción</strong><span>Motivación, antecedentes, objetivo</span></button>
+          <button type="button" class="index-card" data-goto="propuesta"><strong>3 · Propuesta</strong><span>Woven, arquitectura, poderes</span></button>
+          <button type="button" class="index-card" data-goto="implementacion"><strong>4 · Implementación</strong><span>Pyodide, frontend, decisiones</span></button>
+          <button type="button" class="index-card" data-goto="pruebas"><strong>5 · Pruebas</strong><span>Paquetes y casos críticos</span></button>
+          <button type="button" class="index-card" data-goto="conclusiones"><strong>6 · Conclusiones</strong><span>Logros y trabajo futuro</span></button>
+          <button type="button" class="index-card" data-goto="referencias"><strong>7 · Referencias</strong><span>Bibliografía</span></button>
+          <button type="button" class="index-card" data-goto="cierre"><strong>Cierre</strong><span>Gracias · demo en vivo</span></button>
+        </div>
+      </div>
+      <aside class="hilo-aside hilo-aside--corner reveal" aria-label="Hilo">
+        <div class="hilo-pres-bubble">
+          <p class="hilo-pres-bubble-text">Elige una sección o avanza con ← →; la demo es en <em>Stitch Code</em> en línea.</p>
+        </div>
+        <div class="hilo-pres-avatar">
+          <img class="hilo-pres-sprite" src="../assets/sprite/frames/smile.png" alt="">
+        </div>
+      </aside>
+    </section>
+
+    <!-- Narrativa 1 -->
+    <section class="slide slide--reflective" data-slide data-section="narrativa">
+      <div class="orb orb--gold" style="top: 15%; right: 20%"></div>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-layout">
+        <div class="slide-content">
+          <p class="kicker kicker--reflective reveal"><span class="kicker-dot"></span> Antes de la arquitectura</p>
+          <p class="reflective-lead reveal">¿Por qué otra herramienta si ya hay editores, IDEs y chatbots que «resuelven» el ejercicio?</p>
+          <p class="reflective-body reveal">
+            Porque en la primera universidad muchos estudiantes no fallan por falta de respuestas, sino por <strong>no saber mirar</strong> un programa: confunden sintaxis con sentido y terminan con código <strong>rejido</strong> —enredado, sin patrón— frente a un <strong>tejido</strong> donde cada hilo tiene lugar.
+          </p>
+        </div>
+        <div class="visual-panel reveal">
+          <div class="weave-compare">
+            <div class="weave-card weave-card--tangled">
+              <svg viewBox="0 0 64 64" aria-hidden="true">
+                <path fill="none" stroke="#e07070" stroke-width="1.5" d="M12 20 Q32 8 52 24 Q40 44 20 52 Q8 36 32 28 Q48 20 12 44"/>
+                <path fill="none" stroke="#e07070" stroke-width="1" opacity="0.6" d="M24 16 Q44 32 28 48"/>
+              </svg>
+              <span>Rejido</span>
+            </div>
+            <div class="weave-card weave-card--woven">
+              <svg viewBox="0 0 64 64" aria-hidden="true">
+                <line x1="8" y1="16" x2="56" y2="16" stroke="#7fb069" stroke-width="1"/>
+                <line x1="8" y1="32" x2="56" y2="32" stroke="#7fb069" stroke-width="1"/>
+                <line x1="8" y1="48" x2="56" y2="48" stroke="#7fb069" stroke-width="1"/>
+                <line x1="20" y1="8" x2="20" y2="56" stroke="#c4703a" stroke-width="1"/>
+                <line x1="44" y1="8" x2="44" y2="56" stroke="#c4703a" stroke-width="1"/>
+              </svg>
+              <span>Tejido</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Narrativa 2 -->
+    <section class="slide slide--reflective" data-slide>
+      <div class="slide-bg-threads threads--wave" aria-hidden="true">
+        <svg viewBox="0 0 400 400">
+          <path class="thread-path-anim" d="M0 200 Q100 100 200 200 T400 200"/>
+          <path class="thread-path-anim thread-path-anim--gold" d="M0 300 Q130 220 260 300 T520 300" style="animation-delay: -7s; opacity: 0.28"/>
+          <path class="thread-path-anim thread-path-anim--moss" d="M60 80 Q200 40 340 90" style="animation-delay: -11s; opacity: 0.2"/>
+        </svg>
+      </div>
+      <div class="slide-layout">
+        <div class="slide-content">
+          <p class="kicker kicker--reflective reveal"><span class="kicker-dot"></span> Sensibilidad del código</p>
+          <p class="reflective-lead reveal">El código no es solo texto: es material que se tensa, se rompe y se recompone.</p>
+          <p class="reflective-body reveal">
+            Instrucciones como <strong>hilos</strong>, bloques como <strong>patrones</strong>, errores como <strong>nudos</strong> mal atados. La herramienta premia <strong>diagnosticar y ejecutar con cuidado</strong> —como revisar una costura antes del siguiente puntada.
+          </p>
+        </div>
+        <div class="visual-panel reveal">
+          <div class="mock-window">
+            <div class="mock-titlebar">
+              <span class="mock-dot mock-dot--r"></span>
+              <span class="mock-dot mock-dot--y"></span>
+              <span class="mock-dot mock-dot--g"></span>
+            </div>
+            <div class="mock-body">
+              <span class="ty">int</span> i = <span class="kw">0</span><br>
+              <span class="kw">for</span> (<span class="ty">int</span> i = 0; i &lt; 3; ...):<br>
+              &nbsp;&nbsp;<span class="kw">print</span>(i)<br>
+              <span class="cm"># traza · linter · run</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Narrativa 3 + Hilo -->
+    <section class="slide slide--reflective" data-slide>
+      <div class="orb orb--accent" style="bottom: 15%; left: 30%"></div>
+      <div class="slide-layout">
+        <div class="slide-content">
+          <p class="kicker kicker--reflective reveal"><span class="kicker-dot"></span> Motivación pedagógica</p>
+          <p class="reflective-lead reveal">Un tutor que guía, no que sustituye el pensamiento.</p>
+          <p class="reflective-body reveal">
+            <strong>Hilo</strong> ofrece tono configurable, pistas progresivas, planes y ejercicios alineados con la pantalla. Leer en Woven, bloques, lenguaje natural y otras sintaxis —sin un mar de código rejido.
+          </p>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">No regalo la solución: te ayudo a <em>ver</em> el programa, línea a línea.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/wink.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="intro">
+      <span class="section-watermark" aria-hidden="true">b</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">b · i</p>
+        <p class="kicker"><span class="kicker-dot"></span> Introducción</p>
+        <h2>Motivación y pertinencia del problema</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="orb orb--moss" style="top: 10%; right: 5%"></div>
+      <div class="slide-content">
+        <h2 class="reveal">El problema que importa</h2>
+        <ul class="reveal stagger">
+          <li>Deserción y ansiedad en intro a programación: el salto de sintaxis a <strong>razonar sobre ejecución</strong> es abrupto.</li>
+          <li>Herramientas expertas, no <strong>lectura diagnóstica</strong> del principiante.</li>
+          <li>LLMs que entregan soluciones completas y debilitan depuración.</li>
+          <li>Falta un entorno: <strong>lenguaje didáctico + ejecución visible + tutoría acotada</strong> en el navegador.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide>
+      <span class="section-watermark">b</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">b · ii</p>
+        <p class="kicker"><span class="kicker-dot"></span> Introducción</p>
+        <h2>Antecedentes y trabajos relacionados</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="two-col stagger">
+        <div class="card">
+          <div class="card-icon card-icon--scratch">🧩</div>
+          <h3>Programación visual</h3>
+          <ul>
+            <li>Scratch: baja barrera, puede desconectar del código «real».</li>
+            <li>Notebooks: narrativa + código, poco diagnóstico de errores ajenos.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-icon card-icon--its">🎓</div>
+          <h3>Tutores inteligentes</h3>
+          <ul>
+            <li>ITS con pistas y restricción de solución.</li>
+            <li>LLMs: diálogo + <strong>validación</strong> para no sobreayudar.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-icon card-icon--lang">⌨️</div>
+          <h3>Lenguajes didácticos</h3>
+          <ul>
+            <li>Subconjuntos Py/Java en educación superior.</li>
+            <li><strong>Woven:</strong> convergencia Py / Java / C++.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-icon card-icon--stitch">🪡</div>
+          <h3>Stitch Code</h3>
+          <ul>
+            <li>Intérprete, traductor, traza, linter y tutor en <strong>una app</strong> (Pyodide).</li>
+            <li>Metáfora del tejido como marco pedagógico.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide>
+      <span class="section-watermark">b</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">b · iii</p>
+        <p class="kicker"><span class="kicker-dot"></span> Introducción</p>
+        <h2>Objetivo del presente trabajo</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo">
+        <div class="slide-content">
+          <h2 class="reveal">Objetivo general</h2>
+          <p class="reflective-body reveal" style="margin-bottom: 1.25rem;">
+            Diseñar e implementar <strong>Stitch Code</strong> con <strong>Woven</strong> y <strong>Hilo</strong>, para que estudiantes en su primer contacto con programación <strong>lean, ejecuten, diagnostiquen y practiquen</strong> con IA progresiva, sin sustituir su razonamiento.
+          </p>
+          <p class="kicker reveal"><span class="kicker-dot"></span> Objetivos específicos</p>
+          <ol class="reveal stagger">
+            <li>Woven: gramática, intérprete, linter, traducciones.</li>
+            <li>Vistas: texto, bloques y verboso del mismo programa.</li>
+            <li>Tutoría: planes, ejercicios guiados, explicación y traza.</li>
+            <li>Validación automatizada del motor y del frontend.</li>
+          </ol>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Cuatro metas claras: lenguaje, vistas, tutoría y pruebas que nos respalden.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/happy.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="propuesta">
+      <span class="section-watermark">c</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">c</p>
+        <p class="kicker"><span class="kicker-dot"></span> Propuesta</p>
+        <h2>¿Qué se va a desarrollar?</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo">
+        <div class="slide-content">
+        <h2 class="reveal">Propuesta de solución</h2>
+        <div class="arch-flow reveal">
+          <div class="arch-row">
+            <div class="arch-node arch-node--editor">Editor<small>Texto · Bloques · Verboso</small></div>
+            <div class="arch-node arch-node--motor">Motor Woven<small>ANTLR · Run · Linter</small></div>
+            <div class="arch-node arch-node--hilo">Hilo<small>Plan · Ejercicio · Explic.</small></div>
+          </div>
+          <div class="arch-connector">↓ consola · traza paso a paso ↓</div>
+          <div class="arch-node arch-node--panel">Panel lateral · Enunciado · Py/Java/C++ · Logros</div>
+        </div>
+        <ul class="reveal stagger" style="margin-top: 0.5rem;">
+          <li><strong>Woven</strong> — tipos, OOP, listas, sintaxis convergente.</li>
+          <li><strong>Hilo</strong> — Gemini con poderes acotados y código validado.</li>
+          <li><strong>Experiencia</strong> — tutorial, onboarding y competencias.</li>
+        </ul>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Tres pilares en el navegador: escribir, ejecutar y que yo te guíe sin hacerte trampa.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/neutral.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo" style="max-width:58rem;margin:0 auto;padding:0 clamp(2rem,6vw,5rem);width:100%;box-sizing:border-box">
+        <div style="flex:1;min-width:0">
+      <h2 class="reveal">Poderes de Hilo</h2>
+      <div class="power-grid reveal stagger">
+        <div class="power-tile"><div class="power-tile-icon">📋</div><strong>Plan</strong><p>Itinerario multiactividad hasta logro.</p></div>
+        <div class="power-tile"><div class="power-tile-icon">📖</div><strong>Aprendizaje</strong><p>Lección + traducciones validadas.</p></div>
+        <div class="power-tile"><div class="power-tile-icon">✏️</div><strong>Ejercicio</strong><p>Libre, corrección o relleno alineado.</p></div>
+        <div class="power-tile"><div class="power-tile-icon">💡</div><strong>Explicación</strong><p>Foco en editor; pistas graduales.</p></div>
+        <div class="power-tile"><div class="power-tile-icon">👣</div><strong>Paso a paso</strong><p>Traza, variables y grafo.</p></div>
+      </div>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Pídeme un plan, un ejercicio o «explícame esta línea» — cada poder tiene reglas.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/heart_eyes.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="implementacion">
+      <span class="section-watermark">d</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">d</p>
+        <p class="kicker"><span class="kicker-dot"></span> Implementación</p>
+        <h2>¿Cómo se implementó?</h2>
+      </div>
+    </section>
+
+    <section class="slide slide--impl" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo" style="max-width:54rem;margin:0 auto;padding:0 clamp(2rem,6vw,5rem);width:100%;box-sizing:border-box">
+        <div class="stack-lanes reveal stagger" style="flex:1;min-width:0">
+        <div class="stack-lane stack-lane--py">
+          <h4>⚙️ Backend (Pyodide)</h4>
+          <ul>
+            <li>ANTLR4 → lexer/parser/visitors</li>
+            <li>Intérprete, traductor, tracer, verbose, linter</li>
+            <li><code>gemini_agent.py</code> — prompts por poder</li>
+          </ul>
+          <div class="tag-row">
+            <span class="tag">Woven.g4</span><span class="tag">Python</span><span class="tag">Pyodide</span>
+          </div>
+        </div>
+        <div class="stack-lane stack-lane--fe">
+          <h4>🖥️ Frontend</h4>
+          <ul>
+            <li>Módulos ES · bridge · intención</li>
+            <li>Editor, consola, panel, tutorial Hilo</li>
+            <li>Modos plan / ejercicio · API Gemini opcional</li>
+          </ul>
+          <div class="tag-row">
+            <span class="tag">index.html</span><span class="tag">assets/js</span><span class="tag">Gemini</span>
+          </div>
+        </div>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Todo el motor Woven vive en tu navegador con Pyodide — sin instalar Python.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/grin.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="slide-content">
+        <h2 class="reveal">Decisiones clave</h2>
+        <ul class="reveal stagger">
+          <li><strong>Alineación:</strong> paquete único en corrección/relleno (enunciado + líneas + salida).</li>
+          <li><strong>Calidad IA:</strong> saneado, linter, reintentos y recuperación.</li>
+          <li><strong>Logros:</strong> competencias de dominio, no solo «terminé el reto».</li>
+          <li><strong>Tests:</strong> pytest + Node test en CI local.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="pruebas">
+      <span class="section-watermark">e</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">e</p>
+        <p class="kicker"><span class="kicker-dot"></span> Pruebas y validación</p>
+        <h2>Escenarios y resultados</h2>
+      </div>
+    </section>
+
+    <section class="slide slide--tests" data-slide>
+      <div class="orb orb--moss" style="top: 12%; right: 8%" aria-hidden="true"></div>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-content">
+        <p class="kicker reveal"><span class="kicker-dot"></span> Pruebas · panorama</p>
+        <h2 class="reveal">Paquetes de prueba</h2>
+        <p class="slide-intro reveal">Dos suites: <strong>pytest</strong> (motor + agente) y <strong>Node test</strong> (Hilo y UI). El detalle completo vive en <code>tests/</code> y el README.</p>
+        <div class="pkg-overview reveal stagger">
+          <div class="pkg-lane pkg-lane--py">
+            <h3>🐍 pytest · motor y agente</h3>
+            <ul class="pkg-list">
+              <li><code>test_lexer.py</code><span class="pkg-count">tokens · indent</span></li>
+              <li><code>test_parser.py</code><span class="pkg-count">AST · OOP</span></li>
+              <li><code>test_interpreter.py</code><span class="pkg-count">semántica</span></li>
+              <li><code>test_translator.py</code><span class="pkg-count">Py/Java/C++</span></li>
+              <li><code>test_tracer.py</code><span class="pkg-count">eventos JSON</span></li>
+              <li><code>test_verbose.py</code><span class="pkg-count">bloques ↔ Woven</span></li>
+              <li><code>test_linter.py</code><span class="pkg-count">estático</span></li>
+              <li><code>test_gemini_agent.py</code><span class="pkg-count">payloads Hilo</span></li>
+              <li><code>test_pedagogical_*.py</code><span class="pkg-count">errores UX</span></li>
+            </ul>
+          </div>
+          <div class="pkg-lane pkg-lane--js">
+            <h3>⬡ Node · tutor y UI</h3>
+            <ul class="pkg-list">
+              <li><code>test_hilo_intent.mjs</code><span class="pkg-count">ruteo</span></li>
+              <li><code>test_hilo_plan.mjs</code><span class="pkg-count">itinerario</span></li>
+              <li><code>test_hilo_exercise_correction.mjs</code><span class="pkg-count">alineación</span></li>
+              <li><code>test_hilo_draft.mjs</code><span class="pkg-count">código IA</span></li>
+              <li><code>test_hilo_response.mjs</code><span class="pkg-count">turnos JSON</span></li>
+              <li><code>test_learning_achievements.mjs</code><span class="pkg-count">logros</span></li>
+              <li><code>test_step_trace.mjs</code><span class="pkg-count">paso a paso</span></li>
+              <li><code>test_structure_graph.mjs</code><span class="pkg-count">grafo</span></li>
+              <li><code>test_hilo_tutorial.mjs</code><span class="pkg-count">onboarding</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide slide--tests" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo">
+        <div class="slide-content">
+          <p class="kicker reveal"><span class="kicker-dot"></span> Pruebas · casos estrella</p>
+          <h2 class="reveal">Cuatro pruebas que blindan la experiencia</h2>
+          <p class="slide-intro reveal">Cada una evita un fallo visible en clase: sintaxis confusa, IA desalineada o tutoría incoherente.</p>
+          <div class="test-grid test-grid--stars reveal stagger">
+            <article class="test-card">
+              <div class="test-card__head">
+                <span class="test-card__file">test_pedagogical_errors.py</span>
+                <span class="test-card__name">error legible</span>
+              </div>
+              <pre class="test-card__code"><span class="err">while i &lt; 10:</span></pre>
+              <p class="test-card__assert">Cursor, ejemplo mínimo y contexto — no traceback ANTLR crudo.</p>
+            </article>
+            <article class="test-card">
+              <div class="test-card__head">
+                <span class="test-card__file">test_interpreter.py</span>
+                <span class="test-card__name">new obligatorio</span>
+              </div>
+              <pre class="test-card__code">Punto p = Punto(3)</pre>
+              <p class="test-card__assert">Exige <code>usa new</code> — regla didáctica del lenguaje.</p>
+            </article>
+            <article class="test-card">
+              <div class="test-card__head">
+                <span class="test-card__file">test_hilo_exercise_correction.mjs</span>
+                <span class="test-card__name">enunciado alineado</span>
+              </div>
+              <pre class="test-card__code">Líneas editables: 2, 3
+sin «línea 5» fantasma</pre>
+              <p class="test-card__assert">Panel, Hilo y editor comparten las mismas líneas.</p>
+            </article>
+            <article class="test-card">
+              <div class="test-card__head">
+                <span class="test-card__file">test_gemini_agent.py</span>
+                <span class="test-card__name">sin logro falso</span>
+              </div>
+              <pre class="test-card__code">dominio_tema: null</pre>
+              <p class="test-card__assert">No inventa competencia si Gemini omite el dominio.</p>
+            </article>
+          </div>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Si estas pruebas fallan, en clase me desordeno yo también.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/worried.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-content">
+        <p class="kicker reveal"><span class="kicker-dot"></span> Pruebas · resultados</p>
+        <h2 class="reveal">Resultados obtenidos</h2>
+        <div class="stat-row reveal stagger">
+          <div class="stat-badge stat-badge--big"><div class="stat-num">339</div><div class="stat-label">Tests totales</div></div>
+          <div class="stat-badge stat-badge--py"><div class="stat-num">274</div><div class="stat-label">pytest</div></div>
+          <div class="stat-badge stat-badge--js"><div class="stat-num">65</div><div class="stat-label">Node</div></div>
+        </div>
+        <ul class="reveal stagger">
+          <li>Cobertura por <strong>paquete</strong>: lexer→linter, pedagogía de errores, contratos Gemini, alineación de ejercicios y tutorial completo.</li>
+          <li>Motor Woven en navegador sin Python local del alumno.</li>
+          <li>Ejemplos críticos reproducibles: cada tarjeta corresponde a un test con nombre en el repo (<code>tests/</code>).</li>
+          <li>Futuro: pruebas E2E en navegador y estudio con usuarios reales.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="conclusiones">
+      <span class="section-watermark">f</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">f</p>
+        <p class="kicker"><span class="kicker-dot"></span> Conclusiones</p>
+        <h2>Cierre del trabajo</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="stitch-border" aria-hidden="true"></div>
+      <div class="slide-body-with-hilo">
+        <div class="slide-content">
+        <h2 class="reveal">Conclusiones</h2>
+        <ul class="reveal stagger">
+          <li>Entorno donde el estudiante <strong>lee y diagnostica</strong>, no solo escribe.</li>
+          <li>Metáfora del <strong>tejido</strong> en UX y en traza, bloques y corrección de nudos.</li>
+          <li><strong>Hilo</strong> tutoriza con límites si el sistema valida y alinea panel y ejecución.</li>
+          <li>Tests automatizados permiten iterar sin regresiones silenciosas.</li>
+        </ul>
+        </div>
+        <aside class="hilo-aside reveal" aria-label="Hilo">
+          <div class="hilo-pres-bubble">
+            <p class="hilo-pres-bubble-text">Pasamos de código rejido a tejido que se puede leer y defender.</p>
+          </div>
+          <div class="hilo-pres-avatar">
+            <img class="hilo-pres-sprite" src="../assets/sprite/frames/happy.png" alt="">
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <div class="slide-content">
+        <h2 class="reveal">Trabajo futuro</h2>
+        <ul class="reveal stagger">
+          <li>Plan y perfil persistentes entre sesiones.</li>
+          <li>Verboso editable estilo Scratch; reflexión al cerrar planes.</li>
+          <li>Tools <code>get_trace</code>, <code>get_variables</code> para Hilo.</li>
+          <li>Evaluación con usuarios reales vs. IDE o solo-chatbot.</li>
+        </ul>
+        <p class="quote-block reveal">«Deshilachar» un error es el primer paso para volver a tejer con intención.</p>
+      </div>
+    </section>
+
+    <section class="slide slide--section" data-slide data-section="referencias">
+      <span class="section-watermark">g</span>
+      <div class="stitch-border"></div>
+      <div class="slide-content reveal">
+        <p class="section-num">g</p>
+        <p class="kicker"><span class="kicker-dot"></span> Referencias</p>
+        <h2>Bibliografía y recursos</h2>
+      </div>
+    </section>
+
+    <section class="slide" data-slide>
+      <ol class="refs reveal stagger">
+        <li>Resnick, M., et al. (2009). <em>Scratch: Programming for All.</em> CACM.</li>
+        <li>VanLehn, K. (2011). Effectiveness of tutoring systems. <em>Educational Psychologist.</em></li>
+        <li>Holland, J., et al. (2019). Codewitz-Editor. <em>Koli Calling.</em></li>
+        <li>Guo, P. J. (2013). Online Python Tutor. <em>SIGCSE.</em></li>
+        <li>Parr, T. (2013). <em>The Definitive ANTLR 4 Reference.</em></li>
+        <li>Pyodide Project (2024). Python in the browser.</li>
+        <li>Google (2024). Gemini API — integración del tutor.</li>
+        <li>Repositorio Stitch Code — <code>README.md</code>.</li>
+      </ol>
+    </section>
+
+    <section class="slide slide--cover slide--cierre slide--with-hilo-corner" data-slide data-section="cierre">
+      <div class="slide-bg-threads" aria-hidden="true">
+        <div class="orb orb--accent"></div>
+        <div class="orb orb--gold"></div>
+        <svg viewBox="0 0 800 600" preserveAspectRatio="xMaxYMid slice">
+          <path class="thread-path-anim thread-path-anim--gold" d="M700 60 Q560 140 500 100 Q360 40 320 180 Q280 340 400 400 Q520 460 480 580"/>
+          <path class="thread-path-anim" d="M740 200 Q600 280 520 240" style="animation-delay: -5s; opacity: 0.22"/>
+        </svg>
+      </div>
+      <div class="stitch-border"></div>
+      <div class="slide-cover-center">
+        <div class="slide-content">
+          <p class="kicker reveal"><span class="kicker-dot"></span> Gracias</p>
+          <h1 class="reveal">Stitch <em>Code</em></h1>
+          <p class="subtitle reveal">Del código rejido al tejido comprendido.</p>
+          <div class="authors reveal stagger">
+            <div class="author-chip"><span class="author-avatar author-avatar--1">JV</span> Juan Vergara</div>
+            <div class="author-chip"><span class="author-avatar author-avatar--2">NF</span> Nael Fontaine</div>
+            <div class="author-chip"><span class="author-avatar author-avatar--3">DG</span> Daniel Gracia</div>
+          </div>
+          <p class="reflective-body reveal" style="margin-top: 1.5rem; font-size: 0.88rem;">
+            Demo en vivo · <a href="https://vethariel.github.io/StitchCode/" style="color: var(--gold-soft);">vethariel.github.io/StitchCode</a>
+          </p>
+        </div>
+      </div>
+      <aside class="hilo-aside hilo-aside--corner reveal" aria-label="Hilo">
+        <div class="hilo-pres-bubble">
+          <p class="hilo-pres-bubble-text">¿Probamos juntos? Entra al enlace y pregúntame lo que quieras.</p>
+        </div>
+        <div class="hilo-pres-avatar">
+          <img class="hilo-pres-sprite" src="../assets/sprite/frames/grin.png" alt="">
+        </div>
+      </aside>
+    </section>
+  </div>
+
+  <div class="progress-wrap"><div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+  <span class="slide-counter" id="counter" aria-hidden="true"></span>
+  <p class="nav-hint" aria-hidden="true">← → Espacio · 1–7 secciones · F pantalla completa</p>
+
+  <script>
+    (function () {
+      const slides = [...document.querySelectorAll("[data-slide]")];
+      const progress = document.getElementById("progress");
+      const counter = document.getElementById("counter");
+
+      const SECTIONS = [
+        { id: "indice", key: "0" },
+        { id: "narrativa", key: "1" },
+        { id: "intro", key: "2" },
+        { id: "propuesta", key: "3" },
+        { id: "implementacion", key: "4" },
+        { id: "pruebas", key: "5" },
+        { id: "conclusiones", key: "6" },
+        { id: "referencias", key: "7" },
+        { id: "cierre", key: "" },
+      ];
+
+      const sectionIndex = new Map();
+      SECTIONS.forEach((sec) => {
+        const i = slides.findIndex((s) => s.dataset.section === sec.id);
+        if (i >= 0) sectionIndex.set(sec.id, i);
+      });
+
+      document.querySelectorAll("[data-goto]").forEach((el) => {
+        el.addEventListener("click", () => goToSection(el.dataset.goto));
+      });
+
+      let index = 0;
+
+      function goToSection(id) {
+        const i = sectionIndex.get(id);
+        if (i != null) show(i);
+      }
+
+      function show(i) {
+        index = Math.max(0, Math.min(i, slides.length - 1));
+        slides.forEach((s, j) => s.classList.toggle("is-active", j === index));
+        const pct = slides.length > 1 ? (index / (slides.length - 1)) * 100 : 100;
+        progress.style.width = pct + "%";
+        progress.setAttribute("aria-valuenow", String(Math.round(pct)));
+        counter.textContent =
+          String(index + 1).padStart(2, "0") + " / " + String(slides.length).padStart(2, "0");
+      }
+
+      function next() { show(index + 1); }
+      function prev() { show(index - 1); }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+          e.preventDefault();
+          next();
+        } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+          e.preventDefault();
+          prev();
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          show(0);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          show(slides.length - 1);
+        } else if (e.key === "f" || e.key === "F") {
+          document.fullscreenElement
+            ? document.exitFullscreen?.()
+            : document.documentElement.requestFullscreen?.();
+        } else if (e.key >= "0" && e.key <= "7") {
+          const sec = SECTIONS.find((s) => s.key === e.key);
+          if (sec && sectionIndex.has(sec.id)) {
+            e.preventDefault();
+            goToSection(sec.id);
+          }
+        }
+      });
+
+      let touchX = null;
+      document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+      document.addEventListener("touchend", (e) => {
+        if (touchX == null) return;
+        const dx = e.changedTouches[0].clientX - touchX;
+        if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+        touchX = null;
+      }, { passive: true });
+
+      document.getElementById("deck").addEventListener("click", (e) => {
+        if (e.target.closest("a, button, code")) return;
+        const x = e.clientX / window.innerWidth;
+        if (x > 0.65) next();
+        else if (x < 0.35) prev();
+      });
+
+      /** Hilos animados en diapositivas que aún no los tienen */
+      const THREAD_SETS = {
+        right: {
+          viewBox: "0 0 800 600",
+          preserve: "xMaxYMid slice",
+          paths: [
+            { d: "M720 40 Q580 120 520 80 Q380 20 340 160 Q300 320 420 380 Q540 440 500 560" },
+            { d: "M760 120 Q640 200 560 180", delay: -4, opacity: 0.25 },
+            { d: "M680 300 Q520 340 480 420 Q440 500 580 520", delay: -8, opacity: 0.2, class: "thread-path-anim--moss" },
+          ],
+        },
+        left: {
+          viewBox: "0 0 800 600",
+          preserve: "xMinYMid slice",
+          paths: [
+            { d: "M80 50 Q240 130 180 90 Q40 30 120 170 Q200 310 80 380 Q20 450 140 530" },
+            { d: "M60 220 Q200 300 120 260", delay: -6, opacity: 0.28 },
+            { d: "M100 380 Q260 420 200 500", delay: -10, opacity: 0.18, class: "thread-path-anim--gold" },
+          ],
+        },
+        wave: {
+          viewBox: "0 0 400 400",
+          preserve: "none",
+          class: "threads--wave",
+          paths: [
+            { d: "M0 200 Q100 100 200 200 T400 200" },
+            { d: "M0 280 Q120 200 240 280 T480 280", delay: -6, opacity: 0.3 },
+            { d: "M40 120 Q180 60 320 100", delay: -12, opacity: 0.2, class: "thread-path-anim--gold thread-path-anim--slow" },
+          ],
+        },
+        duo: {
+          viewBox: "0 0 600 600",
+          preserve: "xMidYMid slice",
+          class: "threads--duo threads--faint",
+          paths: [
+            { d: "M500 30 Q540 140 420 200 Q300 120 360 40", class: "thread-path-anim--gold" },
+            { d: "M80 560 Q160 480 240 540 Q320 580 120 500", delay: -7, class: "thread-path-anim--moss" },
+            { d: "M520 480 Q480 380 400 420", delay: -14, opacity: 0.15 },
+          ],
+        },
+        arc: {
+          viewBox: "0 0 500 500",
+          preserve: "xMaxYMin slice",
+          class: "threads--arc",
+          paths: [
+            { d: "M420 40 Q300 80 280 200 Q260 320 380 380 Q460 420 400 280", class: "thread-path-anim--gold thread-path-anim--slow" },
+            { d: "M450 120 Q380 180 360 260", delay: -8, opacity: 0.22 },
+          ],
+        },
+        corner: {
+          viewBox: "0 0 600 600",
+          preserve: "xMidYMid slice",
+          class: "threads--faint",
+          paths: [
+            { d: "M520 40 Q480 160 380 220", class: "thread-path-anim--gold" },
+            { d: "M60 520 Q140 440 220 500", delay: -9, class: "thread-path-anim--moss" },
+          ],
+        },
+      };
+
+      function appendThreadPaths(container, setName) {
+        const set = THREAD_SETS[setName];
+        if (!set) return;
+        let svg = container.querySelector("svg");
+        if (!svg) {
+          svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", set.viewBox);
+          if (set.preserve) svg.setAttribute("preserveAspectRatio", set.preserve);
+          container.appendChild(svg);
+        }
+        set.paths.forEach((p) => {
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", p.d);
+          path.setAttribute("class", p.class || "thread-path-anim");
+          if (p.delay != null) path.style.animationDelay = `${p.delay}s`;
+          if (p.opacity != null) path.style.opacity = String(p.opacity);
+          svg.appendChild(path);
+        });
+      }
+
+      function pickThreadSet(slide, idx) {
+        if (slide.dataset.thread) return slide.dataset.thread;
+        if (slide.dataset.section === "narrativa") return "left";
+        if (slide.dataset.section === "indice") return "duo";
+        if (slide.dataset.section === "pruebas" && slide.classList.contains("slide--section")) return "arc";
+        if (slide.dataset.section === "cierre") return "right";
+        if (slide.classList.contains("slide--section")) return "corner";
+        if (slide.classList.contains("slide--reflective")) {
+          return idx % 2 === 0 ? "wave" : "left";
+        }
+        if (slide.classList.contains("slide--cover")) return "right";
+        if (slide.classList.contains("slide--tests")) return idx % 2 ? "arc" : "duo";
+        const content = ["right", "left", "duo", "arc", "wave", "corner"];
+        return content[idx % content.length];
+      }
+
+      slides.forEach((slide, idx) => {
+        const setName = pickThreadSet(slide, idx);
+        const set = THREAD_SETS[setName];
+        let wrap = slide.querySelector(".slide-bg-threads");
+        const hasPaths = wrap && wrap.querySelector(".thread-path-anim");
+
+        if (!wrap) {
+          wrap = document.createElement("div");
+          wrap.className = `slide-bg-threads ${set.class || ""}`.trim();
+          wrap.setAttribute("aria-hidden", "true");
+          slide.insertBefore(wrap, slide.firstChild);
+        }
+        if (!wrap.querySelector(".thread-path-anim")) {
+          if (set.class) set.class.split(/\s+/).forEach((c) => wrap.classList.add(c));
+          appendThreadPaths(wrap, setName);
+        }
+      });
+
+      show(0);
+    })();
+  </script>
+</body>
+</html>

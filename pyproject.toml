@@ -3,7 +3,9 @@ name = "stitch-code"
 version = "0.1.0"
 description = "Entorno educativo Stitch Code con el lenguaje Woven"
 readme = "README.md"
+license = { text = "Proprietary — Copyright (c) 2026 Vethariel. All rights reserved." }
 requires-python = ">=3.11"
+authors = [{ name = "Vethariel" }]
 dependencies = [
     "antlr4-python3-runtime==4.13.2",
 ]
