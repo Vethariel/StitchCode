@@ -32,9 +32,57 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
   let moveDrag = null;
   /** @type {{ bloque: Bloque, parentList: Bloque[], index: number, startX: number, startY: number } | null} */
   let movePending = null;
+  /** @type {Set<number> | null} Líneas Woven editables (1-based) en ejercicio guiado. */
+  let exerciseEditableLines = null;
 
   function notify() {
     onChange?.();
+  }
+
+  function isExerciseLockActive() {
+    return exerciseEditableLines != null && exerciseEditableLines.size > 0;
+  }
+
+  /**
+   * @param {Bloque} bloque
+   */
+  function getWovenLine(bloque) {
+    const wl = bloque.linea_fuente ?? bloque.linea;
+    return typeof wl === "number" && wl > 0 ? wl : 0;
+  }
+
+  /**
+   * @param {Bloque} bloque
+   */
+  function isBlockEditable(bloque) {
+    if (!isExerciseLockActive()) return true;
+    const wl = getWovenLine(bloque);
+    return wl > 0 && exerciseEditableLines.has(wl);
+  }
+
+  /**
+   * @param {number | null | undefined} wovenLine
+   */
+  function wovenLineRowClass(wovenLine) {
+    if (!isExerciseLockActive() || !wovenLine) return "";
+    return exerciseEditableLines.has(wovenLine)
+      ? " blocks-woven-editable"
+      : " blocks-woven-locked";
+  }
+
+  /** @param {number[] | null} lines */
+  function setExerciseEditableLines(lines) {
+    exerciseEditableLines = lines?.length ? new Set(lines) : null;
+    documentEl.classList.toggle("blocks-exercise-active", isExerciseLockActive());
+    paletteEl.classList.toggle("blocks-palette-locked", isExerciseLockActive());
+    render();
+  }
+
+  function clearExerciseEditableLines() {
+    exerciseEditableLines = null;
+    documentEl.classList.remove("blocks-exercise-active");
+    paletteEl.classList.remove("blocks-palette-locked");
+    render();
   }
 
   function setDragActive(active) {
@@ -83,6 +131,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    * @param {DropTarget} target
    */
   function isGapDisabledForMove(target) {
+    if (isExerciseLockActive()) return true;
     if (!moveDrag) return false;
     if (isInvalidMoveTarget(moveDrag.bloque, target)) return true;
     if (moveDrag.sourceList === target.list && target.at === moveDrag.sourceIndex) {
@@ -104,6 +153,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    * @param {DataTransfer} dataTransfer
    */
   function applyPaletteDropAtTarget(target, dataTransfer) {
+    if (isExerciseLockActive()) return false;
     const tipo = dataTransfer.getData("application/x-woven-block");
     if (!tipo) return false;
     target.list.splice(target.at, 0, createBlock(tipo));
@@ -166,6 +216,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    * @param {MouseEvent} [ev]
    */
   function beginMoveDrag(bloque, parentList, index, ev) {
+    if (!isBlockEditable(bloque)) return;
     const [removed] = parentList.splice(index, 1);
     moveDrag = {
       bloque: removed,
@@ -223,6 +274,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    */
   function onBlockPointerDown(bloque, parentList, index, card, e) {
     if (e.button !== 0) return;
+    if (!isBlockEditable(bloque)) return;
     if (e.target.closest("button, input, select, textarea, option, label")) return;
 
     movePending = {
@@ -487,10 +539,14 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
       for (const schema of byCat[cat]) {
         const chip = document.createElement("div");
         chip.className = `blocks-palette-chip block-${schema.color}`;
-        chip.draggable = true;
+        chip.draggable = !isExerciseLockActive();
         chip.dataset.blockTipo = schema.tipo;
         chip.textContent = schema.label;
         chip.addEventListener("dragstart", (e) => {
+          if (isExerciseLockActive()) {
+            e.preventDefault();
+            return;
+          }
           moveDrag = null;
           documentEl.classList.remove("blocks-move-dragging");
           e.dataTransfer?.setData("application/x-woven-block", schema.tipo);
@@ -651,6 +707,9 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     gap.appendChild(label);
 
     gap._wovenDropTarget = target;
+    if (isExerciseLockActive()) {
+      gap.classList.add("block-drop-gap--disabled");
+    }
 
     gap.addEventListener("dragover", (e) => {
       if (!dragActive || isGapDisabledForMove(target)) return;
@@ -729,22 +788,23 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     const displayLine = lineCounter.n++;
     bloque.linea = displayLine;
     const wovenLine = bloque.linea_fuente;
+    const rowLockCls = wovenLineRowClass(wovenLine);
 
     const num = document.createElement("div");
-    num.className = "blocks-line-num";
+    num.className = `blocks-line-num${rowLockCls}`;
     num.textContent = String(displayLine);
     num.setAttribute("aria-label", `Línea ${displayLine}`);
     num.dataset.hiloLine = String(displayLine);
     if (wovenLine != null) num.dataset.wovenLine = String(wovenLine);
 
     const kind = document.createElement("div");
-    kind.className = "blocks-line-type";
+    kind.className = `blocks-line-type${rowLockCls}`;
     kind.textContent = schema?.label || bloque.tipo;
     kind.dataset.hiloLine = String(displayLine);
     if (wovenLine != null) kind.dataset.wovenLine = String(wovenLine);
 
     const main = document.createElement("div");
-    main.className = "blocks-line-main";
+    main.className = `blocks-line-main${rowLockCls}`;
     main.dataset.hiloLine = String(displayLine);
     if (wovenLine != null) main.dataset.wovenLine = String(wovenLine);
     main.style.setProperty("--block-depth", String(rowCtx.indent));
@@ -811,19 +871,26 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    */
   function renderBlockCard(bloque, parentList, index) {
     const schema = BLOCK_SCHEMAS[bloque.tipo];
+    const editable = isBlockEditable(bloque);
     const card = document.createElement("article");
-    card.className = `woven-block block-${schema?.color || "let"}`;
+    card.className = `woven-block block-${schema?.color || "let"}${
+      editable ? "" : " block-exercise-locked"
+    }`;
     card.dataset.blockId = bloque.id;
 
     const notch = document.createElement("div");
     notch.className = "block-notch";
     card.appendChild(notch);
 
-    card.classList.add("block-draggable");
-    card.title = "Arrastrar para mover (incluye bloques anidados)";
-    card.addEventListener("mousedown", (e) => {
-      onBlockPointerDown(bloque, parentList, index, card, e);
-    });
+    if (editable) {
+      card.classList.add("block-draggable");
+      card.title = "Arrastrar para mover (incluye bloques anidados)";
+      card.addEventListener("mousedown", (e) => {
+        onBlockPointerDown(bloque, parentList, index, card, e);
+      });
+    } else {
+      card.title = "Línea bloqueada en este ejercicio";
+    }
 
     const body = document.createElement("div");
     body.className = "block-body";
@@ -846,9 +913,9 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
         const resolvedKey = fieldKeyForVerbosePlaceholder(part.key);
         const field = fieldByKey[resolvedKey];
         if (field && viewMode === "verbose" && isLegibleTypePlaceholder(part.key)) {
-          inline.appendChild(renderLegibleTypeField(bloque, field));
+          inline.appendChild(renderLegibleTypeField(bloque, field, editable));
         } else if (field) {
-          inline.appendChild(renderInlineField(bloque, field));
+          inline.appendChild(renderInlineField(bloque, field, editable));
         } else {
           const span = document.createElement("span");
           span.className = "block-inline-readonly";
@@ -859,18 +926,20 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     }
     body.appendChild(inline);
 
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "block-act-btn";
-    delBtn.title = "Eliminar bloque";
-    delBtn.textContent = "✕";
-    delBtn.addEventListener("mousedown", (e) => e.stopPropagation());
-    delBtn.addEventListener("click", () => {
-      parentList.splice(index, 1);
-      render();
-      notify();
-    });
-    body.appendChild(delBtn);
+    if (editable) {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "block-act-btn";
+      delBtn.title = "Eliminar bloque";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+      delBtn.addEventListener("click", () => {
+        parentList.splice(index, 1);
+        render();
+        notify();
+      });
+      body.appendChild(delBtn);
+    }
 
     card.appendChild(body);
     return card;
@@ -881,15 +950,16 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    * @param {Bloque} bloque
    * @param {{ key: string, label: string, kind: string, options?: string[] }} field
    */
-  function renderLegibleTypeField(bloque, field) {
+  function renderLegibleTypeField(bloque, field, editable = true) {
     const wrap = document.createElement("span");
     wrap.className = "block-inline-field";
-    wrap.title = field.label;
+    wrap.title = editable ? field.label : "Campo bloqueado en este ejercicio";
     const p = bloque.placeholders;
     const options = field.options || WOVEN_TYPES;
 
     const input = document.createElement("select");
     input.className = "block-inline-input block-inline-select block-inline-select-legible";
+    input.disabled = !editable;
     for (const t of options) {
       const opt = document.createElement("option");
       opt.value = t;
@@ -911,16 +981,17 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    * @param {Bloque} bloque
    * @param {{ key: string, label: string, kind: string, options?: string[] }} field
    */
-  function renderInlineField(bloque, field) {
+  function renderInlineField(bloque, field, editable = true) {
     const wrap = document.createElement("span");
     wrap.className = "block-inline-field";
-    wrap.title = field.label;
+    wrap.title = editable ? field.label : "Campo bloqueado en este ejercicio";
     wrap.addEventListener("mousedown", (e) => e.stopPropagation());
     const p = bloque.placeholders;
 
     if (field.kind === "type") {
       const input = document.createElement("select");
       input.className = "block-inline-input block-inline-select";
+      input.disabled = !editable;
       for (const t of field.options || ["int", "float", "string", "bool", "void"]) {
         const opt = document.createElement("option");
         opt.value = t;
@@ -938,6 +1009,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
       const input = document.createElement("input");
       input.type = "checkbox";
       input.className = "block-inline-check";
+      input.disabled = !editable;
       input.checked = p[field.key] === "true";
       input.title = field.label;
       input.addEventListener("change", () => {
@@ -949,6 +1021,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
       const input = document.createElement("input");
       input.type = "text";
       input.className = "block-inline-input";
+      input.readOnly = !editable;
       input.value = p[field.key] ?? "";
       input.placeholder = field.label;
       input.size = Math.max(3, Math.min(24, (input.value.length || 3) + 1));
@@ -979,6 +1052,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
   });
 
   documentEl.addEventListener("drop", (e) => {
+    if (isExerciseLockActive()) return;
     if (moveDrag || e.target.closest(".block-drop-gap")) return;
     if (!e.target.closest("[data-drop-zone='root']")) return;
     e.preventDefault();
@@ -1006,5 +1080,7 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     highlightByWovenLine,
     clearStepHighlight,
     findDisplayLineForWovenLine,
+    setExerciseEditableLines,
+    clearExerciseEditableLines,
   };
 }

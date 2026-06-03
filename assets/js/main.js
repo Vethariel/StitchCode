@@ -23,6 +23,7 @@ import { createHiloAgentController } from "./hilo-agent-controller.js";
 import {
   deactivateExerciseMode,
   getActiveExercise,
+  isExerciseModeActive,
   isGuidedExerciseActive,
 } from "./hilo-exercise-mode.js";
 import { buildHiloContext } from "./hilo-context.js";
@@ -255,12 +256,13 @@ async function applyCodeToEditor(code) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       consoleCtl.clear();
-      consoleCtl.appendLine(
-        `No pude convertir el código a bloques: ${msg}. Cambié a modo texto.`,
-        "error",
-        "!"
-      );
-      await editorMode.setMode("text");
+      const fallback = isExerciseModeActive()
+        ? `No pude actualizar los bloques: ${msg}.`
+        : `No pude convertir el código a bloques: ${msg}. Cambié a modo texto.`;
+      consoleCtl.appendLine(fallback, "error", "!");
+      if (!isExerciseModeActive()) {
+        await editorMode.setMode("text");
+      }
     }
   }
   await linter.runLint();
@@ -372,6 +374,7 @@ hiloAgent = createHiloAgentController({
   onFocusTranslationTab,
   onTutorialAction: async (action) => {
     if (!editorMode) return;
+    if (isExerciseModeActive()) return;
     if (action === "mode:text") await editorMode.setMode("text");
     else if (action === "mode:blocks") await editorMode.setMode("blocks");
     else if (action === "mode:verbose") await editorMode.setMode("verbose");
@@ -418,10 +421,12 @@ hiloAgent = createHiloAgentController({
     onEnunciado: (data) => sidePanel.setEnunciado(data),
     onExerciseModeChange: (active) => {
       setExerciseModeUi(active);
+      editorMode?.setModeSwitchLocked(active);
       if (active) {
         stepMode?.exit();
       } else {
         editor.clearExerciseEditableLines();
+        blocksCtl.clearExerciseEditableLines();
       }
     },
     onTopicMastery: (topic) => {
@@ -456,14 +461,24 @@ hiloAgent = createHiloAgentController({
       };
     },
     applyTemplate: async (code, opts = {}) => {
-      if (opts.editableLines?.length) {
-        await editorMode.setMode("text");
-      }
       await applyCodeToEditor(code);
-      if (opts.editableLines?.length) {
-        editor.setExerciseEditableLines(opts.editableLines);
-      } else {
-        editor.clearExerciseEditableLines();
+      const locks = opts.editableLines?.length ? opts.editableLines : null;
+      editor.setExerciseEditableLines(locks);
+      blocksCtl.setExerciseEditableLines(locks);
+      if (locks?.length && editorMode?.isBlockMode()) {
+        try {
+          const lint = await lintWoven(code);
+          if (lint.parse_ok) {
+            const doc = await parseBlocks(code);
+            const vista = editorMode.getMode();
+            blocksCtl.setDocument(
+              doc.bloques,
+              vista === "verbose" ? "verbose" : "code"
+            );
+          }
+        } catch {
+          /* sin bloques si el parse falla */
+        }
       }
       consoleShowsLintErrors = false;
       const hint = opts.editableLines?.length
@@ -603,6 +618,8 @@ exitExerciseBtn?.addEventListener("click", () => {
   } else {
     deactivateExerciseMode();
     editor.clearExerciseEditableLines();
+    blocksCtl.clearExerciseEditableLines();
+    editorMode?.setModeSwitchLocked(false);
   }
   setExerciseModeUi(false);
 });

@@ -11,6 +11,8 @@
  *   tipo_ejercicio?: ExerciseTipo,
  *   lineas_editables?: number[],
  *   codigo_referencia?: string,
+ *   lineas_detalle?: { linea: number, modo: string, esperado: string, mostrado: string, tarea: string }[],
+ *   salida_esperada?: string[],
  * }} ExerciseEnunciado
  */
 
@@ -62,6 +64,12 @@ export function activateExerciseMode(data) {
       ? [...data.lineas_editables]
       : undefined,
     codigo_referencia: data.codigo_referencia,
+    lineas_detalle: data.lineas_detalle
+      ? data.lineas_detalle.map((d) => ({ ...d }))
+      : undefined,
+    salida_esperada: data.salida_esperada
+      ? [...data.salida_esperada]
+      : undefined,
   };
 }
 

@@ -14,10 +14,15 @@ import {
 import { runHiloLearning } from "./hilo-learning.js";
 import { runHiloExercise } from "./hilo-exercise.js";
 import {
+  buildGuidedCompletionTurn,
+  checkGuidedExerciseCompletion,
+} from "./hilo-exercise-correction.js";
+import {
   deactivateExerciseMode,
   getActiveExercise,
   getExerciseEnunciadoJson,
   isExerciseModeActive,
+  isGuidedExerciseActive,
 } from "./hilo-exercise-mode.js";
 import { slugTopicId } from "./learning-achievements.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
@@ -670,6 +675,44 @@ export function createHiloAgentController({
     }
     if (runFeedbackPending) return;
     runFeedbackPending = true;
+
+    const ctx = getContext();
+    if (
+      isGuidedExerciseActive() &&
+      !ctx.lastRunHadError &&
+      getActiveExercise()?.codigo_referencia &&
+      getActiveExercise()?.lineas_editables?.length
+    ) {
+      const ex = getActiveExercise();
+      if (
+        checkGuidedExerciseCompletion(
+          ctx.codigo,
+          ex.codigo_referencia,
+          ex.lineas_editables
+        )
+      ) {
+        const turn = buildGuidedCompletionTurn({
+          titulo: ex.titulo,
+          tema_id: ex.tema_id,
+          tema_nombre: ex.tema_nombre,
+          tipo_ejercicio: ex.tipo_ejercicio,
+          enunciado: ex.enunciado,
+          criterios: ex.criterios,
+          resumen: ex.resumen,
+        });
+        historial.push({
+          role: "user",
+          content: "[Ejecución Run] Programa ejecutado; líneas editables verificadas.",
+        });
+        historial.push({ role: "model", content: turn.texto_completo });
+        queueTurn(turn);
+        tryCompleteExercise(turn, ctx, { afterRun: true });
+        runFeedbackPending = false;
+        setBusy(false);
+        return;
+      }
+    }
+
     setBusy(true);
     setEmotionState("thinking");
     bubbleHint.hidden = true;

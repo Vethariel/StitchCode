@@ -29,13 +29,25 @@ export function createEditorModeController({
   /** @type {EditorMode} */
   let mode = "text";
   let syncTimer = null;
+  let modeSwitchLocked = false;
 
   function setActiveButton() {
     modeButtons.querySelectorAll(".mode-btn").forEach((btn) => {
       const active = btn.dataset.mode === mode;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
+      btn.disabled = modeSwitchLocked;
+      btn.title = modeSwitchLocked
+        ? "Sal del ejercicio para cambiar entre texto y bloques"
+        : "";
     });
+    modeButtons.classList.toggle("mode-selector-locked", modeSwitchLocked);
+  }
+
+  /** @param {boolean} locked */
+  function setModeSwitchLocked(locked) {
+    modeSwitchLocked = locked;
+    setActiveButton();
   }
 
   function applyView() {
@@ -66,10 +78,18 @@ export function createEditorModeController({
 
   /**
    * @param {EditorMode} next
+   * @param {{ force?: boolean }} [opts]
    * @returns {Promise<boolean>}
    */
-  async function setMode(next) {
+  async function setMode(next, opts = {}) {
     if (next === mode) return true;
+
+    if (!opts.force && modeSwitchLocked) {
+      onModeError?.(
+        "En modo ejercicio no puedes cambiar entre texto y bloques. Pulsa Salir en la barra azul."
+      );
+      return false;
+    }
 
     if (next === "blocks" || next === "verbose") {
       if (mode === "text") {
@@ -122,6 +142,8 @@ export function createEditorModeController({
   return {
     getMode: () => mode,
     setMode,
+    setModeSwitchLocked,
+    isModeSwitchLocked: () => modeSwitchLocked,
     scheduleSyncFromBlocks,
     syncBlocksToText,
     isBlockMode: () => mode === "blocks" || mode === "verbose",

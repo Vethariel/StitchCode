@@ -362,13 +362,17 @@ Campos OBLIGATORIOS además de los del ejercicio libre:
 - "tipo_ejercicio": "correccion" (líneas con error cercano al original) o "relleno" (líneas vacías para completar).
 - "codigo_solucion": programa Woven COMPLETO y CORRECTO (la referencia que tú validarías).
 - "lineas_edicion": lista de 1 a 4 objetos, cada uno:
-  {"linea": <número 1-based>, "modo": "vacio" | "incorrecto", "contenido_erroneo": "..."}
-  - modo "vacio": esa línea quedará en blanco para que el estudiante la complete (usa en relleno).
-  - modo "incorrecto": contenido_erroneo es una versión con error cercana a la línea correcta (usa en corrección).
+  {"linea": <número 1-based>, "modo": "vacio" | "incorrecto", "contenido_erroneo": "...", "tarea": "..."}
+  - modo "vacio": esa línea quedará en blanco (relleno).
+  - modo "incorrecto": contenido_erroneo con error cercano a la línea correcta (corrección).
+  - "tarea": una frase corta de qué debe hacer el estudiante en ESA línea (sin dar la solución).
   - Elige líneas clave (asignaciones, condiciones, print, return), no comentarios ni class/init vacíos.
 - "codigo_plantilla": puede repetir codigo_solucion (el cliente generará la versión para el alumno).
 
-El enunciado debe decir explícitamente qué líneas puede editar (por número o descripción) y que el resto está bloqueado.
+- "enunciado": solo objetivo general (1–3 frases). NO cites números de línea ni listes tareas por línea;
+  la app construye el panel y las instrucciones por línea desde lineas_edicion y la validación.
+- "resumen": misma idea que el objetivo, sin números de línea contradictorios.
+lineas_edicion: solo índices 1..N que existan en codigo_solucion (cuenta líneas del programa).
 """
 
 EXERCISE_ACTIVE_PROMPT = """
@@ -396,9 +400,11 @@ Reglas generales:
 - No propongas otro ejercicio ni reescribas el enunciado.
 
 Si el enunciado indica tipo_ejercicio "correccion" o "relleno":
-- Solo el estudiante puede editar las líneas listadas en lineas_editables; el resto está bloqueado.
-- Compara su código con codigo_referencia (solución interna): las líneas editables deben quedar correctas.
-- No reveles codigo_referencia ni la solución completa; guía con preguntas sobre las líneas editables.
+- Fuente de verdad por línea: lineas_detalle (campo "tarea", "mostrado" en editor). Coincide con el panel.
+- Solo puede editar lineas_editables; el resto está bloqueado.
+- Compara con codigo_referencia (interno): las líneas editables deben coincidir con la solución.
+- Usa salida_esperada si está en el JSON para validar la consola; no contradigas lineas_detalle.
+- No reveles codigo_referencia ni la solución completa; guía con preguntas sobre cada "tarea" de línea.
 
 Evaluación al revisar una ejecución (Run):
 - Compara código y salida de consola con TODOS los criterios del enunciado.
@@ -487,7 +493,28 @@ def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
         if isinstance(lineas, list) and lineas:
             nums = [str(int(x)) for x in lineas if str(x).strip().isdigit()]
             if nums:
-                bloques.append("Líneas que el estudiante puede editar: " + ", ".join(nums))
+                bloques.append("Líneas editables (1-based): " + ", ".join(nums))
+        detalle = data.get("lineas_detalle") or []
+        if isinstance(detalle, list) and detalle:
+            bloques.append("Tareas por línea (fuente de verdad — no contradigas el panel):")
+            for item in detalle:
+                if not isinstance(item, dict):
+                    continue
+                ln = item.get("linea")
+                tarea = str(item.get("tarea") or "").strip()
+                mostrado = str(item.get("mostrado") or "").strip()
+                if ln is None or not tarea:
+                    continue
+                linea_txt = f"  Línea {ln}: {tarea}"
+                if mostrado and tipo == "correccion":
+                    linea_txt += f" (en editor: {mostrado})"
+                bloques.append(linea_txt)
+        salida = data.get("salida_esperada") or []
+        if isinstance(salida, list) and salida:
+            bloques.append(
+                "Salida esperada en consola: "
+                + ", ".join(f'"{str(s)}"' for s in salida if str(s).strip())
+            )
         ref = str(data.get("codigo_referencia") or "").strip()
         if ref:
             bloques.append(
@@ -811,9 +838,12 @@ def _normalizar_lineas_edicion(raw) -> list:
         if modo not in ("vacio", "incorrecto"):
             modo = "vacio"
         err = str(item.get("contenido_erroneo") or item.get("contenido") or "").strip()
+        tarea = str(item.get("tarea") or item.get("instruccion") or "").strip()
         entry = {"linea": linea, "modo": modo}
         if modo == "incorrecto" and err:
             entry["contenido_erroneo"] = err
+        if tarea:
+            entry["tarea"] = tarea[:200]
         out.append(entry)
     return out
 

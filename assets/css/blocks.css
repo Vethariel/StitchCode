@@ -49,6 +49,10 @@
   cursor: not-allowed;
 }
 
+.mode-selector.mode-selector-locked {
+  opacity: 0.85;
+}
+
 .editor-body.blocks-active .text-view {
   display: none;
 }
@@ -653,5 +657,44 @@ body.blocks-pointer-dragging button {
 .blocks-drag-active .block-drop-gap:hover .block-drop-gap-label,
 .blocks-drag-active .block-drop-gap.drag-over .block-drop-gap-label {
   color: var(--editor-title);
+}
+
+/* Ejercicio guiado (corrección / relleno) */
+.blocks-exercise-active .blocks-woven-editable .blocks-line-num {
+  color: var(--pastel-blue, #78a8dc);
+  font-weight: 700;
+}
+
+.blocks-exercise-active .blocks-woven-locked .blocks-line-num,
+.blocks-exercise-active .blocks-woven-locked .blocks-line-type {
+  opacity: 0.55;
+}
+
+.blocks-exercise-active .woven-block.block-exercise-locked {
+  opacity: 0.72;
+  filter: grayscale(0.15);
+  cursor: not-allowed;
+}
+
+.blocks-exercise-active .blocks-woven-editable .woven-block:not(.block-exercise-locked) {
+  box-shadow: inset 0 0 0 1px rgba(120, 168, 220, 0.45);
+}
+
+.blocks-palette-locked .blocks-palette-chip {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.blocks-exercise-active .block-drop-gap {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.blocks-exercise-active .block-inline-input:read-only,
+.blocks-exercise-active .block-inline-input:disabled,
+.blocks-exercise-active .block-inline-check:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
 }
 

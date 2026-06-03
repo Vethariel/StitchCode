@@ -5,14 +5,14 @@ import {
 } from "./bridge/pyodide-bridge.js";
 import { activateExerciseMode } from "./hilo-exercise-mode.js";
 import {
+  finalizeGuidedExercise,
   inferExerciseTipo,
-  prepareGuidedExercise,
 } from "./hilo-exercise-correction.js";
 import { slugTopicId } from "./learning-achievements.js";
 import { localHiloTurn } from "./hilo-response.js";
 
 /** @typedef {'libre' | 'correccion' | 'relleno'} ExerciseTipo */
-/** @typedef {{ linea: number, modo: 'vacio' | 'incorrecto', contenido_erroneo?: string }} LineaEdicion */
+/** @typedef {{ linea: number, modo: 'vacio' | 'incorrecto', contenido_erroneo?: string, tarea?: string }} LineaEdicion */
 
 /**
  * @typedef {{
@@ -65,6 +65,7 @@ export function parseExercisePayload(raw) {
           if (item.contenido_erroneo) {
             slot.contenido_erroneo = String(item.contenido_erroneo);
           }
+          if (item.tarea) slot.tarea = String(item.tarea);
           return slot;
         })
         .filter(Boolean)
@@ -147,33 +148,36 @@ export async function runHiloExercise({
   let editableLines = null;
   /** @type {string | undefined} */
   let codigoReferencia;
+  /** @type {import("./hilo-exercise-correction.js").GuidedExercisePackage | null} */
+  let guidedPkg = null;
 
   const guided =
     exercise.tipo_ejercicio === "correccion" ||
     exercise.tipo_ejercicio === "relleno";
 
   if (guided && lintWoven && runWoven) {
-    const prepared = await prepareGuidedExercise(exercise, {
+    guidedPkg = await finalizeGuidedExercise(exercise, {
       lintWoven,
       runWoven,
       retryEstablish: async (detail) => establish(detail),
     });
-    templateCode = prepared.codigo_plantilla;
-    editableLines = prepared.locks;
-    codigoReferencia = prepared.codigo_referencia ?? undefined;
+    templateCode = guidedPkg.codigo_estudiante;
+    editableLines = guidedPkg.lineas_editables;
+    codigoReferencia = guidedPkg.codigo_referencia;
     exercise = {
       ...exercise,
-      lineas_editables: prepared.lineas_editables,
+      criterios: guidedPkg.criterios.length
+        ? guidedPkg.criterios
+        : exercise.criterios,
+      lineas_editables: guidedPkg.lineas_editables,
     };
   }
 
-  const paragraphs = [...exercise.enunciado];
-  if (guided && editableLines?.length) {
-    paragraphs.push(
-      `Solo puedes editar las líneas: ${editableLines.join(", ")}. El resto del código está bloqueado.`
-    );
-  }
-  if (exercise.criterios.length) {
+  /** @type {string[]} */
+  const paragraphs = guidedPkg
+    ? [...guidedPkg.enunciado]
+    : [...exercise.enunciado];
+  if (!guidedPkg && exercise.criterios.length) {
     paragraphs.push(
       "Criterios: " + exercise.criterios.map((c) => `• ${c}`).join(" ")
     );
@@ -194,24 +198,31 @@ export async function runHiloExercise({
 
   activateExerciseMode({
     titulo: exercise.titulo,
-    enunciado: exercise.enunciado,
+    enunciado: paragraphs,
     criterios: exercise.criterios,
-    resumen: exercise.resumen,
+    resumen: guidedPkg?.resumen || exercise.resumen,
     tema_id: exercise.tema_id,
     tema_nombre: exercise.tema_nombre,
     tipo_ejercicio: exercise.tipo_ejercicio,
     lineas_editables: editableLines ?? undefined,
     codigo_referencia: codigoReferencia,
+    lineas_detalle: guidedPkg?.lineas_detalle,
+    salida_esperada: guidedPkg?.salida_esperada,
   });
   onExerciseModeChange?.(true);
 
   await applyTemplate(templateCode, { editableLines });
 
-  const intro = exercise.resumen
-    ? exercise.resumen
-    : guided
-      ? `Listo: «${exercise.titulo}». Corrige o completa solo las líneas indicadas.`
-      : `Listo: «${exercise.titulo}». El enunciado está en el panel lateral. Cuando ejecutes (Run) te iré guiando.`;
+  const intro =
+    guidedPkg?.enunciado[0] ||
+    exercise.resumen ||
+    (guided
+      ? `Listo: «${exercise.titulo}». Revisa el panel: ahí están las líneas que debes editar.`
+      : `Listo: «${exercise.titulo}». El enunciado está en el panel lateral. Cuando ejecutes (Run) te iré guiando.`);
+
+  const lineasHint = guidedPkg?.lineas_editables?.length
+    ? `Líneas editables: ${guidedPkg.lineas_editables.join(", ")}.`
+    : "";
 
   return {
     exercise,
@@ -219,7 +230,7 @@ export async function runHiloExercise({
       { text: intro, emotion: "happy" },
       {
         text: guided
-          ? "Edita únicamente las líneas permitidas y pulsa Run para comprobar."
+          ? `${lineasHint} Edita solo esas líneas y pulsa Run. El panel y yo usamos la misma ficha.`
           : "Pregúntame sobre el ejercicio o pulsa Run para que revise tu avance.",
         emotion: "smile",
       },
