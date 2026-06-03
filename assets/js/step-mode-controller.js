@@ -25,6 +25,11 @@ function escapeHtml(text) {
  *     findDisplayLineForWovenLine: (line: number) => string | null,
  *   },
  *   editor?: { setStepLineHighlight: (line: number | null) => void },
+ *   console?: {
+ *     snapshot: () => { html: string, outputLineCount: number },
+ *     restore: (snap: { html: string, outputLineCount: number } | null | undefined) => void,
+ *     setStepOutput: (lines: { texto: string, es_error?: boolean }[]) => void,
+ *   },
  *   sidePanel?: {
  *     setOpen: (open: boolean) => void,
  *     setActiveTab: (tab: string) => void,
@@ -57,6 +62,7 @@ export function createStepModeController({
   refreshBlocksFromCode,
   blocks,
   editor,
+  console: consoleCtl,
   sidePanel,
   elements,
   onModeChange,
@@ -66,6 +72,8 @@ export function createStepModeController({
   let stepIndex = 0;
   let active = false;
   let busy = false;
+  /** @type {{ html: string, outputLineCount: number } | null} */
+  let consoleSnapshot = null;
 
   /** @param {number | null | undefined} wovenLine */
   function applyStepHighlight(wovenLine) {
@@ -131,10 +139,14 @@ export function createStepModeController({
         const code = view.code
           ? `<pre class="step-code-line">${escapeHtml(view.code)}</pre>`
           : "";
+        const salida =
+          ev.tipo === "salida" && ev.texto !== undefined
+            ? `<pre class="step-code-line step-salida-preview">${escapeHtml(String(ev.texto))}</pre>`
+            : "";
         elements.panelEvent.innerHTML = `
           <div class="step-event-type">${escapeHtml(eventTypeLabel(ev.tipo))}</div>
           <div class="step-event-meta">${escapeHtml(line)}</div>
-          ${code}`;
+          ${code}${salida}`;
       }
     }
 
@@ -177,6 +189,7 @@ export function createStepModeController({
     }
 
     applyStepHighlight(view.line ?? null);
+    consoleCtl?.setStepOutput?.(view.outputLines ?? []);
   }
 
   function goToStep(next) {
@@ -194,6 +207,8 @@ export function createStepModeController({
     setContextBarVisible(false);
     sidePanel?.enableStepTab?.(false);
     applyStepHighlight(null);
+    consoleCtl?.restore?.(consoleSnapshot);
+    consoleSnapshot = null;
     onModeChange?.(false);
   }
 
@@ -218,6 +233,7 @@ export function createStepModeController({
       if (!trace.eventos?.length) {
         throw new Error("La traza no generó pasos. Revisa que el programa tenga sentencias ejecutables.");
       }
+      consoleSnapshot = consoleCtl?.snapshot?.() ?? null;
       stepIndex = 0;
       active = true;
       setContextBarVisible(true);

@@ -198,6 +198,19 @@ Si MODO DE VISTA es "verboso":
   Nivel 4: describe paso a paso cómo cambiar el placeholder
 """
 
+STEP_MODE_HINT = """
+HERRAMIENTA: EJECUCIÓN PASO A PASO (editor)
+Cuando el estudiante no entiende el flujo de SU programa en pantalla, la salida
+en consola le confunde o un error de ejecución requiere ver qué ocurre línea a
+línea, puedes activar el modo paso a paso del editor añadiendo al JSON de respuesta:
+  "activar_paso_a_paso": true
+Reglas:
+- Solo si hay código ejecutable en el contexto (no programa vacío).
+- No lo uses si acaba de pedir un ejercicio nuevo o modo aprendizaje con otro tema.
+- En un fragmento indica que puede usar Anterior/Siguiente en la barra azul.
+- Sigue dando guía pedagógica en los chunks; la traza es complemento visual.
+"""
+
 EXPLANATION_PROMPT = """
 PODER: EXPLICACIÓN (modo foco)
 El estudiante pidió entender lo que tiene en pantalla.
@@ -799,6 +812,8 @@ def construir_payload_hilo(
             f"\n\n{EXERCISE_ACTIVE_PROMPT}"
             "\n\nTURNO ACTUAL: MODO EJERCICIO — responde con JSON type \"conversation\"."
         )
+    elif tipo_interaccion == "conversacion" and (codigo or "").strip():
+        system_completo += f"\n\n{STEP_MODE_HINT}"
 
     mensajes = []
     for h in historial:
@@ -1118,6 +1133,8 @@ def normalizar_respuesta_hilo(
                 }
             else:
                 resultado["ejercicio_completado"] = False
+            if _coerce_bool(data_eval.get("activar_paso_a_paso")):
+                resultado["activar_paso_a_paso"] = True
     except json.JSONDecodeError:
         resultado["ejercicio_completado"] = False
     return resultado

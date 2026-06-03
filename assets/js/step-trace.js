@@ -12,7 +12,11 @@
  *   scope_al_fallar?: Record<string, { valor: unknown, tipo: string }>,
  *   call_stack?: string[],
  *   mensaje?: string,
+ *   texto?: string,
+ *   es_error?: boolean,
  * }} TraceEvent */
+
+/** @typedef {{ texto: string, es_error: boolean, linea?: number | null }} StepOutputLine */
 
 /** @typedef {{
  *   eventos: TraceEvent[],
@@ -57,6 +61,7 @@ export function eventTypeLabel(tipo) {
     retorno: "Retorno",
     clase: "Clase",
     error: "Error",
+    salida: "Salida",
   };
   return map[tipo] ?? tipo;
 }
@@ -77,6 +82,8 @@ export function buildStepView(trace, index) {
   let callStack = [];
   let lastLine = null;
   let lastCode = "";
+  /** @type {StepOutputLine[]} */
+  const outputLines = [];
 
   for (let i = 0; i <= idx; i++) {
     const e = eventos[i];
@@ -85,6 +92,14 @@ export function buildStepView(trace, index) {
     if (e.tipo === "linea") {
       lastLine = e.linea ?? lastLine;
       lastCode = e.codigo ?? lastCode;
+    }
+    if (e.tipo === "salida" && e.texto !== undefined) {
+      outputLines.push({
+        texto: String(e.texto),
+        es_error: !!e.es_error,
+        linea: e.linea ?? null,
+      });
+      lastLine = e.linea ?? lastLine;
     }
     if (e.tipo === "variable" && e.scope) scope = { ...e.scope };
     if (e.tipo === "llamada" && e.scope_previo) scope = { ...e.scope_previo };
@@ -111,5 +126,6 @@ export function buildStepView(trace, index) {
     code: event?.codigo ?? lastCode,
     hasError: event?.tipo === "error",
     errorMessage: event?.tipo === "error" ? event.mensaje : null,
+    outputLines,
   };
 }

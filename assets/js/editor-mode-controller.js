@@ -12,6 +12,7 @@ import { blocksToSource, lintWoven, parseBlocks } from "./bridge/pyodide-bridge.
  *   blocks: ReturnType<import("./blocks-controller.js").createBlocksController>,
  *   onLint: () => void,
  *   onModeError?: (msg: string) => void,
+ *   onModeChange?: (mode: EditorMode) => void,
  * }} opts
  */
 export function createEditorModeController({
@@ -23,6 +24,7 @@ export function createEditorModeController({
   blocks,
   onLint,
   onModeError,
+  onModeChange,
 }) {
   /** @type {EditorMode} */
   let mode = "text";
@@ -91,6 +93,7 @@ export function createEditorModeController({
       }
       mode = next;
       applyView();
+      onModeChange?.(mode);
       return true;
     }
 
@@ -98,6 +101,7 @@ export function createEditorModeController({
       await syncBlocksToText();
       mode = "text";
       applyView();
+      onModeChange?.(mode);
       return true;
     }
 

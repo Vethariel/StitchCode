@@ -4,6 +4,7 @@ import {
   detectHiloIntent,
   detectExercise,
   detectLearning,
+  detectStepTrace,
   exerciseActiveApiTipo,
   intentToApiTipo,
 } from "../assets/js/hilo-intent.js";
@@ -65,4 +66,20 @@ test("detecta ejercicio antes que aprendizaje", () => {
 test("aprendizaje sigue sin confundirse con ejercicio explícito", () => {
   assert.equal(detectHiloIntent("Enséñame de listas"), "learning");
   assert.equal(detectHiloIntent("Quiero aprender arrays"), "learning");
+});
+
+test("detecta modo paso a paso del editor", () => {
+  assert.equal(detectHiloIntent("activa paso a paso"), "step_trace");
+  assert.equal(detectHiloIntent("quiero ver la ejecución paso a paso"), "step_trace");
+  assert.equal(detectHiloIntent("línea por línea qué pasa"), "step_trace");
+  assert.equal(detectStepTrace("modo paso a paso"), true);
+});
+
+test("paso a paso no roba explicación explícita", () => {
+  assert.equal(detectHiloIntent("Explícame paso a paso mi código"), "explanation");
+  assert.equal(detectHiloIntent("Explícame este código"), "explanation");
+});
+
+test("ejercicio sale antes que paso a paso", () => {
+  assert.equal(detectHiloIntent("Dame un ejercicio paso a paso"), "exercise");
 });

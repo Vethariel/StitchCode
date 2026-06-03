@@ -9,6 +9,7 @@ import {
   traceWoven,
 } from "./bridge/pyodide-bridge.js";
 import { createStepModeController } from "./step-mode-controller.js";
+import { createExitStepModeIfActive } from "./step-mode-interactions.js";
 import { createSidePanelController } from "./side-panel-controller.js";
 import { createBlocksController } from "./blocks-controller.js";
 import { createEditorController } from "./editor-controller.js";
@@ -139,7 +140,10 @@ const editor = createEditorController({
 const blocksCtl = createBlocksController({
   paletteEl: document.getElementById("blocks-palette"),
   documentEl: document.getElementById("blocks-document"),
-  onChange: () => editorMode?.scheduleSyncFromBlocks(),
+  onChange: () => {
+    editorMode?.scheduleSyncFromBlocks();
+    if (stepMode?.isActive()) stepMode.exit();
+  },
 });
 
 function syncEditorDiagnostics() {
@@ -169,6 +173,9 @@ editorMode = createEditorModeController({
   onModeError: (msg) => {
     consoleCtl.clear();
     consoleCtl.appendLine(msg, "error", "!");
+  },
+  onModeChange: () => {
+    if (stepMode?.isActive()) stepMode.exit();
   },
 });
 
@@ -224,6 +231,7 @@ function escapeExerciseBarText(text) {
 
 /** @param {string} code */
 async function applyCodeToEditor(code) {
+  if (stepMode?.isActive()) stepMode.exit();
   editor.setCode(code);
   const vista = editorMode?.getMode() ?? "text";
   if (vista === "blocks" || vista === "verbose") {
@@ -274,6 +282,44 @@ const onFocusTranslationTab = (lang) => {
   sidePanel.setOpen(true);
   sidePanel.setActiveTab(lang);
 };
+
+stepMode = createStepModeController({
+  getCode: () => editor.getCode(),
+  traceWoven,
+  hasLintErrors: () => linter.tieneErroresBloqueantes(),
+  syncBlocksToText: () => editorMode.syncBlocksToText(),
+  isBlockMode: () => editorMode.isBlockMode(),
+  getVista: () => editorMode.getMode(),
+  refreshBlocksFromCode: async () => {
+    const vista = editorMode.getMode();
+    const doc = await parseBlocks(editor.getCode());
+    blocksCtl.setDocument(
+      doc.bloques,
+      vista === "verbose" ? "verbose" : "code"
+    );
+  },
+  blocks: blocksCtl,
+  editor,
+  console: consoleCtl,
+  sidePanel,
+  elements: {
+    navBtn: stepModeBtn,
+    contextBar: document.getElementById("step-context-bar"),
+    contextText: document.getElementById("step-context-text"),
+    btnPrev: document.getElementById("step-prev-btn"),
+    btnNext: document.getElementById("step-next-btn"),
+    btnExit: document.getElementById("exit-step-btn"),
+    panelRoot: document.querySelector('[data-tab-panel="paso"]'),
+    panelStepLabel: document.getElementById("step-panel-step-label"),
+    panelEvent: document.getElementById("step-panel-event"),
+    panelContext: document.getElementById("step-panel-context"),
+    panelVars: document.getElementById("step-panel-vars"),
+    panelEmpty: document.getElementById("step-panel-empty"),
+  },
+});
+
+/** @type {() => void} */
+let exitStepModeIfActive = () => {};
 
 hiloAgent = createHiloAgentController({
   root: document.getElementById("hilo-agent"),
@@ -333,9 +379,13 @@ hiloAgent = createHiloAgentController({
       }
     },
   },
+  stepMode,
   exercise: {
     onEnunciado: (data) => sidePanel.setEnunciado(data),
-    onExerciseModeChange: (active) => setExerciseModeUi(active),
+    onExerciseModeChange: (active) => {
+      setExerciseModeUi(active);
+      if (active) stepMode?.exit();
+    },
     onTopicMastery: (topic) => {
       try {
         sidePanel.recordTopicMastery(topic);
@@ -408,42 +458,11 @@ function updateRunButton() {
   }
 }
 
-stepMode = createStepModeController({
-  getCode: () => editor.getCode(),
-  traceWoven,
-  hasLintErrors: () => linter.tieneErroresBloqueantes(),
-  syncBlocksToText: () => editorMode.syncBlocksToText(),
-  isBlockMode: () => editorMode.isBlockMode(),
-  getVista: () => editorMode.getMode(),
-  refreshBlocksFromCode: async () => {
-    const vista = editorMode.getMode();
-    const doc = await parseBlocks(editor.getCode());
-    blocksCtl.setDocument(
-      doc.bloques,
-      vista === "verbose" ? "verbose" : "code"
-    );
-  },
-  blocks: blocksCtl,
-  editor,
-  sidePanel,
-  elements: {
-    navBtn: stepModeBtn,
-    contextBar: document.getElementById("step-context-bar"),
-    contextText: document.getElementById("step-context-text"),
-    btnPrev: document.getElementById("step-prev-btn"),
-    btnNext: document.getElementById("step-next-btn"),
-    btnExit: document.getElementById("exit-step-btn"),
-    panelRoot: document.querySelector('[data-tab-panel="paso"]'),
-    panelStepLabel: document.getElementById("step-panel-step-label"),
-    panelEvent: document.getElementById("step-panel-event"),
-    panelContext: document.getElementById("step-panel-context"),
-    panelVars: document.getElementById("step-panel-vars"),
-    panelEmpty: document.getElementById("step-panel-empty"),
-  },
-});
+exitStepModeIfActive = createExitStepModeIfActive(stepMode);
 
 async function handleRun() {
   if (!isReady() || isRunning) return;
+  exitStepModeIfActive();
 
   if (editorMode.isBlockMode()) {
     await editorMode.syncBlocksToText();

@@ -20,6 +20,7 @@ import { normalizeSpriteEmotion } from "./hilo-emotions.js";
  *   texto_completo: string,
  *   ejercicioCompletado?: boolean,
  *   dominioTema?: HiloTopicAchievement | null,
+ *   activarPasoAPaso?: boolean,
  * }} HiloTurn */
 
 /**
@@ -90,6 +91,13 @@ export function parseHiloTurn(raw) {
   const completado =
     data.ejercicio_completado === true ||
     String(data.ejercicio_completado).toLowerCase() === "true";
+  if (
+    data.activar_paso_a_paso === true ||
+    String(data.activar_paso_a_paso).toLowerCase() === "true"
+  ) {
+    turn.activarPasoAPaso = true;
+  }
+
   if (completado) {
     turn.ejercicioCompletado = true;
     const t = data.dominio_tema;

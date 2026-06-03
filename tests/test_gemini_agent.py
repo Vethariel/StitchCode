@@ -378,6 +378,21 @@ def test_normalizar_completado_sin_dominio_usa_fallback():
     assert out["dominio_tema"]["id"] == "ejercicio_completado"
 
 
+def test_normalizar_activar_paso_a_paso():
+    raw = json.dumps(
+        {
+            "type": "conversation",
+            "activar_paso_a_paso": True,
+            "chunks": [
+                {"text": "Activo la traza.", "emotion": "wink"},
+                {"text": "Usa Anterior y Siguiente.", "emotion": "smile"},
+            ],
+        }
+    )
+    out = normalizar_respuesta_hilo(raw)
+    assert out.get("activar_paso_a_paso") is True
+
+
 def test_normalizar_ejercicio_no_completado_sin_dominio():
     raw = json.dumps(
         {

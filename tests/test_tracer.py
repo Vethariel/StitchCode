@@ -19,6 +19,20 @@ def test_tracer_produce_eventos_linea():
     assert "linea" in tipos
 
 
+def test_tracer_produce_evento_salida_en_print():
+    resultado = trace("int x = 5\nprint(x)\n")
+    salidas = [e for e in resultado["eventos"] if e["tipo"] == "salida"]
+    assert len(salidas) == 1
+    assert salidas[0]["texto"] == "5"
+    assert not salidas[0].get("es_error")
+
+
+def test_tracer_salida_acumulada_en_varios_print():
+    resultado = trace('print("a")\nprint("b")\n')
+    salidas = [e for e in resultado["eventos"] if e["tipo"] == "salida"]
+    assert [e["texto"] for e in salidas] == ["a", "b"]
+
+
 def test_tracer_produce_evento_variable():
     resultado = trace("int x = 5\n")
     vars_ = [e for e in resultado["eventos"] if e["tipo"] == "variable"]

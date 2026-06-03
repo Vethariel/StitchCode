@@ -61,5 +61,43 @@ export function createConsoleController({ body }) {
     }
   }
 
-  return { clear, showEmpty, appendLine, removeLine, appendOutputLines };
+  function snapshot() {
+    return { html: body.innerHTML, outputLineCount };
+  }
+
+  /**
+   * @param {{ html: string, outputLineCount: number } | null | undefined} snap
+   */
+  function restore(snap) {
+    if (!snap) return;
+    body.innerHTML = snap.html;
+    outputLineCount = body.querySelectorAll("[data-console-line]").length;
+  }
+
+  /**
+   * Consola acumulada hasta el paso actual (modo paso a paso).
+   * @param {{ texto: string, es_error?: boolean }[]} lines
+   */
+  function setStepOutput(lines) {
+    clear();
+    if (!lines.length) {
+      showEmpty("// Sin salida en consola hasta este paso…");
+      return;
+    }
+    for (const entry of lines) {
+      const isError = entry.es_error || esErrorWoven(entry.texto);
+      appendLine(entry.texto, isError ? "error" : "output", isError ? "!" : ">");
+    }
+  }
+
+  return {
+    clear,
+    showEmpty,
+    appendLine,
+    removeLine,
+    appendOutputLines,
+    snapshot,
+    restore,
+    setStepOutput,
+  };
 }

@@ -1,4 +1,4 @@
-/** @typedef {'conversation' | 'explanation' | 'learning' | 'exercise'} HiloIntent */
+/** @typedef {'conversation' | 'explanation' | 'learning' | 'exercise' | 'step_trace'} HiloIntent */
 
 /** Quita tildes para que los regex coincidan con "enseñame" y "enséñame" por igual. */
 function foldAccents(text) {
@@ -35,6 +35,17 @@ const EXERCISE_PATTERNS = [
   /\b(?:ensen[a-z]*|ens[eé][nñ][a-z]*)\s+(?:un\s+)?ejercicio\b/i,
   /\b(?:un[a]?\s+)?pr[aá]ctica\s+(?:de|sobre|para|con)\b/i,
   /\b(?:hazme|dame|pon(?:me)?)\s+(?:un[a]?\s+)?pr[aá]ctica\b/i,
+];
+
+/** Modo ejecución paso a paso del editor (traza), no explicación narrativa de Hilo. */
+const STEP_TRACE_PATTERNS = [
+  /\b(?:modo\s+)?paso\s+a\s+paso\b/i,
+  /\bejecuci[oó]n\s+paso\s+a\s+paso\b/i,
+  /\b(?:activa|entra|pon|usa|abre|inicia)\s+(?:el\s+)?(?:modo\s+)?paso\s+a\s+paso\b/i,
+  /\b(?:l[ií]nea|paso)\s+por\s+(?:l[ií]nea|paso)\b/i,
+  /\b(?:ver|mostrar|seguir|recorrer)\s+(?:la\s+)?(?:traza|ejecuci[oó]n)(?:\s+paso\s+a\s+paso)?\b/i,
+  /\btrazar\s+(?:la\s+)?ejecuci[oó]n\b/i,
+  /\b(?:quiero|necesito)\s+ver\s+(?:qu[eé]\s+)?(?:pasa|ocurre)\s+(?:l[ií]nea\s+por\s+l[ií]nea|paso\s+a\s+paso)\b/i,
 ];
 
 const EXPLANATION_PATTERNS = [
@@ -83,6 +94,18 @@ const SCREEN_CONTEXT =
 
 const EXPLAIN_MY_CODE =
   /\b(?:expl[ií]c|entiend|revis|analiz|corrige|arregla|depur|qué\s+hace|qué\s+hace\s+este)\w*/i;
+
+/**
+ * @param {string} message
+ */
+function detectStepTrace(message) {
+  const n = foldAccents(message.trim());
+  if (!n) return false;
+  for (const re of STEP_TRACE_PATTERNS) {
+    if (re.test(n)) return true;
+  }
+  return false;
+}
 
 /**
  * @param {string} message
@@ -155,23 +178,21 @@ export function detectHiloIntent(message) {
   if (detectExercise(t)) return "exercise";
   if (detectLearning(t)) return "learning";
 
+  const wantsExplain =
+    EXPLANATION_PATTERNS.some((re) => re.test(n)) ||
+    (/\b(?:explic|entender|significa|descr|cu[eé]nta)\w*/i.test(n) &&
+      /\b(?:c[oó]digo|programa|l[ií]nea|editor|woven|variable|funci[oó]n|bucle|bloque|consola|salida)\w*/i.test(
+        n
+      ));
+
+  if (detectStepTrace(t) && !/\bexpl[ií]c/i.test(n)) return "step_trace";
+
   for (const re of EXPLANATION_PATTERNS) {
     if (re.test(n)) return "explanation";
   }
 
-  const lower = n.toLowerCase();
-  const asksExplain =
-    /\b(?:explic|entender|significa|descr|cu[eé]nta)\w*/i.test(lower);
-  const aboutCode =
-    /\b(?:c[oó]digo|programa|l[ií]nea|editor|woven|variable|funci[oó]n|bucle|bloque|bloques|verboso|L\d+)\w*/i.test(
-      lower
-    );
-  const aboutConsole =
-    /\b(?:consola|salida|output|resultado|imprime|muestra|ejecut)\w*/i.test(
-      lower
-    );
-
-  if (asksExplain && (aboutCode || aboutConsole)) return "explanation";
+  if (wantsExplain) return "explanation";
+  if (detectStepTrace(t)) return "step_trace";
 
   return "conversation";
 }
@@ -181,6 +202,7 @@ export function intentToApiTipo(intent) {
   if (intent === "learning") return "aprendizaje";
   if (intent === "explanation") return "explicacion";
   if (intent === "exercise") return "ejercicio";
+  if (intent === "step_trace") return "conversacion";
   return "conversacion";
 }
 
@@ -193,6 +215,8 @@ export function exerciseActiveApiTipo() {
 export {
   detectExercise,
   detectLearning,
+  detectStepTrace,
   LEARNING_PHRASE_PATTERNS,
   PROGRAMMING_TOPIC,
+  STEP_TRACE_PATTERNS,
 };

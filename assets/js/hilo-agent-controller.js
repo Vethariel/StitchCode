@@ -86,6 +86,11 @@ import {
  *     onExerciseModeChange?: (active: boolean) => void,
  *     onTopicMastery?: (topic: { id: string, name: string, desc: string, icon?: string }) => void,
  *   },
+ *   stepMode?: {
+ *     isActive: () => boolean,
+ *     enter: () => Promise<void>,
+ *     exit: () => void,
+ *   },
  * }} opts
  */
 export function createHiloAgentController({
@@ -107,6 +112,7 @@ export function createHiloAgentController({
   onFocusTranslationTab,
   learning,
   exercise,
+  stepMode,
 }) {
   /** @type {{ role: string, content: string }[]} */
   let historial = [];
@@ -576,6 +582,16 @@ export function createHiloAgentController({
     setEmotionState("happy");
   }
 
+  async function maybeActivateStepModeFromTurn(turn) {
+    if (!turn?.activarPasoAPaso || !stepMode || stepMode.isActive()) return;
+    try {
+      await stepMode.enter();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showStaticMessage(msg, "worried");
+    }
+  }
+
   async function sendExerciseAwareMessage(mensaje, { silentRun = false } = {}) {
     const apiKey = geminiApi.getActiveKey();
     const ctx = getContext();
@@ -626,6 +642,7 @@ export function createHiloAgentController({
     }
     queueTurn(turn);
     tryCompleteExercise(turn, ctx, { afterRun: silentRun });
+    await maybeActivateStepModeFromTurn(turn);
   }
 
   async function onAfterRun() {
@@ -695,6 +712,7 @@ export function createHiloAgentController({
     bubble.classList.add("show");
 
     if (intent === "exercise") {
+      stepMode?.exit();
       if (!exercise) {
         showStaticMessage(
           "El modo ejercicio no está disponible todavía.",
@@ -728,6 +746,7 @@ export function createHiloAgentController({
     }
 
     if (intent === "learning") {
+      stepMode?.exit();
       if (!learning) {
         showStaticMessage(
           "El modo aprendizaje no está disponible todavía.",
@@ -781,6 +800,52 @@ export function createHiloAgentController({
       return;
     }
 
+    if (intent === "step_trace") {
+      if (!stepMode) {
+        showStaticMessage(
+          "El modo paso a paso no está disponible todavía.",
+          "worried"
+        );
+        setBusy(false);
+        return;
+      }
+      stepMode.exit();
+      bubbleText.textContent = "Preparo la ejecución paso a paso…";
+      try {
+        await stepMode.enter();
+        historial.push({ role: "user", content: mensaje });
+        historial.push({
+          role: "model",
+          content:
+            "Activé el modo paso a paso. Usa Anterior y Siguiente en la barra azul; " +
+            "la consola y las variables se actualizan con cada paso.",
+        });
+        queueTurn(
+          localHiloTurn([
+            {
+              text: "Listo: modo paso a paso activado.",
+              emotion: "wink",
+            },
+            {
+              text: "Recorre la traza con Anterior y Siguiente; la consola muestra cada print hasta ese paso.",
+              emotion: "smile",
+            },
+          ])
+        );
+      } catch (err) {
+        setEmotionState("error");
+        const msg = err instanceof Error ? err.message : String(err);
+        showStaticMessage(msg, "worried");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (intent === "explanation") {
+      stepMode?.exit();
+    }
+
     bubbleText.textContent =
       intent === "explanation"
         ? "Preparo la explicación…"
@@ -818,7 +883,7 @@ export function createHiloAgentController({
           localHiloTurn([
             { text: "¡Hola! Soy Hilo.", emotion: "happy" },
             {
-              text: "Pregúntame sobre tu código o pídeme que te lo explique.",
+              text: "Pregúntame, pídeme un ejercicio o di «paso a paso» si quieres ver la traza.",
               emotion: "smile",
             },
           ])

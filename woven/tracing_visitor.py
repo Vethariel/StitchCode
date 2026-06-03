@@ -224,6 +224,26 @@ class TracingInterpreterVisitor(InterpreterVisitor):
         self._emitir_retorno(ctx, self.call_stack[-1] if self.call_stack else None, value)
         raise _ReturnSignal(value)
 
+    def _emitir_salida(self, ctx, texto: str, es_error: bool = False):
+        self._emit_event(
+            {
+                "tipo": "salida",
+                "linea": getattr(ctx.start, "line", None) if ctx else None,
+                "texto": texto,
+                "es_error": es_error,
+            }
+        )
+
+    def _runtime_error(self, message, linea=None, columna=None, forma=None):
+        super()._runtime_error(message, linea, columna, forma)
+        if self.output:
+            self._emitir_salida(None, self.output[-1], es_error=True)
+
+    def visitPrintStmt(self, ctx: WovenParser.PrintStmtContext):
+        super().visitPrintStmt(ctx)
+        if self.output:
+            self._emitir_salida(ctx, self.output[-1])
+
 
 def trace_woven(source: str) -> str:
     lexer = WovenLexer(InputStream(source))
