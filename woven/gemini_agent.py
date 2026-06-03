@@ -413,7 +413,10 @@ Evaluación al revisar una ejecución (Run):
 - Si ejercicio_completado es true:
   * Los chunks deben celebrar el logro (emociones alegres: happy, heart_eyes, grin, kiss).
   * Incluye dominio_tema con el tema que el estudiante demostró dominar:
-    {"id": "slug_snake_case", "nombre": "Nombre corto del tema", "descripcion": "Qué domina ahora (1 frase)", "icono": "emoji"}
+    {"id": "slug_snake_case", "nombre": "Nombre corto del tema", "descripcion": "...", "icono": "emoji"}
+    - descripcion: solo competencias Woven (conceptos, estructuras, habilidades). 1–2 frases.
+    - NUNCA digas que completó el ejercicio, el reto ni cites el título del ejercicio.
+    - Si no hay nada nuevo que aportar sobre el aprendizaje, pon dominio_tema en null.
     El id debe ser estable (ej. bucles_for, listas_woven, condicionales, funciones, clases_poo).
 - Si ejercicio_completado es false: dominio_tema debe ser null.
 """
@@ -454,9 +457,34 @@ def _normalizar_dominio_tema(raw) -> dict | None:
     icono = str(raw.get("icono") or raw.get("icon") or "🏆").strip()[:4] or "🏆"
     if not nombre:
         nombre = tid.replace("_", " ").title()
-    if not desc:
-        desc = f"Dominio demostrado en ejercicio: {nombre}."
+    desc = _limpiar_descripcion_logro(desc)
     return {"id": tid, "nombre": nombre, "descripcion": desc, "icono": icono}
+
+
+def _limpiar_descripcion_logro(desc: str) -> str:
+    texto = (desc or "").strip()
+    if not texto:
+        return ""
+    partes = re.split(r"(?<=[.!?])\s+", texto)
+    basura = (
+        r"^completaste el ejercicio\b",
+        r"^completaste el reto\b",
+        r"^dominio demostrado en ejercicio\b",
+        r"^ejercicio completado\b",
+    )
+    kept = []
+    for p in partes:
+        p = p.strip()
+        if not p:
+            continue
+        if any(re.search(pat, p, re.I) for pat in basura):
+            continue
+        kept.append(p)
+    if kept:
+        return " ".join(kept)[:200]
+    if any(re.search(pat, texto, re.I) for pat in basura):
+        return ""
+    return texto[:200]
 
 
 def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
@@ -1377,12 +1405,8 @@ def normalizar_respuesta_hilo(
             dominio = _normalizar_dominio_tema(data_eval.get("dominio_tema"))
             if completado:
                 resultado["ejercicio_completado"] = True
-                resultado["dominio_tema"] = dominio or {
-                    "id": "ejercicio_completado",
-                    "nombre": "Ejercicio completado",
-                    "descripcion": "Completaste el ejercicio en Woven.",
-                    "icono": "🏆",
-                }
+                if dominio and (dominio.get("descripcion") or dominio.get("nombre")):
+                    resultado["dominio_tema"] = dominio
             else:
                 resultado["ejercicio_completado"] = False
             if _coerce_bool(data_eval.get("activar_paso_a_paso")):

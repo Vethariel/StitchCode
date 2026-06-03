@@ -267,7 +267,7 @@ export function createSidePanelController({
           <div class="logro-info">
             <div class="logro-name${earned ? "" : " locked"}">${escapeHtml(a.name)}</div>
             ${countLabel ? `<div class="logro-count">${escapeHtml(countLabel)}</div>` : ""}
-            <div class="logro-desc">${escapeHtml(a.desc)}</div>
+            ${a.desc ? `<div class="logro-desc">${escapeHtml(a.desc)}</div>` : ""}
             <div class="logro-bar-wrap">
               <div class="logro-bar" style="width:${a.progress}%;${earned ? "" : " background: var(--palette-linen-muted);"}"></div>
             </div>

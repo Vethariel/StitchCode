@@ -24,7 +24,10 @@ import {
   isExerciseModeActive,
   isGuidedExerciseActive,
 } from "./hilo-exercise-mode.js";
-import { slugTopicId } from "./learning-achievements.js";
+import {
+  sanitizeAchievementDesc,
+  slugTopicId,
+} from "./learning-achievements.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
   getHiloTutorialScript,
@@ -553,6 +556,15 @@ export function createHiloAgentController({
   /**
    * @param {import("./hilo-response.js").HiloTurn} turn
    */
+  function pickLearningDescFromExercise(active) {
+    if (!active) return "";
+    const criterios = (active.criterios ?? []).map((c) => String(c).trim()).filter(Boolean);
+    if (criterios.length) {
+      return sanitizeAchievementDesc(criterios.join(" "));
+    }
+    return sanitizeAchievementDesc(active.resumen);
+  }
+
   function buildTopicFromExerciseTurn(turn) {
     const active = getActiveExercise();
     const dominio = turn.dominioTema;
@@ -565,8 +577,8 @@ export function createHiloAgentController({
       active?.titulo?.trim() ||
       "Tema Woven";
     const desc =
-      dominio?.descripcion?.trim() ||
-      `Completaste el ejercicio «${active?.titulo ?? name}».`;
+      sanitizeAchievementDesc(dominio?.descripcion) ||
+      pickLearningDescFromExercise(active);
     const icon = dominio?.icono || "🏆";
     return { id, name, desc, icon };
   }

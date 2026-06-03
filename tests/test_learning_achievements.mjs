@@ -4,6 +4,7 @@ import {
   grantTopicAchievement,
   loadLearningAchievements,
   mergeAchievementDesc,
+  sanitizeAchievementDesc,
   saveLearningAchievements,
   slugTopicId,
   formatExerciseCountLabel,
@@ -13,6 +14,43 @@ import {
 test("slugTopicId normaliza ids", () => {
   assert.equal(slugTopicId("Bucles For"), "bucles_for");
   assert.equal(slugTopicId("  listas!!!  "), "listas");
+});
+
+test("sanitizeAchievementDesc quita frases de ejercicio completado", () => {
+  const raw =
+    "El estudiante domina listas y métodos. Completaste el ejercicio «Lista de Tareas».";
+  const clean = sanitizeAchievementDesc(raw);
+  assert.match(clean, /domina listas/);
+  assert.ok(!/completaste el ejercicio/i.test(clean));
+});
+
+test("grantTopicAchievement repite tema sin añadir texto vacío", () => {
+  const store = new Map();
+  const ls = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => store.delete(k),
+  };
+  const prev = globalThis.localStorage;
+  // @ts-expect-error test mock
+  globalThis.localStorage = ls;
+  try {
+    saveLearningAchievements([]);
+    const first = grantTopicAchievement({
+      id: "listas",
+      name: "Listas",
+      desc: "Dominas índices y append.",
+    });
+    const second = grantTopicAchievement(
+      { id: "listas", name: "Listas", desc: "Completaste el ejercicio «X»." },
+      first.list
+    );
+    assert.equal(second.achievement?.exerciseCount, 2);
+    assert.equal(second.achievement?.desc, "Dominas índices y append.");
+  } finally {
+    globalThis.localStorage = prev;
+    store.delete(LEARNING_ACHIEVEMENTS_STORAGE_KEY);
+  }
 });
 
 test("mergeAchievementDesc complementa sin duplicar", () => {

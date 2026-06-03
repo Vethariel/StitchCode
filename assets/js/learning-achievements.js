@@ -14,6 +14,40 @@ export const LEARNING_ACHIEVEMENTS_STORAGE_KEY = "stitchcode-learning-achievemen
 
 const MAX_DESC_LEN = 500;
 
+/** Frases que no aportan dominio de aprendizaje (solo constatan el reto). */
+const ACHIEVEMENT_DESC_BOILERPLATE = [
+  /^completaste el ejercicio\b/i,
+  /^completaste el reto\b/i,
+  /^completaste\b.*\bejercicio\b/i,
+  /^dominio demostrado en ejercicio\b/i,
+  /^ejercicio completado\b/i,
+  /^reto completado\b/i,
+];
+
+/**
+ * Conserva solo texto que describe competencias Woven (no el hecho de terminar un reto).
+ * @param {string} raw
+ * @returns {string}
+ */
+export function sanitizeAchievementDesc(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return "";
+
+  const parts = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const kept = parts.filter(
+    (p) => !ACHIEVEMENT_DESC_BOILERPLATE.some((rx) => rx.test(p))
+  );
+  if (kept.length) {
+    return kept.join(" ").slice(0, MAX_DESC_LEN);
+  }
+
+  const whole = ACHIEVEMENT_DESC_BOILERPLATE.some((rx) => rx.test(text)) ? "" : text;
+  return whole.slice(0, MAX_DESC_LEN);
+}
+
 /** @param {string} id */
 export function slugTopicId(id) {
   return String(id)
@@ -32,7 +66,7 @@ export function slugTopicId(id) {
  */
 export function mergeAchievementDesc(existing, incoming) {
   const prev = (existing ?? "").trim();
-  const next = (incoming ?? "").trim();
+  const next = sanitizeAchievementDesc(incoming);
   if (!next) return prev.slice(0, MAX_DESC_LEN);
   if (!prev) return next.slice(0, MAX_DESC_LEN);
   if (prev === next) return prev;
@@ -99,17 +133,20 @@ export function grantTopicAchievement(topic, list = loadLearningAchievements()) 
   }
 
   const now = new Date().toISOString();
-  const incomingDesc = String(topic.desc ?? "").trim();
+  const incomingDesc = sanitizeAchievementDesc(topic.desc);
   const existing = list.find((a) => a.id === id);
 
   if (existing?.earned) {
     const exerciseCount = (existing.exerciseCount ?? 1) + 1;
+    const desc = incomingDesc
+      ? mergeAchievementDesc(existing.desc, incomingDesc)
+      : existing.desc;
     /** @type {LearningAchievement} */
     const achievement = {
       ...existing,
       icon: String(topic.icon ?? existing.icon).slice(0, 4) || existing.icon,
       name: String(topic.name || existing.name).slice(0, 80),
-      desc: mergeAchievementDesc(existing.desc, incomingDesc),
+      desc,
       progress: 100,
       earned: true,
       earnedAt: existing.earnedAt ?? now,
@@ -127,9 +164,7 @@ export function grantTopicAchievement(topic, list = loadLearningAchievements()) 
     id,
     icon: String(topic.icon ?? "🏆").slice(0, 4) || "🏆",
     name,
-    desc:
-      incomingDesc.slice(0, MAX_DESC_LEN) ||
-      `Dominio demostrado en ejercicio: ${name}.`,
+    desc: incomingDesc.slice(0, MAX_DESC_LEN),
     progress: 100,
     earned: true,
     earnedAt: now,

@@ -392,7 +392,6 @@ export function checkGuidedExerciseCompletion(
  * @param {GuidedExercisePackage | { titulo: string, tema_id?: string, tema_nombre?: string }} pkg
  */
 export function buildGuidedCompletionTurn(pkg) {
-  const name = pkg.tema_nombre || pkg.titulo || "Tema Woven";
   return {
     type: "conversation",
     chunks: [
@@ -401,18 +400,12 @@ export function buildGuidedCompletionTurn(pkg) {
         emotion: "happy",
       },
       {
-        text: "Completaste el ejercicio. Mira el panel de Logros si quieres.",
+        text: "Si hay un tema nuevo en Logros, es por lo que practicaste, no solo por terminar el reto.",
         emotion: "heart_eyes",
       },
     ],
     texto_completo:
-      "¡Correcto! Las líneas editables ya coinciden con la solución. Completaste el ejercicio.",
+      "¡Correcto! Las líneas editables ya coinciden con la solución.",
     ejercicioCompletado: true,
-    dominioTema: {
-      id: pkg.tema_id || "tema_woven",
-      nombre: name,
-      descripcion: `Completaste el ejercicio «${pkg.titulo}».`,
-      icono: "🏆",
-    },
   };
 }
