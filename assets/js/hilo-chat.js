@@ -46,6 +46,7 @@ export async function callGeminiHilo(apiKey, payloadJson) {
  *   bloquesResumen?: string,
  *   traduccionesJsonForParse?: string,
  *   traduccionesJsonForPrepare?: string,
+ *   enunciadoJsonForPrepare?: string,
  * }} ctx
  */
 export async function sendHiloMessage(ctx) {
@@ -62,6 +63,7 @@ export async function sendHiloMessage(ctx) {
     tipoInteraccion: ctx.tipoInteraccion ?? "conversacion",
     bloquesResumen: ctx.bloquesResumen ?? "",
     traduccionesJson: ctx.traduccionesJsonForPrepare ?? "{}",
+    enunciadoJson: ctx.enunciadoJsonForPrepare ?? "{}",
   });
 
   if (!prep.ok) {

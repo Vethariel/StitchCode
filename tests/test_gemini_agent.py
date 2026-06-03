@@ -7,10 +7,12 @@ sys.path.append(str(ROOT / "woven"))
 import json
 
 from gemini_agent import (  # noqa: E402
+    _anexar_enunciado_ejercicio,
     construir_contexto,
     construir_payload_hilo,
     construir_preferencias_estudiante,
     normalizar_perfil,
+    normalizar_respuesta_ejercicio,
     normalizar_respuesta_hilo,
     normalizar_respuesta_redaccion,
 )
@@ -278,3 +280,68 @@ def test_normalizar_fallback_texto_plano():
     out = normalizar_respuesta_hilo(raw)
     assert len(out["chunks"]) >= 2
     assert out["chunks"][0]["text"] == "Primera frase."
+
+
+def test_normalizar_respuesta_ejercicio():
+    raw = json.dumps(
+        {
+            "type": "ejercicio",
+            "titulo": "Suma acumulada",
+            "enunciado": ["Calcula la suma de 1 a n.", "Usa un bucle."],
+            "codigo_plantilla": "int n = 5\n// completa aquí",
+            "criterios": ["Imprime el total correcto"],
+            "resumen": "Practica bucles",
+        },
+        ensure_ascii=False,
+    )
+    out = normalizar_respuesta_ejercicio(raw)
+    assert out["type"] == "ejercicio"
+    assert out["titulo"] == "Suma acumulada"
+    assert len(out["enunciado"]) == 2
+    assert "n = 5" in out["codigo_plantilla"]
+    assert out["criterios"][0].startswith("Imprime")
+
+
+def test_payload_ejercicio_activo_incluye_enunciado():
+    enunciado = json.dumps(
+        {
+            "titulo": "Reto listas",
+            "enunciado": ["Crea una lista de números."],
+            "criterios": ["Debe tener al menos 3 elementos"],
+        },
+        ensure_ascii=False,
+    )
+    payload = json.loads(
+        construir_payload_hilo(
+            "ayuda",
+            "[]",
+            "lista numeros = []",
+            "[]",
+            "[]",
+            False,
+            "woven",
+            1,
+            "{}",
+            "ejercicio_activo",
+            "",
+            "{}",
+            enunciado,
+        )
+    )
+    system_text = payload["system_instruction"]["parts"][0]["text"]
+    assert "MODO EJERCICIO ACTIVO" in system_text
+    assert "Reto listas" in system_text
+    assert "Crea una lista" in system_text
+    assert 'type "conversation"' in system_text
+
+
+def test_anexar_enunciado_ejercicio():
+    ctx = construir_contexto("int x = 1", [], [], False, "woven", "")
+    enun = json.dumps(
+        {"titulo": "T", "enunciado": ["P1"], "criterios": ["C1"]},
+        ensure_ascii=False,
+    )
+    merged = _anexar_enunciado_ejercicio(ctx, enun)
+    assert "ENUNCIADO DEL EJERCICIO ACTIVO" in merged
+    assert "P1" in merged
+    assert "C1" in merged

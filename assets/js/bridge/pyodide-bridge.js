@@ -38,6 +38,10 @@ let hiloRedactFn = null;
 let parseHiloResponseFn = null;
 /** @type {import("pyodide").PyProxy | null} */
 let parseHiloRedactFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let hiloEstablishExerciseFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let parseHiloExerciseFn = null;
 /** @type {((source: string, language: string) => import("pyodide").PyProxy) | null} */
 let translateWovenFn = null;
 /** @type {RuntimeStatus} */
@@ -122,7 +126,7 @@ from pedagogical_lint import lint_woven_pedagogico
 from pedagogical_runtime import run_woven_pedagogico
 from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
-from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion
+from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion, hilo_establecer_ejercicio, parsear_respuesta_ejercicio
 from translator_visitor import translate_woven
 `);
 
@@ -134,6 +138,8 @@ from translator_visitor import translate_woven
     hiloRedactFn = pyodide.globals.get("hilo_redactar");
     parseHiloResponseFn = pyodide.globals.get("parsear_respuesta_hilo");
     parseHiloRedactFn = pyodide.globals.get("parsear_respuesta_redaccion");
+    hiloEstablishExerciseFn = pyodide.globals.get("hilo_establecer_ejercicio");
+    parseHiloExerciseFn = pyodide.globals.get("parsear_respuesta_ejercicio");
     translateWovenFn = pyodide.globals.get("translate_woven");
     setStatus("ready", "Listo");
   } catch (err) {
@@ -146,6 +152,8 @@ from translator_visitor import translate_woven
     hiloRedactFn = null;
     parseHiloResponseFn = null;
     parseHiloRedactFn = null;
+    hiloEstablishExerciseFn = null;
+    parseHiloExerciseFn = null;
     translateWovenFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
@@ -225,6 +233,7 @@ export async function blocksToSource(doc) {
  *   tipoInteraccion?: string,
  *   bloquesResumen?: string,
  *   traduccionesJson?: string,
+ *   enunciadoJson?: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -244,7 +253,8 @@ export async function hiloPrepareMessage(args) {
       args.perfilJson ?? "{}",
       args.tipoInteraccion ?? "conversacion",
       args.bloquesResumen ?? "",
-      args.traduccionesJson ?? "{}"
+      args.traduccionesJson ?? "{}",
+      args.enunciadoJson ?? "{}"
     )
   );
   return JSON.parse(raw);
@@ -308,6 +318,39 @@ export async function hiloParseRedaction(responseJson) {
     throw new Error("Hilo aún no está listo.");
   }
   return pyResultToString(parseHiloRedactFn(JSON.stringify(responseJson)));
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   codigo: string,
+ *   modo: string,
+ *   perfilJson: string,
+ *   bloquesResumen?: string,
+ * }} args
+ */
+export async function hiloEstablishExercise(args) {
+  if (!hiloEstablishExerciseFn) {
+    return { ok: false, error: "Hilo aún no está listo." };
+  }
+  const raw = pyResultToString(
+    hiloEstablishExerciseFn(
+      args.mensaje,
+      args.codigo,
+      args.modo,
+      args.perfilJson ?? "{}",
+      args.bloquesResumen ?? ""
+    )
+  );
+  return JSON.parse(raw);
+}
+
+/** @param {object} responseJson Respuesta cruda de Gemini. */
+export async function hiloParseExercise(responseJson) {
+  if (!parseHiloExerciseFn) {
+    throw new Error("Hilo aún no está listo.");
+  }
+  return pyResultToString(parseHiloExerciseFn(JSON.stringify(responseJson)));
 }
 
 /**

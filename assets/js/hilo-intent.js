@@ -1,4 +1,4 @@
-/** @typedef {'conversation' | 'explanation' | 'learning'} HiloIntent */
+/** @typedef {'conversation' | 'explanation' | 'learning' | 'exercise'} HiloIntent */
 
 /** Quita tildes para que los regex coincidan con "enseñame" y "enséñame" por igual. */
 function foldAccents(text) {
@@ -24,6 +24,18 @@ function foldAccents(text) {
  * - Referencia explícita al código del alumno en pantalla:
  *   "Explícame mi código", "¿Qué hace esta línea?", "No entiendo mi programa"
  */
+
+const EXERCISE_PATTERNS = [
+  /\bmodo\s+ejercicio\b/i,
+  /\b(?:dame|pon(?:me)?|prop[oó]neme?|as[ií]gn(?:ame)?)\s+(?:un\s+)?(?:ejercicio|reto|pr[aá]ctica)\b/i,
+  /\b(?:quiero|necesito)\s+(?:un\s+)?(?:ejercicio|reto|pr[aá]ctica)\b/i,
+  /\bejercicio\s+(?:de|sobre|para|con)\b/i,
+  /\bpracticar\s+(?:con\s+)?(?:un\s+)?(?:ejercicio|reto)\b/i,
+  /\b(?:hazme|crea(?:me)?)\s+(?:un\s+)?(?:ejercicio|reto)\b/i,
+  /\b(?:ensen[a-z]*|ens[eé][nñ][a-z]*)\s+(?:un\s+)?ejercicio\b/i,
+  /\b(?:un[a]?\s+)?pr[aá]ctica\s+(?:de|sobre|para|con)\b/i,
+  /\b(?:hazme|dame|pon(?:me)?)\s+(?:un[a]?\s+)?pr[aá]ctica\b/i,
+];
 
 const EXPLANATION_PATTERNS = [
   /\bexpl[ií]came\b/i,
@@ -71,6 +83,19 @@ const SCREEN_CONTEXT =
 
 const EXPLAIN_MY_CODE =
   /\b(?:expl[ií]c|entiend|revis|analiz|corrige|arregla|depur|qué\s+hace|qué\s+hace\s+este)\w*/i;
+
+/**
+ * @param {string} message
+ */
+function detectExercise(message) {
+  const t = message.trim();
+  if (!t) return false;
+  const n = foldAccents(t);
+  for (const re of EXERCISE_PATTERNS) {
+    if (re.test(n)) return true;
+  }
+  return false;
+}
 
 /**
  * @param {string} message
@@ -127,6 +152,7 @@ export function detectHiloIntent(message) {
   if (!t) return "conversation";
   const n = foldAccents(t);
 
+  if (detectExercise(t)) return "exercise";
   if (detectLearning(t)) return "learning";
 
   for (const re of EXPLANATION_PATTERNS) {
@@ -154,8 +180,19 @@ export function detectHiloIntent(message) {
 export function intentToApiTipo(intent) {
   if (intent === "learning") return "aprendizaje";
   if (intent === "explanation") return "explicacion";
+  if (intent === "exercise") return "ejercicio";
   return "conversacion";
 }
 
+/** Tipo API cuando el modo ejercicio ya está activo (chat y feedback tras Run). */
+export function exerciseActiveApiTipo() {
+  return "ejercicio_activo";
+}
+
 /** Expuesto para pruebas y depuración de triggers. */
-export { detectLearning, LEARNING_PHRASE_PATTERNS, PROGRAMMING_TOPIC };
+export {
+  detectExercise,
+  detectLearning,
+  LEARNING_PHRASE_PATTERNS,
+  PROGRAMMING_TOPIC,
+};

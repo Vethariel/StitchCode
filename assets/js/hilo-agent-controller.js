@@ -4,8 +4,18 @@ import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
 import { defaultExplanationPanel } from "./hilo-context.js";
 import { resolveHighlightLine } from "./hilo-highlight-line.js";
-import { detectHiloIntent, intentToApiTipo } from "./hilo-intent.js";
+import {
+  detectHiloIntent,
+  exerciseActiveApiTipo,
+  intentToApiTipo,
+} from "./hilo-intent.js";
 import { runHiloLearning } from "./hilo-learning.js";
+import { runHiloExercise } from "./hilo-exercise.js";
+import {
+  deactivateExerciseMode,
+  getExerciseEnunciadoJson,
+  isExerciseModeActive,
+} from "./hilo-exercise-mode.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
   getHiloTutorialScript,
@@ -68,6 +78,11 @@ import {
  *     onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
  *     onTranslations?: (trans: { python: string, java: string, cpp: string }) => void,
  *   },
+ *   exercise?: {
+ *     applyTemplate: (code: string) => Promise<void>,
+ *     onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
+ *     onExerciseModeChange?: (active: boolean) => void,
+ *   },
  * }} opts
  */
 export function createHiloAgentController({
@@ -88,6 +103,7 @@ export function createHiloAgentController({
   onTutorialAction,
   onFocusTranslationTab,
   learning,
+  exercise,
 }) {
   /** @type {{ role: string, content: string }[]} */
   let historial = [];
@@ -98,6 +114,7 @@ export function createHiloAgentController({
   let busy = false;
   let tutorialActive = false;
   let spriteReady = false;
+  let runFeedbackPending = false;
   function formatBubbleHtml(text) {
     const safe = text
       .replace(/&/g, "&amp;")
@@ -478,6 +495,104 @@ export function createHiloAgentController({
     advanceTurn();
   }
 
+  function exitExerciseMode() {
+    if (!isExerciseModeActive()) return;
+    deactivateExerciseMode();
+    exercise?.onExerciseModeChange?.(false);
+    endExplanationFocus();
+    activeTurn = null;
+    setExplainingUi(false);
+    setEmotionState("idle");
+    showStaticMessage(
+      "Saliste del modo ejercicio. Puedes seguir programando con normalidad.",
+      "smile"
+    );
+  }
+
+  async function sendExerciseAwareMessage(mensaje, { silentRun = false } = {}) {
+    const apiKey = geminiApi.getActiveKey();
+    const ctx = getContext();
+    const inExercise = isExerciseModeActive();
+    const intent = detectHiloIntent(mensaje);
+    const tipoInteraccion = inExercise
+      ? exerciseActiveApiTipo()
+      : intentToApiTipo(intent);
+
+    const raw = await sendHiloMessage({
+      mensaje,
+      historial,
+      codigo: ctx.codigo,
+      output: ctx.output,
+      errores: ctx.errores,
+      tieneError: ctx.tieneError,
+      modo: ctx.modo,
+      nivelAyuda: inExercise ? nivelAyuda : intent === "explanation" ? 1 : nivelAyuda,
+      apiKey,
+      perfilJson: getPerfilJson(),
+      tipoInteraccion,
+      bloquesResumen: ctx.bloquesResumen,
+      codigoForParse: ctx.codigo,
+      outputJsonForParse: JSON.stringify(ctx.output),
+      enunciadoJsonForPrepare: inExercise ? getExerciseEnunciadoJson() : "{}",
+    });
+
+    let turn = parseHiloTurn(raw);
+    if (intent === "explanation" && !inExercise) {
+      turn = {
+        ...turn,
+        type: "explanation",
+        chunks: normalizeExplanationChunks(turn.chunks),
+      };
+    }
+
+    if (!silentRun) {
+      historial.push({ role: "user", content: mensaje });
+    } else {
+      historial.push({
+        role: "user",
+        content: "[Ejecución Run] " + mensaje,
+      });
+    }
+    historial.push({ role: "model", content: turn.texto_completo });
+    if (turn.type !== "explanation") {
+      avanzarNivel();
+    }
+    queueTurn(turn);
+  }
+
+  async function onAfterRun() {
+    if (
+      tutorialActive ||
+      busy ||
+      !isExerciseModeActive() ||
+      !isRuntimeReady() ||
+      !geminiApi.isValid()
+    ) {
+      return;
+    }
+    if (runFeedbackPending) return;
+    runFeedbackPending = true;
+    setBusy(true);
+    setEmotionState("thinking");
+    bubbleHint.hidden = true;
+    bubble.classList.add("show");
+    bubbleText.textContent = "Reviso tu ejecución en el ejercicio…";
+    try {
+      await sendExerciseAwareMessage(
+        "Acabo de pulsar Run. Revisa mi código actual y la salida o errores de la consola. " +
+          "Guíame con el mismo ejercicio sin darme la solución completa.",
+        { silentRun: true }
+      );
+    } catch (err) {
+      setEmotionState("error");
+      const msg = err instanceof Error ? err.message : String(err);
+      showStaticMessage(msg, "worried");
+    } finally {
+      runFeedbackPending = false;
+      setBusy(false);
+    }
+  }
+
   async function sendUserMessage(mensaje) {
     if (tutorialActive) return;
 
@@ -509,6 +624,39 @@ export function createHiloAgentController({
     activeTurn = null;
     bubbleHint.hidden = true;
     bubble.classList.add("show");
+
+    if (intent === "exercise") {
+      if (!exercise) {
+        showStaticMessage(
+          "El modo ejercicio no está disponible todavía.",
+          "worried"
+        );
+        setBusy(false);
+        return;
+      }
+      bubbleText.textContent = "Preparo tu ejercicio…";
+      try {
+        const { turn } = await runHiloExercise({
+          mensaje,
+          apiKey,
+          perfilJson: getPerfilJson(),
+          getContext,
+          applyTemplate: exercise.applyTemplate,
+          onEnunciado: exercise.onEnunciado,
+          onExerciseModeChange: exercise.onExerciseModeChange,
+        });
+        historial.push({ role: "user", content: mensaje });
+        historial.push({ role: "model", content: turn.texto_completo });
+        queueTurn(turn);
+      } catch (err) {
+        setEmotionState("error");
+        const msg = err instanceof Error ? err.message : String(err);
+        showStaticMessage(msg, "worried");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     if (intent === "learning") {
       if (!learning) {
@@ -565,42 +713,14 @@ export function createHiloAgentController({
     }
 
     bubbleText.textContent =
-      intent === "explanation" ? "Preparo la explicación…" : "Déjame pensar…";
+      intent === "explanation"
+        ? "Preparo la explicación…"
+        : isExerciseModeActive()
+          ? "Te apoyo con el ejercicio…"
+          : "Déjame pensar…";
 
     try {
-      const raw = await sendHiloMessage({
-        mensaje,
-        historial,
-        codigo: ctx.codigo,
-        output: ctx.output,
-        errores: ctx.errores,
-        tieneError: ctx.tieneError,
-        modo: ctx.modo,
-        nivelAyuda: intent === "explanation" ? 1 : nivelAyuda,
-        apiKey,
-        perfilJson: getPerfilJson(),
-        tipoInteraccion: intentToApiTipo(intent),
-        bloquesResumen: ctx.bloquesResumen,
-        codigoForParse: ctx.codigo,
-        outputJsonForParse: JSON.stringify(ctx.output),
-      });
-
-      let turn = parseHiloTurn(raw);
-      const defaultPanel = defaultExplanationPanel(ctx.vista);
-      if (intent === "explanation") {
-        turn = {
-          ...turn,
-          type: "explanation",
-          chunks: normalizeExplanationChunks(turn.chunks),
-        };
-      }
-
-      historial.push({ role: "user", content: mensaje });
-      historial.push({ role: "model", content: turn.texto_completo });
-      if (turn.type !== "explanation") {
-        avanzarNivel();
-      }
-      queueTurn(turn);
+      await sendExerciseAwareMessage(mensaje);
     } catch (err) {
       setEmotionState("error");
       const msg = err instanceof Error ? err.message : String(err);
@@ -649,6 +769,9 @@ export function createHiloAgentController({
     onExecutionContextChange() {
       reiniciarNivelSiSinError();
     },
+    onAfterRun,
+    exitExerciseMode,
+    isExerciseModeActive,
     startTutorial,
     isTutorialActive: () => tutorialActive,
   };

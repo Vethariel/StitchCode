@@ -283,6 +283,81 @@ Reglas del código:
 
 OBJETIVOS_REDACCION_VALIDOS = frozenset({"ejemplo_correcto", "ejemplo_para_corregir"})
 
+EJERCICIO_ESTABLISH_PROMPT = """
+PODER: ESTABLECER EJERCICIO
+El estudiante pide un ejercicio de práctica (no un ejemplo didáctico completo).
+
+Responde SOLO con JSON válido:
+{
+  "type": "ejercicio",
+  "titulo": "título corto del reto",
+  "enunciado": ["párrafo 1 del enunciado", "párrafo 2 opcional"],
+  "codigo_plantilla": "programa Woven inicial para el editor",
+  "criterios": ["criterio verificable 1", "criterio 2"],
+  "resumen": "frase breve del objetivo pedagógico"
+}
+
+Reglas:
+- enunciado: 2 a 4 párrafos claros (qué debe lograr, restricciones, pistas sin dar la solución).
+- codigo_plantilla: esqueleto ejecutable (declaraciones, comentarios // con pistas, huecos con valores iniciales).
+  No entregues la solución final; deja trabajo al estudiante.
+- criterios: 2 a 5 ítems observables (salida esperada, estructuras obligatorias, etc.).
+- Solo sintaxis Woven; sin markdown fuera del JSON.
+"""
+
+EXERCISE_ACTIVE_PROMPT = """
+PODER: MODO EJERCICIO ACTIVO
+El estudiante está resolviendo UN ejercicio fijo. Recibirás el ENUNCIADO del panel lateral
+y su código actual. Debes apoyar SIEMPRE en función de ese mismo ejercicio (no cambies de tema).
+
+Responde con JSON type "conversation" y entre 2 y 5 chunks (frases cortas, emoción cada una).
+
+Reglas:
+- Relaciona cada respuesta con el enunciado y el código en pantalla.
+- Si acaba de ejecutar (Run), comenta salida o errores sin regalar la solución completa.
+- Usa niveles de ayuda del SYSTEM_PROMPT cuando haya errores; en exploración exitosa celebra y sugiere siguiente paso.
+- Si pide explicación de una línea, explica solo esa parte en el marco del ejercicio.
+- No propongas otro ejercicio ni reescribas el enunciado.
+"""
+
+
+def _es_modo_ejercicio_activo(tipo_interaccion: str) -> bool:
+    return (tipo_interaccion or "").strip().lower() in (
+        "ejercicio_activo",
+        "ejercicio",
+        "modo_ejercicio",
+    )
+
+
+def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
+    try:
+        data = json.loads(enunciado_json) if enunciado_json else {}
+    except json.JSONDecodeError:
+        data = {}
+    if not isinstance(data, dict):
+        return contexto
+    titulo = str(data.get("titulo") or "").strip()
+    parrafos = data.get("enunciado") or data.get("paragraphs") or []
+    if isinstance(parrafos, str):
+        parrafos = [parrafos]
+    criterios = data.get("criterios") or []
+    if not titulo and not parrafos:
+        return contexto
+    bloques = ["ENUNCIADO DEL EJERCICIO ACTIVO (panel lateral — no lo cambies):"]
+    if titulo:
+        bloques.append(f"Título: {titulo}")
+    for i, p in enumerate(parrafos, 1):
+        texto = str(p).strip()
+        if texto:
+            bloques.append(f"  {i}. {texto}")
+    if criterios:
+        bloques.append("Criterios de éxito:")
+        for c in criterios:
+            ct = str(c).strip()
+            if ct:
+                bloques.append(f"  - {ct}")
+    return contexto + "\n\n" + "\n".join(bloques)
+
 
 def construir_contexto(
     codigo: str,
@@ -466,6 +541,99 @@ def normalizar_respuesta_redaccion(texto_modelo: str) -> dict:
     raise ValueError("La redacción no incluyó código Woven.")
 
 
+def construir_payload_ejercicio(
+    mensaje: str,
+    codigo: str,
+    modo: str,
+    perfil_json: str = "{}",
+    bloques_resumen: str = "",
+) -> str:
+    contexto = construir_contexto(codigo, [], [], False, modo, bloques_resumen)
+    preferencias = construir_preferencias_estudiante(perfil_json)
+
+    system_completo = (
+        SYSTEM_PROMPT
+        + f"\n\n{EJERCICIO_ESTABLISH_PROMPT}"
+        + f"\n\n{preferencias}"
+        + f"\n\nCONTEXTO (referencia del editor; genera plantilla nueva):\n{contexto}"
+        + "\n\nTURNO ACTUAL: el estudiante pidió un ejercicio de práctica. "
+        'Responde solo con JSON type "ejercicio".'
+    )
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_completo}]},
+        "contents": [{"role": "user", "parts": [{"text": mensaje}]}],
+        "generationConfig": {
+            "temperature": 0.55,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
+    crudo = _limpiar_json_crudo(texto_modelo)
+    try:
+        data = json.loads(crudo)
+        if isinstance(data, dict) and str(data.get("type", "")).lower() == "ejercicio":
+            titulo = str(data.get("titulo", "")).strip()[:120]
+            raw_enun = data.get("enunciado") or data.get("paragraphs") or []
+            if isinstance(raw_enun, str):
+                parrafos = [raw_enun.strip()] if raw_enun.strip() else []
+            elif isinstance(raw_enun, list):
+                parrafos = [str(p).strip() for p in raw_enun if str(p).strip()]
+            else:
+                parrafos = []
+            codigo = str(data.get("codigo_plantilla") or data.get("codigo") or "").strip()
+            criterios_raw = data.get("criterios") or []
+            criterios = (
+                [str(c).strip() for c in criterios_raw if str(c).strip()]
+                if isinstance(criterios_raw, list)
+                else []
+            )
+            resumen = str(data.get("resumen", "")).strip()[:200]
+            if not titulo and parrafos:
+                titulo = parrafos[0][:80]
+            if not parrafos and titulo:
+                parrafos = [titulo]
+            if not codigo:
+                raise ValueError("Falta codigo_plantilla en el ejercicio.")
+            return {
+                "type": "ejercicio",
+                "titulo": titulo or "Ejercicio",
+                "enunciado": parrafos,
+                "codigo_plantilla": codigo,
+                "criterios": criterios,
+                "resumen": resumen,
+            }
+    except json.JSONDecodeError:
+        pass
+    raise ValueError("La respuesta no incluyó un ejercicio válido.")
+
+
+def parsear_respuesta_ejercicio(response_json: str) -> str:
+    data = json.loads(response_json)
+    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+    return json.dumps(normalizar_respuesta_ejercicio(raw), ensure_ascii=False)
+
+
+def hilo_establecer_ejercicio(
+    mensaje,
+    codigo,
+    modo,
+    perfil_json="{}",
+    bloques_resumen="",
+):
+    try:
+        payload = construir_payload_ejercicio(
+            mensaje, codigo, modo, perfil_json, bloques_resumen
+        )
+        return json.dumps({"ok": True, "payload": payload})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
+
+
 def parsear_respuesta_redaccion(response_json: str) -> str:
     data = json.loads(response_json)
     raw = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -508,6 +676,7 @@ def construir_payload_hilo(
     tipo_interaccion: str = "conversacion",
     bloques_resumen: str = "",
     traducciones_json: str = "{}",
+    enunciado_json: str = "{}",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -516,6 +685,8 @@ def construir_payload_hilo(
     contexto = construir_contexto(
         codigo, output, errores, tiene_error, modo, bloques_resumen
     )
+    if _es_modo_ejercicio_activo(tipo_interaccion):
+        contexto = _anexar_enunciado_ejercicio(contexto, enunciado_json)
     if _es_modo_explicacion_aprendizaje(tipo_interaccion):
         contexto = _anexar_traducciones_contexto(contexto, traducciones_json)
         contexto = _resaltar_consola_aprendizaje(contexto, output)
@@ -562,6 +733,11 @@ def construir_payload_hilo(
             "\n\nTURNO ACTUAL: el estudiante pidió una EXPLICACIÓN. "
             'Responde solo con JSON type "explanation".'
         )
+    elif _es_modo_ejercicio_activo(tipo_interaccion):
+        system_completo += (
+            f"\n\n{EXERCISE_ACTIVE_PROMPT}"
+            "\n\nTURNO ACTUAL: MODO EJERCICIO — responde con JSON type \"conversation\"."
+        )
 
     mensajes = []
     for h in historial:
@@ -574,7 +750,10 @@ def construir_payload_hilo(
         "parts": [{"text": mensaje}]
     })
 
-    max_tokens = 3072 if modo_aprendizaje else 1024
+    if _es_modo_ejercicio_activo(tipo_interaccion):
+        max_tokens = 1024
+    else:
+        max_tokens = 3072 if modo_aprendizaje else 1024
     payload = {
         "system_instruction": {"parts": [{"text": system_completo}]},
         "contents": mensajes,
@@ -901,12 +1080,14 @@ def hilo_chat(
     tipo_interaccion="conversacion",
     bloques_resumen="",
     traducciones_json="{}",
+    enunciado_json="{}",
 ):
     """
     Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
-    tipo_interaccion: "conversacion" | "explicacion" | "explicacion_aprendizaje".
+    tipo_interaccion: "conversacion" | "explicacion" | "explicacion_aprendizaje" | "ejercicio_activo".
     bloques_resumen: programa L1… cuando modo es bloques o verboso.
     traducciones_json: {python, java, cpp} para explicación de aprendizaje.
+    enunciado_json: título y párrafos del ejercicio activo.
     """
     try:
         payload = construir_payload_hilo(
@@ -922,6 +1103,7 @@ def hilo_chat(
             tipo_interaccion,
             bloques_resumen,
             traducciones_json,
+            enunciado_json,
         )
         return json.dumps({
             "ok": True,

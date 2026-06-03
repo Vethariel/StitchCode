@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   detectHiloIntent,
+  detectExercise,
   detectLearning,
+  exerciseActiveApiTipo,
   intentToApiTipo,
 } from "../assets/js/hilo-intent.js";
 
@@ -48,4 +50,19 @@ test("aprendizaje no roba explicación del código del alumno", () => {
   assert.equal(detectHiloIntent("Explícame mi código"), "explanation");
   assert.equal(detectHiloIntent("Enséñame qué hace mi función"), "explanation");
   assert.equal(detectLearning("Explícame este programa en pantalla"), false);
+});
+
+test("detecta ejercicio antes que aprendizaje", () => {
+  assert.equal(detectHiloIntent("Dame un ejercicio de listas"), "exercise");
+  assert.equal(detectHiloIntent("modo ejercicio"), "exercise");
+  assert.equal(detectHiloIntent("Quiero un reto de bucles"), "exercise");
+  assert.equal(detectHiloIntent("Enséñame un ejercicio de variables"), "exercise");
+  assert.equal(intentToApiTipo("exercise"), "ejercicio");
+  assert.equal(exerciseActiveApiTipo(), "ejercicio_activo");
+  assert.equal(detectExercise("Hazme una práctica de condicionales"), true);
+});
+
+test("aprendizaje sigue sin confundirse con ejercicio explícito", () => {
+  assert.equal(detectHiloIntent("Enséñame de listas"), "learning");
+  assert.equal(detectHiloIntent("Quiero aprender arrays"), "learning");
 });

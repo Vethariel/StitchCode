@@ -350,6 +350,22 @@
   cursor: not-allowed;
 }
 
+.nav-btn--exercise-exit {
+  background: rgba(var(--rgb-accent), 0.22);
+  border-color: rgba(var(--rgb-accent), 0.45);
+  color: var(--terra-gold, var(--color-accent));
+  font-weight: 600;
+}
+
+.nav-btn--exercise-exit:hover:not(:disabled) {
+  background: rgba(var(--rgb-accent), 0.32);
+  color: var(--color-text);
+}
+
+body.exercise-mode-active .nav-btn--exercise-exit {
+  box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.35);
+}
+
 .nav-btn.active {
   background: rgba(212, 168, 83, 0.14);
   border-color: rgba(212, 168, 83, 0.32);

@@ -178,6 +178,34 @@ const sidePanel = createSidePanelController({
   isRuntimeReady: isReady,
 });
 
+const exitExerciseBtn = document.getElementById("exit-exercise-btn");
+
+/** @param {string} code */
+async function applyCodeToEditor(code) {
+  editor.setCode(code);
+  const vista = editorMode?.getMode() ?? "text";
+  if (vista === "blocks" || vista === "verbose") {
+    try {
+      const doc = await parseBlocks(code);
+      blocksCtl.setDocument(
+        doc.bloques,
+        vista === "verbose" ? "verbose" : "code"
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      consoleCtl.clear();
+      consoleCtl.appendLine(
+        `No pude convertir el código a bloques: ${msg}. Cambié a modo texto.`,
+        "error",
+        "!"
+      );
+      await editorMode.setMode("text");
+    }
+  }
+  await linter.runLint();
+  syncEditorDiagnostics();
+}
+
 const hiloFocus = createHiloFocusController({
   overlay: document.getElementById("hilo-focus-overlay"),
   dock: document.getElementById("floating-dock"),
@@ -233,28 +261,7 @@ hiloAgent = createHiloAgentController({
     onEnunciado: (data) => sidePanel.setEnunciado(data),
     onTranslations: (trans) => sidePanel.setTranslations(trans),
     applyExample: async (code) => {
-      editor.setCode(code);
-      const vista = editorMode?.getMode() ?? "text";
-      if (vista === "blocks" || vista === "verbose") {
-        try {
-          const doc = await parseBlocks(code);
-          blocksCtl.setDocument(
-            doc.bloques,
-            vista === "verbose" ? "verbose" : "code"
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          consoleCtl.clear();
-          consoleCtl.appendLine(
-            `No pude convertir el ejemplo a bloques: ${msg}. Cambié a modo texto.`,
-            "error",
-            "!"
-          );
-          await editorMode.setMode("text");
-        }
-      }
-      await linter.runLint();
-      syncEditorDiagnostics();
+      await applyCodeToEditor(code);
 
       if (!linter.tieneErroresBloqueantes()) {
         consoleShowsLintErrors = false;
@@ -282,6 +289,21 @@ hiloAgent = createHiloAgentController({
         }
         hiloAgent?.onExecutionContextChange();
       }
+    },
+  },
+  exercise: {
+    onEnunciado: (data) => sidePanel.setEnunciado(data),
+    onExerciseModeChange: (active) => {
+      if (exitExerciseBtn) exitExerciseBtn.hidden = !active;
+      document.body.classList.toggle("exercise-mode-active", active);
+    },
+    applyTemplate: async (code) => {
+      await applyCodeToEditor(code);
+      consoleShowsLintErrors = false;
+      consoleCtl.showEmpty("// Ejercicio cargado. Pulsa Run cuando quieras probar tu solución…");
+      lastRunOutput = [];
+      lastRunHadError = false;
+      hiloAgent?.onExecutionContextChange();
     },
   },
   getContext: () =>
@@ -377,6 +399,7 @@ async function handleRun() {
     lastRunOutput = result.salida ?? [];
     lastRunHadError = !!result.tiene_errores;
     hiloAgent?.onExecutionContextChange();
+    void hiloAgent?.onAfterRun();
 
     if (!result.tiene_errores) {
       consoleCtl.appendLine(`✓ Completado en ${ms} ms`, "info");
@@ -387,6 +410,7 @@ async function handleRun() {
     lastRunHadError = true;
     lastRunOutput = [];
     hiloAgent?.onExecutionContextChange();
+    void hiloAgent?.onAfterRun();
     consoleCtl.appendLine(message, "error", "!");
   } finally {
     isRunning = false;
@@ -395,6 +419,11 @@ async function handleRun() {
 }
 
 runBtn.addEventListener("click", handleRun);
+
+exitExerciseBtn?.addEventListener("click", () => {
+  hiloAgent?.exitExerciseMode();
+});
+
 clearBtn.addEventListener("click", () => {
   consoleShowsLintErrors = false;
   consoleCtl.showEmpty("// Consola limpiada…");
