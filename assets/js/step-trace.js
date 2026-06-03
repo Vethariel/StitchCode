@@ -129,3 +129,55 @@ export function buildStepView(trace, index) {
     outputLines,
   };
 }
+
+/**
+ * Contexto compacto para Hilo cuando el modo paso a paso está activo.
+ * @param {WovenTrace} trace
+ * @param {number} stepIndex índice del evento actual (0-based)
+ */
+export function buildStepContextForHilo(trace, stepIndex) {
+  const eventos = trace.eventos ?? [];
+  if (!eventos.length) return null;
+
+  const view = buildStepView(trace, stepIndex);
+  const ev = view.event;
+
+  const resumen_traza = eventos.map((e, i) => {
+    const actual = i === view.index ? " ← PASO ACTUAL" : "";
+    let line = `${i + 1}/${eventos.length} · ${eventTypeLabel(e.tipo)}`;
+    if (e.linea != null) line += ` · línea ${e.linea}`;
+    if (e.codigo) line += ` · ${String(e.codigo).trim().slice(0, 100)}`;
+    else if (e.nombre) line += ` · ${e.nombre}`;
+    else if (e.texto !== undefined) line += ` · salida «${String(e.texto).slice(0, 80)}»`;
+    else if (e.mensaje) line += ` · ${String(e.mensaje).slice(0, 100)}`;
+    return line + actual;
+  });
+
+  const variables_visibles = Object.entries(view.scope)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, info]) => `${name} (${info.tipo}) = ${formatWovenValue(info.valor)}`);
+
+  return {
+    activo: true,
+    paso_actual: view.index + 1,
+    total_pasos: view.total,
+    indice_evento: view.index,
+    evento: ev
+      ? {
+          tipo: ev.tipo,
+          linea: ev.linea ?? null,
+          codigo: view.code || ev.codigo || null,
+          nombre: ev.nombre ?? null,
+          mensaje: ev.mensaje ?? null,
+          texto: ev.texto ?? null,
+        }
+      : null,
+    contexto_ejecucion: view.contextLabel,
+    variables_visibles,
+    salida_consola_hasta_paso: view.outputLines.map((l) => l.texto),
+    resumen_traza,
+    traza_exito: !!trace.exito,
+    hay_error_en_paso_actual: view.hasError,
+    mensaje_error: view.errorMessage,
+  };
+}

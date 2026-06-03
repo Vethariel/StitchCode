@@ -240,6 +240,7 @@ export async function blocksToSource(doc) {
  *   bloquesResumen?: string,
  *   traduccionesJson?: string,
  *   enunciadoJson?: string,
+ *   pasoAPasoJson?: string,
  * }} args
  */
 export async function hiloPrepareMessage(args) {
@@ -260,7 +261,8 @@ export async function hiloPrepareMessage(args) {
       args.tipoInteraccion ?? "conversacion",
       args.bloquesResumen ?? "",
       args.traduccionesJson ?? "{}",
-      args.enunciadoJson ?? "{}"
+      args.enunciadoJson ?? "{}",
+      args.pasoAPasoJson ?? "{}"
     )
   );
   return JSON.parse(raw);

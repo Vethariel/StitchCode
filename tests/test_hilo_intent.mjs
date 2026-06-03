@@ -5,6 +5,8 @@ import {
   detectExercise,
   detectLearning,
   detectStepTrace,
+  detectExitStepMode,
+  stepModeActiveApiTipo,
   exerciseActiveApiTipo,
   intentToApiTipo,
 } from "../assets/js/hilo-intent.js";
@@ -82,4 +84,11 @@ test("paso a paso no roba explicación explícita", () => {
 
 test("ejercicio sale antes que paso a paso", () => {
   assert.equal(detectHiloIntent("Dame un ejercicio paso a paso"), "exercise");
+});
+
+test("detecta salir del modo paso a paso", () => {
+  assert.equal(detectExitStepMode("salir del paso a paso"), true);
+  assert.equal(detectExitStepMode("cerrar el modo paso a paso"), true);
+  assert.equal(detectExitStepMode("explícame esto"), false);
+  assert.equal(stepModeActiveApiTipo(), "paso_a_paso_activo");
 });

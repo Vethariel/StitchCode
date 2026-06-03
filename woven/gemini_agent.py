@@ -198,6 +198,36 @@ Si MODO DE VISTA es "verboso":
   Nivel 4: describe paso a paso cómo cambiar el placeholder
 """
 
+STEP_MODE_ACTIVE_HINT = """
+MODO PASO A PASO ACTIVO EN EL EDITOR
+El estudiante está recorriendo la TRAZA de ejecución (no un Run completo).
+En el contexto verás MODO PASO A PASO ACTIVO con:
+- paso actual y total de eventos
+- evento actual (tipo, línea, código)
+- variables visibles en ese instante
+- salida de consola acumulada SOLO hasta ese paso
+- resumen de toda la traza (el paso actual está marcado)
+
+Reglas:
+- Responde en función del PASO ACTUAL; no adelantes pasos futuros ni asumas salida posterior.
+- Si pregunta «qué pasa aquí» o «por qué falla», usa el evento y variables del paso marcado.
+- Puedes referirte a otros eventos del resumen solo como contexto, sin spoilear lo que aún no ocurrió.
+- No sugieras activar paso a paso (ya está activo); guía con Anterior/Siguiente si hace falta.
+
+PODERES DESACTIVADOS mientras este modo está activo:
+- NO ejercicios, NO aprendizaje con ejemplo nuevo, NO redacción, NO activar_paso_a_paso.
+- Si pide otro poder, indica que use «Salir del modo paso a paso» en la barra azul.
+- Solo explica el paso actual (type "explanation") o indica cómo salir del modo.
+"""
+
+PASO_A_PASO_SOLO_EXPLICACION = """
+TURNO EN MODO PASO A PASO (restricción estricta)
+Responde ÚNICAMENTE con JSON type: "explanation" y entre 2 y 5 chunks.
+Cada chunk comenta el PASO ACTUAL de la traza (panel editor/blocks/consola según MODO DE VISTA).
+highlight.line debe corresponder al paso o línea que mencionas.
+Prohibido: activar_paso_a_paso, ejercicio_completado, proponer ejercicios o lecciones nuevas.
+"""
+
 STEP_MODE_HINT = """
 HERRAMIENTA: EJECUCIÓN PASO A PASO (editor)
 Cuando el estudiante no entiende el flujo de SU programa en pantalla, la salida
@@ -429,6 +459,65 @@ def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
     return contexto + "\n\n" + "\n".join(bloques)
 
 
+def _anexar_contexto_paso_a_paso(contexto: str, paso_a_paso_json: str) -> str:
+    try:
+        data = json.loads(paso_a_paso_json) if paso_a_paso_json else {}
+    except json.JSONDecodeError:
+        return contexto
+    if not isinstance(data, dict) or not data.get("activo"):
+        return contexto
+
+    bloques = [
+        "MODO PASO A PASO ACTIVO (el estudiante está en la traza del editor):",
+        f"Paso actual: {data.get('paso_actual', '?')} de {data.get('total_pasos', '?')} "
+        f"(índice de evento {data.get('indice_evento', '?')}).",
+        f"Contexto de ejecución: {data.get('contexto_ejecucion', 'Programa principal')}.",
+    ]
+
+    evento = data.get("evento")
+    if isinstance(evento, dict):
+        partes_ev = [f"Evento actual: tipo={evento.get('tipo', '?')}"]
+        if evento.get("linea") is not None:
+            partes_ev.append(f"línea={evento.get('linea')}")
+        if evento.get("codigo"):
+            partes_ev.append(f"código=`{evento.get('codigo')}`")
+        if evento.get("nombre"):
+            partes_ev.append(f"nombre={evento.get('nombre')}")
+        if evento.get("texto") is not None:
+            partes_ev.append(f"texto impreso={evento.get('texto')!r}")
+        if evento.get("mensaje"):
+            partes_ev.append(f"mensaje={evento.get('mensaje')}")
+        bloques.append(" ".join(partes_ev))
+
+    vars_vis = data.get("variables_visibles") or []
+    if isinstance(vars_vis, list) and vars_vis:
+        bloques.append("Variables visibles en este paso:")
+        for v in vars_vis:
+            vt = str(v).strip()
+            if vt:
+                bloques.append(f"  - {vt}")
+
+    salida = data.get("salida_consola_hasta_paso") or []
+    if isinstance(salida, list) and salida:
+        bloques.append("Salida de consola hasta este paso (no posterior):")
+        for i, linea in enumerate(salida, 1):
+            bloques.append(f"  {i}. {linea}")
+    else:
+        bloques.append("Salida de consola hasta este paso: (ninguna línea impresa aún).")
+
+    if data.get("hay_error_en_paso_actual"):
+        bloques.append(
+            f"Error en el paso actual: {data.get('mensaje_error') or 'ver evento de error en la traza'}."
+        )
+
+    resumen = data.get("resumen_traza") or []
+    if isinstance(resumen, list) and resumen:
+        bloques.append("Resumen de la traza (el paso actual está marcado ← PASO ACTUAL):")
+        bloques.extend(f"  {linea}" for linea in resumen if str(linea).strip())
+
+    return contexto + "\n\n" + "\n".join(bloques)
+
+
 def construir_contexto(
     codigo: str,
     output: list,
@@ -510,6 +599,13 @@ def _es_modo_explicacion_aprendizaje(tipo_interaccion: str) -> bool:
     return (tipo_interaccion or "").strip().lower() in (
         "explicacion_aprendizaje",
         "aprendizaje_explicacion",
+    )
+
+
+def _es_modo_paso_a_paso_activo(tipo_interaccion: str) -> bool:
+    return (tipo_interaccion or "").strip().lower() in (
+        "paso_a_paso_activo",
+        "step_mode_active",
     )
 
 
@@ -751,6 +847,7 @@ def construir_payload_hilo(
     bloques_resumen: str = "",
     traducciones_json: str = "{}",
     enunciado_json: str = "{}",
+    paso_a_paso_json: str = "{}",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -759,6 +856,13 @@ def construir_payload_hilo(
     contexto = construir_contexto(
         codigo, output, errores, tiene_error, modo, bloques_resumen
     )
+    contexto = _anexar_contexto_paso_a_paso(contexto, paso_a_paso_json)
+    paso_activo = False
+    try:
+        paso_data = json.loads(paso_a_paso_json) if paso_a_paso_json else {}
+        paso_activo = isinstance(paso_data, dict) and paso_data.get("activo")
+    except json.JSONDecodeError:
+        paso_activo = False
     if _es_modo_ejercicio_activo(tipo_interaccion):
         contexto = _anexar_enunciado_ejercicio(contexto, enunciado_json)
     if _es_modo_explicacion_aprendizaje(tipo_interaccion):
@@ -782,11 +886,16 @@ def construir_payload_hilo(
 
     preferencias = construir_preferencias_estudiante(perfil_json)
     modo_aprendizaje = _es_modo_explicacion_aprendizaje(tipo_interaccion)
-    modo_explicacion = _es_modo_explicacion(tipo_interaccion) or modo_aprendizaje
+    modo_paso_a_paso = paso_activo or _es_modo_paso_a_paso_activo(tipo_interaccion)
+    modo_explicacion = (
+        _es_modo_explicacion(tipo_interaccion) or modo_aprendizaje or modo_paso_a_paso
+    )
 
     explicacion_extra = ""
     if modo_aprendizaje:
         explicacion_extra = EXPLANATION_LEARNING_PROMPT
+    elif modo_paso_a_paso:
+        explicacion_extra = EXPLANATION_PROMPT
     elif modo_explicacion:
         explicacion_extra = EXPLANATION_PROMPT
 
@@ -811,6 +920,12 @@ def construir_payload_hilo(
         system_completo += (
             f"\n\n{EXERCISE_ACTIVE_PROMPT}"
             "\n\nTURNO ACTUAL: MODO EJERCICIO — responde con JSON type \"conversation\"."
+        )
+    elif paso_activo or modo_paso_a_paso:
+        system_completo += (
+            f"\n\n{STEP_MODE_ACTIVE_HINT}"
+            f"\n\n{PASO_A_PASO_SOLO_EXPLICACION}"
+            '\n\nResponde solo con JSON type "explanation".'
         )
     elif tipo_interaccion == "conversacion" and (codigo or "").strip():
         system_completo += f"\n\n{STEP_MODE_HINT}"
@@ -1177,6 +1292,7 @@ def hilo_chat(
     bloques_resumen="",
     traducciones_json="{}",
     enunciado_json="{}",
+    paso_a_paso_json="{}",
 ):
     """
     Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
@@ -1184,6 +1300,7 @@ def hilo_chat(
     bloques_resumen: programa L1… cuando modo es bloques o verboso.
     traducciones_json: {python, java, cpp} para explicación de aprendizaje.
     enunciado_json: título y párrafos del ejercicio activo.
+    paso_a_paso_json: traza y paso actual si el modo paso a paso del editor está activo.
     """
     try:
         payload = construir_payload_hilo(
@@ -1200,6 +1317,7 @@ def hilo_chat(
             bloques_resumen,
             traducciones_json,
             enunciado_json,
+            paso_a_paso_json,
         )
         return json.dumps({
             "ok": True,

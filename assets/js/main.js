@@ -283,6 +283,27 @@ const onFocusTranslationTab = (lang) => {
   sidePanel.setActiveTab(lang);
 };
 
+const hiloInput = document.getElementById("hilo-input");
+const hiloBubbleHint = document.getElementById("hilo-bubble-hint");
+const HILO_INPUT_PLACEHOLDER_DEFAULT =
+  hiloInput?.getAttribute("placeholder") ?? "Pregúntale a Hilo…";
+
+/** @param {boolean} active */
+function setHiloStepModeRestrict(active) {
+  if (hiloInput) {
+    hiloInput.placeholder = active
+      ? "Pregunta sobre este paso o di «salir del paso a paso»…"
+      : HILO_INPUT_PLACEHOLDER_DEFAULT;
+    hiloInput.setAttribute(
+      "aria-description",
+      active
+        ? "Modo paso a paso: solo explicación del paso actual o salir del modo"
+        : ""
+    );
+  }
+  document.body.classList.toggle("hilo-step-only", active);
+}
+
 stepMode = createStepModeController({
   getCode: () => editor.getCode(),
   traceWoven,
@@ -302,6 +323,7 @@ stepMode = createStepModeController({
   editor,
   console: consoleCtl,
   sidePanel,
+  onModeChange: setHiloStepModeRestrict,
   elements: {
     navBtn: stepModeBtn,
     contextBar: document.getElementById("step-context-bar"),
@@ -415,6 +437,7 @@ hiloAgent = createHiloAgentController({
       bloquesResumen: editorMode?.isBlockMode()
         ? blocksCtl.getProgramSummary()
         : "",
+      pasoAPaso: stepMode?.getHiloContext?.() ?? null,
     }),
 });
 

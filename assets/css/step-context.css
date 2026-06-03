@@ -213,3 +213,12 @@
 .blocks-line-main.step-highlight-line .woven-block {
   box-shadow: 0 0 0 2px rgba(120, 168, 220, 0.55);
 }
+
+/* Hilo restringido mientras paso a paso está activo */
+body.hilo-step-only .hilo-input {
+  border-color: rgba(120, 168, 220, 0.45);
+}
+
+body.hilo-step-only .hilo-input::placeholder {
+  color: rgba(120, 168, 220, 0.75);
+}

@@ -5,9 +5,11 @@ import { createHiloHighlightController } from "./hilo-highlight.js";
 import { defaultExplanationPanel } from "./hilo-context.js";
 import { resolveHighlightLine } from "./hilo-highlight-line.js";
 import {
+  detectExitStepMode,
   detectHiloIntent,
   exerciseActiveApiTipo,
   intentToApiTipo,
+  stepModeActiveApiTipo,
 } from "./hilo-intent.js";
 import { runHiloLearning } from "./hilo-learning.js";
 import { runHiloExercise } from "./hilo-exercise.js";
@@ -63,6 +65,7 @@ import {
  *     modo: string,
  *     vista: 'text' | 'blocks' | 'verbose',
  *     bloquesResumen: string,
+ *     pasoAPaso?: Record<string, unknown> | null,
  *   },
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
@@ -595,11 +598,14 @@ export function createHiloAgentController({
   async function sendExerciseAwareMessage(mensaje, { silentRun = false } = {}) {
     const apiKey = geminiApi.getActiveKey();
     const ctx = getContext();
-    const inExercise = isExerciseModeActive();
-    const intent = detectHiloIntent(mensaje);
-    const tipoInteraccion = inExercise
-      ? exerciseActiveApiTipo()
-      : intentToApiTipo(intent);
+    const inStepMode = !!ctx.pasoAPaso?.activo;
+    const inExercise = isExerciseModeActive() && !inStepMode;
+    const intent = inStepMode ? "explanation" : detectHiloIntent(mensaje);
+    const tipoInteraccion = inStepMode
+      ? stepModeActiveApiTipo()
+      : inExercise
+        ? exerciseActiveApiTipo()
+        : intentToApiTipo(intent);
 
     const raw = await sendHiloMessage({
       mensaje,
@@ -617,15 +623,19 @@ export function createHiloAgentController({
       codigoForParse: ctx.codigo,
       outputJsonForParse: JSON.stringify(ctx.output),
       enunciadoJsonForPrepare: inExercise ? getExerciseEnunciadoJson() : "{}",
+      pasoAPasoJsonForPrepare: JSON.stringify(ctx.pasoAPaso ?? { activo: false }),
     });
 
     let turn = parseHiloTurn(raw);
-    if (intent === "explanation" && !inExercise) {
+    if ((intent === "explanation" || inStepMode) && !inExercise) {
       turn = {
         ...turn,
         type: "explanation",
         chunks: normalizeExplanationChunks(turn.chunks),
       };
+    }
+    if (inStepMode) {
+      delete turn.activarPasoAPaso;
     }
 
     if (!silentRun) {
@@ -641,14 +651,17 @@ export function createHiloAgentController({
       avanzarNivel();
     }
     queueTurn(turn);
-    tryCompleteExercise(turn, ctx, { afterRun: silentRun });
-    await maybeActivateStepModeFromTurn(turn);
+    if (!inStepMode) {
+      tryCompleteExercise(turn, ctx, { afterRun: silentRun });
+      await maybeActivateStepModeFromTurn(turn);
+    }
   }
 
   async function onAfterRun() {
     if (
       tutorialActive ||
       busy ||
+      stepMode?.isActive() ||
       !isExerciseModeActive() ||
       !isRuntimeReady() ||
       !geminiApi.isValid()
@@ -701,7 +714,67 @@ export function createHiloAgentController({
     }
 
     const apiKey = geminiApi.getActiveKey();
-    const ctx = getContext();
+    const inStepMode = stepMode?.isActive() ?? false;
+
+    if (inStepMode) {
+      if (detectExitStepMode(mensaje)) {
+        stepMode.exit();
+        setBusy(true);
+        setEmotionState("idle");
+        activeTurn = null;
+        bubbleHint.hidden = true;
+        bubble.classList.add("show");
+        historial.push({ role: "user", content: mensaje });
+        historial.push({
+          role: "model",
+          content:
+            "Salí del modo paso a paso. Ya puedes usar todos los poderes de Hilo con normalidad.",
+        });
+        queueTurn(
+          localHiloTurn([
+            {
+              text: "Listo, salimos del modo paso a paso.",
+              emotion: "smile",
+            },
+            {
+              text: "Puedes volver a pedirme ejercicios, aprendizaje o explicaciones cuando quieras.",
+              emotion: "wink",
+            },
+          ])
+        );
+        setBusy(false);
+        return;
+      }
+
+      const intent = detectHiloIntent(mensaje);
+      if (intent === "exercise" || intent === "learning" || intent === "step_trace") {
+        setEmotionState("worried");
+        showStaticMessage(
+          "En modo paso a paso solo te explico el paso actual. " +
+            "Para un ejercicio u otra lección, sal primero con el botón azul o di «salir del paso a paso».",
+          "worried"
+        );
+        return;
+      }
+
+      setBusy(true);
+      setEmotionState("thinking");
+      activeTurn = null;
+      bubbleHint.hidden = true;
+      bubble.classList.add("show");
+      bubbleText.textContent = "Te explico este paso…";
+      try {
+        await sendExerciseAwareMessage(mensaje);
+      } catch (err) {
+        setEmotionState("error");
+        const msg = err instanceof Error ? err.message : String(err);
+        showStaticMessage(msg, "worried");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     const intent = detectHiloIntent(mensaje);
 
     endExplanationFocus();
@@ -840,10 +913,6 @@ export function createHiloAgentController({
         setBusy(false);
       }
       return;
-    }
-
-    if (intent === "explanation") {
-      stepMode?.exit();
     }
 
     bubbleText.textContent =

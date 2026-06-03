@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildStepView, formatWovenValue } from "../assets/js/step-trace.js";
+import {
+  buildStepContextForHilo,
+  buildStepView,
+  formatWovenValue,
+} from "../assets/js/step-trace.js";
 
 test("formatWovenValue serializa objetos y listas", () => {
   assert.equal(formatWovenValue(5), "5");
@@ -61,4 +65,32 @@ test("buildStepView acumula salida de consola hasta el paso", () => {
 
   const before = buildStepView(trace, 0);
   assert.equal(before.outputLines.length, 0);
+});
+
+test("buildStepContextForHilo resume traza y paso actual", () => {
+  const trace = {
+    exito: true,
+    total_pasos: 3,
+    eventos: [
+      { paso: 0, tipo: "linea", linea: 1, codigo: "int x = 1", call_stack: [] },
+      {
+        paso: 1,
+        tipo: "variable",
+        linea: 1,
+        nombre: "x",
+        scope: { x: { valor: 1, tipo: "int" } },
+        call_stack: [],
+      },
+      { paso: 2, tipo: "salida", linea: 2, texto: "1", call_stack: [] },
+    ],
+  };
+  const ctx = buildStepContextForHilo(trace, 1);
+  assert.equal(ctx?.activo, true);
+  assert.equal(ctx?.paso_actual, 2);
+  assert.equal(ctx?.evento?.tipo, "variable");
+  assert.equal(ctx?.variables_visibles?.[0], "x (int) = 1");
+  assert.match(ctx?.resumen_traza?.[1] ?? "", /PASO ACTUAL/);
+  assert.equal(ctx?.salida_consola_hasta_paso?.length, 0);
+  const ctx2 = buildStepContextForHilo(trace, 2);
+  assert.deepEqual(ctx2?.salida_consola_hasta_paso, ["1"]);
 });

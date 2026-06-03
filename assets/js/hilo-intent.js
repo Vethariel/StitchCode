@@ -38,6 +38,13 @@ const EXERCISE_PATTERNS = [
 ];
 
 /** Modo ejecución paso a paso del editor (traza), no explicación narrativa de Hilo. */
+const EXIT_STEP_MODE_PATTERNS = [
+  /\bsalir\s+del\s+(?:modo\s+)?paso\s+a\s+paso\b/i,
+  /\b(?:terminar|cerrar|dejar|quitar|desactivar)\s+(?:el\s+)?(?:modo\s+)?paso\s+a\s+paso\b/i,
+  /\b(?:sal|exit)\s+(?:del\s+)?(?:modo\s+)?paso\s+a\s+paso\b/i,
+  /\bno\s+quiero\s+(?:el\s+)?paso\s+a\s+paso\b/i,
+];
+
 const STEP_TRACE_PATTERNS = [
   /\b(?:modo\s+)?paso\s+a\s+paso\b/i,
   /\bejecuci[oó]n\s+paso\s+a\s+paso\b/i,
@@ -98,6 +105,18 @@ const EXPLAIN_MY_CODE =
 /**
  * @param {string} message
  */
+/**
+ * @param {string} message
+ */
+export function detectExitStepMode(message) {
+  const n = foldAccents(message.trim());
+  if (!n) return false;
+  for (const re of EXIT_STEP_MODE_PATTERNS) {
+    if (re.test(n)) return true;
+  }
+  return false;
+}
+
 function detectStepTrace(message) {
   const n = foldAccents(message.trim());
   if (!n) return false;
@@ -204,6 +223,11 @@ export function intentToApiTipo(intent) {
   if (intent === "exercise") return "ejercicio";
   if (intent === "step_trace") return "conversacion";
   return "conversacion";
+}
+
+/** Tipo API con modo paso a paso del editor activo (solo explicación). */
+export function stepModeActiveApiTipo() {
+  return "paso_a_paso_activo";
 }
 
 /** Tipo API cuando el modo ejercicio ya está activo (chat y feedback tras Run). */

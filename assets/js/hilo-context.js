@@ -10,6 +10,7 @@
  *   tieneError: boolean,
  *   lastRunHadError?: boolean,
  *   bloquesResumen?: string,
+ *   pasoAPaso?: Record<string, unknown> | null,
  * }} input
  */
 export function buildHiloContext({
@@ -20,19 +21,25 @@ export function buildHiloContext({
   tieneError,
   lastRunHadError = false,
   bloquesResumen = "",
+  pasoAPaso = null,
 }) {
   const modo =
     vista === "verbose" ? "verboso" : vista === "blocks" ? "bloques" : "texto";
 
+  const enPasoAPaso = !!pasoAPaso?.activo;
+
   return {
     codigo,
-    output,
+    output: enPasoAPaso ? pasoAPaso.salida_consola_hasta_paso ?? [] : output,
     errores,
-    tieneError,
+    tieneError: enPasoAPaso
+      ? !!pasoAPaso.hay_error_en_paso_actual
+      : tieneError,
     lastRunHadError,
     modo,
     vista,
     bloquesResumen: vista === "text" ? "" : bloquesResumen,
+    pasoAPaso: enPasoAPaso ? pasoAPaso : null,
   };
 }
 

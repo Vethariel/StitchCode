@@ -10,6 +10,11 @@
  * Entra al modo cuando:
  * - El usuario pulsa «Paso a paso» en la barra
  * - Hilo detecta intención paso_a_paso o Gemini devuelve activar_paso_a_paso
+ *
+ * Con paso a paso activo, Hilo solo acepta:
+ * - Explicación del paso actual (cualquier pregunta se trata como explicación)
+ * - «Salir del paso a paso» (o botón azul)
+ * Ejercicio, aprendizaje y demás poderes quedan bloqueados hasta salir.
  */
 
 /** @typedef {() => boolean} IsActiveFn */

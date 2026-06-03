@@ -7,6 +7,7 @@ sys.path.append(str(ROOT / "woven"))
 import json
 
 from gemini_agent import (  # noqa: E402
+    _anexar_contexto_paso_a_paso,
     _anexar_enunciado_ejercicio,
     construir_contexto,
     construir_payload_hilo,
@@ -414,6 +415,30 @@ def test_normalizar_dominio_tema_slug():
     tema = _normalizar_dominio_tema({"id": "Listas Woven!", "nombre": "Listas"})
     assert tema is not None
     assert tema["id"] == "listas_woven"
+
+
+def test_anexar_contexto_paso_a_paso():
+    base = construir_contexto("int x = 1\nprint(x)", [], [], False, "texto", "")
+    paso = json.dumps(
+        {
+            "activo": True,
+            "paso_actual": 2,
+            "total_pasos": 4,
+            "indice_evento": 1,
+            "contexto_ejecucion": "Programa principal",
+            "evento": {"tipo": "variable", "linea": 1, "codigo": "int x = 1"},
+            "variables_visibles": ["x (int) = 1"],
+            "salida_consola_hasta_paso": [],
+            "resumen_traza": ["1/4 · Línea · int x = 1", "2/4 · Variable ← PASO ACTUAL"],
+            "hay_error_en_paso_actual": False,
+        },
+        ensure_ascii=False,
+    )
+    merged = _anexar_contexto_paso_a_paso(base, paso)
+    assert "MODO PASO A PASO ACTIVO" in merged
+    assert "Paso actual: 2 de 4" in merged
+    assert "x (int) = 1" in merged
+    assert "PASO ACTUAL" in merged
 
 
 def test_anexar_enunciado_ejercicio():

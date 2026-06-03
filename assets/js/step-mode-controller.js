@@ -1,4 +1,9 @@
-import { buildStepView, eventTypeLabel, formatWovenValue } from "./step-trace.js";
+import {
+  buildStepContextForHilo,
+  buildStepView,
+  eventTypeLabel,
+  formatWovenValue,
+} from "./step-trace.js";
 
 /**
  * @param {string} text
@@ -260,11 +265,17 @@ export function createStepModeController({
   elements.btnNext?.addEventListener("click", () => goToStep(stepIndex + 1));
   elements.btnExit?.addEventListener("click", () => exitStepMode());
 
+  function getHiloContext() {
+    if (!active || !trace) return null;
+    return buildStepContextForHilo(trace, stepIndex);
+  }
+
   return {
     isActive: () => active,
     enter: enterStepMode,
     exit: exitStepMode,
     goToStep,
+    getHiloContext,
     refreshTrace: async () => {
       if (!active) return;
       await enterStepMode();
