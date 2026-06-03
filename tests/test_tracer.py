@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT / "woven"))
 
+from trace_serializer import TraceValueSerializer  # noqa: E402
 from tracing_visitor import trace_woven  # noqa: E402
 
 
@@ -266,10 +267,67 @@ def test_tracer_variable_objeto_serializado():
     vars_ = [e for e in resultado["eventos"] if e["tipo"] == "variable"]
     punto_var = next((e for e in vars_ if e["nombre"] == "p"), None)
     assert punto_var is not None
-    assert isinstance(punto_var["valor"], dict)
-    assert punto_var["valor"].get("clase") == "Punto"
-    assert "x" in punto_var["valor"].get("campos", {})
-    assert "y" in punto_var["valor"].get("campos", {})
+    valor = punto_var["valor"]
+    assert valor["kind"] == "object"
+    assert valor["id"] == "o1"
+    assert valor["class"] == "Punto"
+    assert valor["fields"]["x"] == 3
+    assert valor["fields"]["y"] == 4
+    assert "o1" in resultado["heap"]
+    assert resultado["heap"]["o1"]["class"] == "Punto"
+
+
+def test_tracer_referencias_compartidas_mismo_id():
+    code = "\n".join([
+        "class Nodo:",
+        "    int valor",
+        "    init(int valor):",
+        "        self.valor = valor",
+        "Nodo a = new Nodo(1)",
+        "Nodo b = a",
+    ])
+    resultado = trace(code)
+    vars_ = [e for e in resultado["eventos"] if e["tipo"] == "variable"]
+    var_b = next(e for e in vars_ if e["nombre"] == "b")
+    assert var_b["valor"] == {"kind": "ref", "id": "o1"}
+    var_a = next(e for e in vars_ if e["nombre"] == "a")
+    assert var_a["valor"]["id"] == "o1"
+    assert len(resultado["heap"]) == 1
+
+
+def test_tracer_lista_enlazada_por_referencias():
+    code = "\n".join([
+        "class Nodo:",
+        "    int valor",
+        "    Nodo siguiente",
+        "    init(int valor):",
+        "        self.valor = valor",
+        "        self.siguiente = null",
+        "Nodo a = new Nodo(1)",
+        "Nodo b = new Nodo(2)",
+        "a.siguiente = b",
+    ])
+    resultado = trace(code)
+    heap = resultado["heap"]
+    assert "o1" in heap and "o2" in heap
+    assert heap["o1"]["fields"]["siguiente"] == {"kind": "ref", "id": "o2"}
+    vars_ = [e for e in resultado["eventos"] if e["tipo"] == "variable" and e["nombre"] == "a"]
+    ultimo = vars_[-1]
+    val_a = ultimo["valor"]
+    if val_a.get("kind") == "ref":
+        val_a = heap[val_a["id"]]
+    assert val_a["fields"]["siguiente"]["id"] == "o2"
+
+
+def test_trace_serializer_lista_con_id():
+    ser = TraceValueSerializer()
+    lista = [1, 2, 3]
+    out = ser.serialize(lista)
+    assert out["kind"] == "list"
+    assert out["id"] == "l1"
+    assert out["items"] == [1, 2, 3]
+    assert ser.serialize(lista) == {"kind": "ref", "id": "l1"}
+    assert "l1" in ser.heap
 
 
 def test_tracer_variable_null_en_traza():

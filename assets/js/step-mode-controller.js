@@ -1,4 +1,9 @@
 import {
+  buildStructureGraphForStep,
+  highlightHintsFromEvent,
+  renderStructureGraph,
+} from "./structure-graph.js";
+import {
   buildStepContextForHilo,
   buildStepView,
   eventTypeLabel,
@@ -53,6 +58,7 @@ function escapeHtml(text) {
  *     panelContext: HTMLElement | null,
  *     panelVars: HTMLElement | null,
  *     panelEmpty: HTMLElement | null,
+ *     graphSvg: SVGElement | null,
  *   },
  *   onModeChange?: (active: boolean) => void,
  * }} opts
@@ -180,7 +186,7 @@ export function createStepModeController({
                 <tr>
                   <td class="step-var-name">${escapeHtml(name)}</td>
                   <td class="step-var-type">${escapeHtml(info.tipo ?? "?")}</td>
-                  <td class="step-var-value">${escapeHtml(formatWovenValue(info.valor))}</td>
+                  <td class="step-var-value">${escapeHtml(formatWovenValue(info.valor, trace?.heap))}</td>
                 </tr>`
                 )
                 .join("")}
@@ -195,6 +201,14 @@ export function createStepModeController({
 
     applyStepHighlight(view.line ?? null);
     consoleCtl?.setStepOutput?.(view.outputLines ?? []);
+
+    if (elements.graphSvg && trace) {
+      const graph = buildStructureGraphForStep(trace, stepIndex);
+      const hints = highlightHintsFromEvent(view.event);
+      renderStructureGraph(elements.graphSvg, graph, {
+        highlightNodeIds: hints.nodeIds,
+      });
+    }
   }
 
   function goToStep(next) {
@@ -214,6 +228,14 @@ export function createStepModeController({
     applyStepHighlight(null);
     consoleCtl?.restore?.(consoleSnapshot);
     consoleSnapshot = null;
+    if (elements.graphSvg) {
+      renderStructureGraph(elements.graphSvg, {
+        nodes: [],
+        edges: [],
+        empty: true,
+        emptyReason: "",
+      });
+    }
     onModeChange?.(false);
   }
 

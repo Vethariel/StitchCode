@@ -1,0 +1,92 @@
+.structure-graph-wrap {
+  margin-top: 6px;
+  border: 1px solid rgba(120, 168, 220, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--rgb-black), 0.2);
+  overflow: auto;
+  max-height: min(360px, 45vh);
+  min-height: 160px;
+}
+
+.structure-graph-svg {
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  font-family: var(--font-ui);
+}
+
+.structure-graph-empty-text {
+  fill: var(--palette-linen-muted);
+  font-size: 12px;
+}
+
+.structure-graph-edge {
+  stroke: rgba(120, 168, 220, 0.5);
+  stroke-width: 1.5;
+}
+
+.structure-graph-edge--ref {
+  stroke: rgba(120, 168, 220, 0.72);
+  stroke-width: 2;
+}
+
+.structure-graph-edge-label {
+  fill: var(--palette-linen-muted);
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.structure-graph-node circle {
+  fill: rgba(30, 40, 55, 0.94);
+  stroke: rgba(120, 168, 220, 0.5);
+  stroke-width: 1.5;
+}
+
+.structure-graph-node rect {
+  fill: rgba(30, 40, 55, 0.92);
+  stroke: rgba(120, 168, 220, 0.42);
+  stroke-width: 1.5;
+}
+
+.structure-graph-node--variable rect {
+  stroke-dasharray: 4 3;
+  fill: rgba(120, 168, 220, 0.1);
+}
+
+.structure-graph-node--highlight circle,
+.structure-graph-node--highlight rect {
+  stroke: var(--pastel-blue, #78a8dc);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 5px rgba(120, 168, 220, 0.4));
+}
+
+.structure-graph-node-value {
+  fill: var(--app-text);
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.structure-graph-node-caption {
+  fill: var(--palette-linen-muted);
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.structure-graph-list-cell {
+  fill: rgba(90, 160, 120, 0.12);
+  stroke: rgba(90, 160, 120, 0.5);
+  stroke-width: 1.5;
+}
+
+.structure-graph-list-link {
+  stroke: rgba(90, 160, 120, 0.4);
+  stroke-width: 1.5;
+}
+
+.structure-graph-node--highlight .structure-graph-list-cell {
+  stroke: var(--pastel-blue, #78a8dc);
+  stroke-width: 2.5;
+}

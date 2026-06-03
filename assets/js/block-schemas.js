@@ -231,6 +231,19 @@ export const BLOCK_SCHEMAS = /** @type {Record<string, BlockSchema>} */ ({
     ],
     defaults: { campo: "x", valor: "0" },
   },
+  member_assignment: {
+    tipo: "member_assignment",
+    label: "obj.campo =",
+    category: "Clase",
+    color: "assign",
+    texto: "guardar {valor} en el campo {campo} de {objeto}",
+    fields: [
+      { key: "objeto", label: "Objeto", kind: "identifier" },
+      { key: "campo", label: "Campo", kind: "identifier" },
+      { key: "valor", label: "Valor", kind: "expression" },
+    ],
+    defaults: { objeto: "a", campo: "siguiente", valor: "b" },
+  },
   index_assignment: {
     tipo: "index_assignment",
     label: "lista[i] =",
@@ -350,6 +363,13 @@ export const CODE_INLINE = /** @type {Record<string, InlinePart[]>} */ ({
     { kind: "text", value: " = " },
     { kind: "field", key: "valor" },
   ],
+  member_assignment: [
+    { kind: "field", key: "objeto" },
+    { kind: "text", value: "." },
+    { kind: "field", key: "campo" },
+    { kind: "text", value: " = " },
+    { kind: "field", key: "valor" },
+  ],
   index_assignment: [
     { kind: "field", key: "nombre" },
     { kind: "text", value: "[" },
@@ -417,6 +437,7 @@ export const CODE_TEMPLATES = {
   break_stmt: () => "break",
   continue_stmt: () => "continue",
   self_assignment: (p) => `self.${p.campo} = ${p.valor}`,
+  member_assignment: (p) => `${p.objeto}.${p.campo} = ${p.valor}`,
   index_assignment: (p) => `${p.nombre}[${p.indice}] = ${p.valor}`,
 };
 

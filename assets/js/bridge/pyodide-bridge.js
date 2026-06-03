@@ -19,6 +19,7 @@ const INTERPRETER_FILES = [
   "gemini_agent.py",
   "translator_visitor.py",
   "tracing_visitor.py",
+  "trace_serializer.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */

@@ -865,6 +865,25 @@ def test_interpreter_self_index_assignment():
     assert output == ["7"]
 
 
+def test_interpreter_member_assignment():
+    code = "\n".join([
+        "class Nodo:",
+        "    int valor",
+        "    Nodo siguiente",
+        "    init(int valor):",
+        "        self.valor = valor",
+        "        self.siguiente = null",
+        "Nodo a = new Nodo(1)",
+        "Nodo b = new Nodo(2)",
+        "a.siguiente = b",
+        "print(a.siguiente.valor)",
+    ])
+    output, lexer_errors, parser_errors = run(code)
+    assert not lexer_errors
+    assert not parser_errors
+    assert output == ["2"]
+
+
 def test_interpreter_for_with_assignment_init():
     code = "\n".join([
         "int i = 0",

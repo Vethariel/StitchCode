@@ -492,6 +492,33 @@ class InterpreterVisitor(WovenVisitor):
         self._set_var(ctx.IDENTIFIER().getText(), self.visit(ctx.expr()))
         return None
 
+    def visitMemberAssignment(self, ctx: WovenParser.MemberAssignmentContext):
+        obj_name = ctx.IDENTIFIER(0).getText()
+        field = ctx.IDENTIFIER(1).getText()
+        _, base_val, _ = self._lookup_var(obj_name)
+        if base_val is None:
+            raise RuntimeError(f"Variable usada sin declarar: '{obj_name}'")
+        if isinstance(base_val.value, NullValue):
+            raise WovenThrowSignal(
+                "No se puede asignar a un campo de un objeto null", ctx.start.line
+            )
+        if not isinstance(base_val.value, WovenObject):
+            raise RuntimeError("Asignacion a campo requiere un objeto")
+        obj = base_val.value
+        if field not in obj.fields:
+            raise RuntimeError(
+                f"Campo no declarado: '{field}' en clase '{obj.class_name}'"
+            )
+        expected = obj.fields[field].type_name
+        value = self.visit(ctx.expr())
+        if not self._is_compatible(expected, value):
+            raise RuntimeError(
+                f"Tipo incompatible en asignacion de campo '{field}': "
+                f"esperado {expected}, recibido {value.type_name}"
+            )
+        obj.fields[field] = self._cast_value(expected, value)
+        return None
+
     def visitSelfAssignment(self, ctx: WovenParser.SelfAssignmentContext):
         _, self_val, _ = self._lookup_var("self")
         if self_val is None or not isinstance(self_val.value, WovenObject):

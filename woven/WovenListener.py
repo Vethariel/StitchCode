@@ -278,6 +278,15 @@ class WovenListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by WovenParser#memberAssignment.
+    def enterMemberAssignment(self, ctx:WovenParser.MemberAssignmentContext):
+        pass
+
+    # Exit a parse tree produced by WovenParser#memberAssignment.
+    def exitMemberAssignment(self, ctx:WovenParser.MemberAssignmentContext):
+        pass
+
+
     # Enter a parse tree produced by WovenParser#selfAssignment.
     def enterSelfAssignment(self, ctx:WovenParser.SelfAssignmentContext):
         pass

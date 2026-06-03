@@ -66,6 +66,7 @@ statement
 simpleStmt
     : varDecl
     | assignment
+    | memberAssignment
     | returnStmt
     | printStmt
     | selfAssignment
@@ -138,6 +139,7 @@ forInit
 
 forUpdate
     : assignment
+    | memberAssignment
     | expr
     ;
 
@@ -198,6 +200,10 @@ throwStmt
 
 assignment
     : IDENTIFIER ASSIGN expr
+    ;
+
+memberAssignment
+    : IDENTIFIER DOT IDENTIFIER ASSIGN expr
     ;
 
 selfAssignment

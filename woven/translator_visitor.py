@@ -643,6 +643,15 @@ class TranslatorVisitor(WovenVisitor):
         else:
             self._emit(f"{n} = {e};")
 
+    def visitMemberAssignment(self, ctx):
+        obj = ctx.IDENTIFIER(0).getText()
+        f = ctx.IDENTIFIER(1).getText()
+        e = self.visit(ctx.expr()).code
+        if isinstance(self.strategy, PythonStrategy):
+            self._emit(f"{obj}.{f} = {e}")
+        else:
+            self._emit(f"{obj}.{f} = {e};")
+
     def visitSelfAssignment(self, ctx):
         f = ctx.IDENTIFIER().getText()
         e = self.visit(ctx.expr()).code

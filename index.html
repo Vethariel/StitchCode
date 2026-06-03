@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/exercise-context.css">
   <link rel="stylesheet" href="assets/css/step-context.css">
+  <link rel="stylesheet" href="assets/css/structure-graph.css">
   <link rel="stylesheet" href="assets/css/editor.css">
   <link rel="stylesheet" href="assets/css/editor-diagnostics.css">
   <link rel="stylesheet" href="assets/css/editor-syntax.css">
@@ -494,6 +495,20 @@ p.mostrar()</textarea>
                   No hay variables en este paso.
                 </p>
                 <div id="step-panel-vars"></div>
+              </section>
+              <section class="step-panel-section">
+                <div class="step-panel-section-title">Estructuras de datos</div>
+                <p class="step-panel-muted" id="step-panel-graph-hint">
+                  Grafo del paso actual (listas y objetos). Las flechas muestran campos e índices.
+                </p>
+                <div class="structure-graph-wrap" id="structure-graph-wrap">
+                  <svg
+                    id="structure-graph-svg"
+                    class="structure-graph-svg"
+                    role="img"
+                    aria-label="Grafo de estructuras de datos en este paso"
+                  ></svg>
+                </div>
               </section>
             </div>
           </div>

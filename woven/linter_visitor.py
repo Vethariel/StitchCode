@@ -513,6 +513,36 @@ class LinterVisitor(WovenVisitor):
             )
         return None
 
+    def visitMemberAssignment(self, ctx: WovenParser.MemberAssignmentContext):
+        obj_name = ctx.IDENTIFIER(0).getText()
+        field = ctx.IDENTIFIER(1).getText()
+        info = self._buscar(obj_name)
+        if info is None:
+            self._error(ctx.start.line, f"Variable '{obj_name}' usada sin declarar")
+            return None
+        base_type = info["tipo"]
+        if base_type not in self.clases:
+            self._error(
+                ctx.start.line,
+                f"Asignación a campo requiere un objeto, '{obj_name}' es {base_type}",
+            )
+            return None
+        class_info = self.clases[base_type]
+        if field not in class_info["campos"]:
+            self._error(
+                ctx.start.line,
+                f"La clase '{base_type}' no tiene campo '{field}'",
+            )
+            return None
+        expected = class_info["campos"][field]["tipo"]
+        expr_tipo = self.visit(ctx.expr())
+        if expr_tipo and not self._compatible(expected, expr_tipo):
+            self._error(
+                ctx.start.line,
+                f"Asignación incompatible en '{field}': esperado {expected}, recibió {expr_tipo}",
+            )
+        return None
+
     def visitReturnStmt(self, ctx: WovenParser.ReturnStmtContext):
         self.tiene_return = True
         if self.funcion_actual:

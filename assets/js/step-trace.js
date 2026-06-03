@@ -19,30 +19,68 @@
 /** @typedef {{ texto: string, es_error: boolean, linea?: number | null }} StepOutputLine */
 
 /** @typedef {{
+ *   kind?: string,
+ *   id?: string,
+ *   class?: string,
+ *   fields?: Record<string, unknown>,
+ *   items?: unknown[],
+ * }} TraceValueNode */
+
+/** @typedef {{
  *   eventos: TraceEvent[],
+ *   heap?: Record<string, TraceValueNode>,
  *   total_pasos: number,
  *   exito: boolean,
  * }} WovenTrace */
 
 /**
  * @param {unknown} val
+ * @param {Record<string, TraceValueNode>} [heap]
  * @returns {string}
  */
-export function formatWovenValue(val) {
+export function formatWovenValue(val, heap) {
   if (val === null || val === undefined) return "null";
   if (typeof val === "string") return `"${val}"`;
   if (typeof val === "boolean" || typeof val === "number") return String(val);
+
+  if (typeof val === "object" && val) {
+    const node = /** @type {TraceValueNode & { clase?: string, campos?: Record<string, unknown> }} */ (
+      val
+    );
+
+    if (node.kind === "ref" && node.id) {
+      const resolved = heap?.[node.id];
+      if (resolved) {
+        return `@${node.id} → ${formatWovenValue(resolved, heap)}`;
+      }
+      return `@${node.id}`;
+    }
+
+    if (node.kind === "object") {
+      const fields = Object.entries(node.fields ?? {})
+        .map(([k, v]) => `${k}: ${formatWovenValue(v, heap)}`)
+        .join(", ");
+      return `${node.class ?? "objeto"} { ${fields} }`;
+    }
+
+    if (node.kind === "list") {
+      const inner = (node.items ?? []).map((v) => formatWovenValue(v, heap)).join(", ");
+      return `[${inner}]`;
+    }
+
+    if ("clase" in node && node.clase) {
+      const fields = Object.entries(node.campos ?? {})
+        .map(([k, v]) => `${k}: ${formatWovenValue(v, heap)}`)
+        .join(", ");
+      return `${node.clase} { ${fields} }`;
+    }
+  }
+
   if (Array.isArray(val)) {
-    const inner = val.map(formatWovenValue).join(", ");
+    const inner = val.map((v) => formatWovenValue(v, heap)).join(", ");
     return `[${inner}]`;
   }
-  if (typeof val === "object" && val && "clase" in val) {
-    const obj = /** @type {{ clase: string, campos?: Record<string, unknown> }} */ (val);
-    const fields = Object.entries(obj.campos ?? {})
-      .map(([k, v]) => `${k}: ${formatWovenValue(v)}`)
-      .join(", ");
-    return `${obj.clase} { ${fields} }`;
-  }
+
   try {
     return JSON.stringify(val);
   } catch {

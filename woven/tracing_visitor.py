@@ -4,13 +4,8 @@ from antlr4 import CommonTokenStream, InputStream
 
 from WovenLexer import WovenLexer
 from WovenParser import WovenParser
-from interpreter_visitor import (
-    InterpreterVisitor,
-    NullValue,
-    Value,
-    WovenObject,
-    _ReturnSignal,
-)
+from interpreter_visitor import InterpreterVisitor, WovenObject, _ReturnSignal
+from trace_serializer import TraceValueSerializer
 
 
 class TracingInterpreterVisitor(InterpreterVisitor):
@@ -19,6 +14,7 @@ class TracingInterpreterVisitor(InterpreterVisitor):
         self.eventos = []
         self.paso_actual = 0
         self.call_stack = []
+        self._serializer = TraceValueSerializer()
 
     def _emit_event(self, data: dict):
         event = dict(data)
@@ -39,22 +35,8 @@ class TracingInterpreterVisitor(InterpreterVisitor):
         return snapshot
 
     def _serializar_valor(self, valor):
-        """Convierte cualquier valor Woven a algo serializable en JSON."""
-        if valor is None or isinstance(valor, NullValue):
-            return None
-        if isinstance(valor, Value):
-            return self._serializar_valor(valor.value)
-        if isinstance(valor, WovenObject):
-            return {
-                "clase": valor.class_name,
-                "campos": {
-                    k: self._serializar_valor(v)
-                    for k, v in valor.fields.items()
-                },
-            }
-        if isinstance(valor, list):
-            return [self._serializar_valor(v) for v in valor]
-        return valor
+        """Valor JSON con kind/id/ref para grafos de estructuras."""
+        return self._serializer.serialize(valor)
 
     def _codigo_linea(self, ctx):
         line = getattr(ctx.start, "line", None)
@@ -158,6 +140,13 @@ class TracingInterpreterVisitor(InterpreterVisitor):
         nombre = ctx.IDENTIFIER().getText()
         _, valor, tipo = self._lookup_var(nombre)
         self._emitir_variable(ctx, nombre, valor, tipo)
+        return result
+
+    def visitMemberAssignment(self, ctx: WovenParser.MemberAssignmentContext):
+        result = super().visitMemberAssignment(ctx)
+        obj_name = ctx.IDENTIFIER(0).getText()
+        _, valor, tipo = self._lookup_var(obj_name)
+        self._emitir_variable(ctx, obj_name, valor, tipo)
         return result
 
     def visitClassDecl(self, ctx: WovenParser.ClassDeclContext):
@@ -267,6 +256,7 @@ def trace_woven(source: str) -> str:
     return json.dumps(
         {
             "eventos": visitor.eventos,
+            "heap": visitor._serializer.heap,
             "total_pasos": visitor.paso_actual,
             "exito": not any(e["tipo"] == "error" for e in visitor.eventos),
         },

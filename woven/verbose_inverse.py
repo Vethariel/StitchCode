@@ -174,6 +174,9 @@ class VerboseInverse:
         elif tipo == "self_assignment":
             self._indentar(f"self.{p['campo']} = {_pick(p, 'valor')}")
 
+        elif tipo == "member_assignment":
+            self._indentar(f"{p['objeto']}.{p['campo']} = {_pick(p, 'valor')}")
+
         elif tipo == "index_assignment":
             self._indentar(
                 f"{p['nombre']}[{_pick(p, 'indice')}] = {_pick(p, 'valor')}"

@@ -337,6 +337,7 @@ stepMode = createStepModeController({
     panelContext: document.getElementById("step-panel-context"),
     panelVars: document.getElementById("step-panel-vars"),
     panelEmpty: document.getElementById("step-panel-empty"),
+    graphSvg: document.getElementById("structure-graph-svg"),
   },
 });
 

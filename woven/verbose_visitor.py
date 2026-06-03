@@ -661,6 +661,25 @@ class VerboseVisitor(WovenVisitor):
         )
         return self._add(bloque)
 
+    def visitMemberAssignment(self, ctx: WovenParser.MemberAssignmentContext):
+        objeto = ctx.IDENTIFIER(0).getText()
+        campo = ctx.IDENTIFIER(1).getText()
+        expr_text = self._texto_expr(ctx.expr())
+        expr_blocks = self._collect_in_temp(lambda: self.visit(ctx.expr()))
+        bloque = self._bloque(
+            "member_assignment",
+            "guardar {valor} en el campo {campo} de {objeto}",
+            {
+                "objeto": objeto,
+                "campo": campo,
+                "valor": expr_text,
+                "valor_raw": self._expr_raw(ctx.expr()),
+            },
+            self._line(ctx),
+            hijos=expr_blocks,
+        )
+        return self._add(bloque)
+
     def visitSelfAssignment(self, ctx: WovenParser.SelfAssignmentContext):
         campo = ctx.IDENTIFIER().getText()
         expr_text = self._texto_expr(ctx.expr())

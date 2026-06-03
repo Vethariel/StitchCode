@@ -67,6 +67,21 @@ test("buildStepView acumula salida de consola hasta el paso", () => {
   assert.equal(before.outputLines.length, 0);
 });
 
+test("formatWovenValue resuelve ref con heap", () => {
+  const heap = {
+    o1: {
+      kind: "object",
+      id: "o1",
+      class: "Nodo",
+      fields: { valor: 1, siguiente: null },
+    },
+  };
+  assert.equal(
+    formatWovenValue({ kind: "ref", id: "o1" }, heap),
+    "@o1 → Nodo { valor: 1, siguiente: null }"
+  );
+});
+
 test("buildStepContextForHilo resume traza y paso actual", () => {
   const trace = {
     exito: true,

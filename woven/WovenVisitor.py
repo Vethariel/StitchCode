@@ -159,6 +159,11 @@ class WovenVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by WovenParser#memberAssignment.
+    def visitMemberAssignment(self, ctx:WovenParser.MemberAssignmentContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by WovenParser#selfAssignment.
     def visitSelfAssignment(self, ctx:WovenParser.SelfAssignmentContext):
         return self.visitChildren(ctx)
