@@ -441,6 +441,49 @@ def test_anexar_contexto_paso_a_paso():
     assert "PASO ACTUAL" in merged
 
 
+def test_normalizar_respuesta_ejercicio_correccion():
+    raw = json.dumps(
+        {
+            "type": "ejercicio",
+            "tipo_ejercicio": "correccion",
+            "titulo": "Arregla el print",
+            "enunciado": ["Corrige la línea indicada."],
+            "codigo_solucion": "int x = 1\nprint(x)",
+            "codigo_plantilla": "int x = 1\nprint(x + 1)",
+            "lineas_edicion": [
+                {"linea": 2, "modo": "incorrecto", "contenido_erroneo": "print(x + 1)"}
+            ],
+            "criterios": ["Debe imprimir 1"],
+            "resumen": "Practica depuración",
+        },
+        ensure_ascii=False,
+    )
+    out = normalizar_respuesta_ejercicio(raw)
+    assert out["tipo_ejercicio"] == "correccion"
+    assert "print(x)" in out["codigo_solucion"]
+    assert len(out["lineas_edicion"]) == 1
+    assert out["lineas_edicion"][0]["linea"] == 2
+
+
+def test_anexar_enunciado_ejercicio_guiado():
+    ctx = "BASE"
+    enun = json.dumps(
+        {
+            "titulo": "Relleno",
+            "enunciado": ["Completa."],
+            "tipo_ejercicio": "relleno",
+            "lineas_editables": [3, 5],
+            "codigo_referencia": "int a = 1\nprint(a)",
+        },
+        ensure_ascii=False,
+    )
+    merged = _anexar_enunciado_ejercicio(ctx, enun)
+    assert "relleno" in merged
+    assert "3, 5" in merged
+    assert "CÓDIGO DE REFERENCIA" in merged
+    assert "print(a)" in merged
+
+
 def test_anexar_enunciado_ejercicio():
     ctx = construir_contexto("int x = 1", [], [], False, "woven", "")
     enun = json.dumps(

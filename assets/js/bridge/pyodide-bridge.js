@@ -348,7 +348,8 @@ export async function hiloEstablishExercise(args) {
       args.codigo,
       args.modo,
       args.perfilJson ?? "{}",
-      args.bloquesResumen ?? ""
+      args.bloquesResumen ?? "",
+      args.tipoEjercicio ?? "libre"
     )
   );
   return JSON.parse(raw);

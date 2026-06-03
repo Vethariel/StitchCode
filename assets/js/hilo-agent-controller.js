@@ -802,6 +802,8 @@ export function createHiloAgentController({
           perfilJson: getPerfilJson(),
           getContext,
           applyTemplate: exercise.applyTemplate,
+          lintWoven: exercise.lintWoven,
+          runWoven: exercise.runWoven,
           onEnunciado: exercise.onEnunciado,
           onExerciseModeChange: exercise.onExerciseModeChange,
         });

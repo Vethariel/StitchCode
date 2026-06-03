@@ -333,6 +333,7 @@ El estudiante pide un ejercicio de práctica (no un ejemplo didáctico completo)
 Responde SOLO con JSON válido:
 {
   "type": "ejercicio",
+  "tipo_ejercicio": "libre",
   "titulo": "título corto del reto",
   "enunciado": ["párrafo 1 del enunciado", "párrafo 2 opcional"],
   "codigo_plantilla": "programa Woven inicial para el editor",
@@ -343,6 +344,7 @@ Responde SOLO con JSON válido:
 }
 
 Reglas:
+- tipo_ejercicio: "libre" salvo que el pedido pida corrección o rellenar huecos (ver prompt adicional).
 - enunciado: 2 a 4 párrafos claros (qué debe lograr, restricciones, pistas sin dar la solución).
 - codigo_plantilla: esqueleto ejecutable (declaraciones, comentarios // con pistas, huecos con valores iniciales).
   No entregues la solución final; deja trabajo al estudiante.
@@ -350,6 +352,23 @@ Reglas:
 - tema_id: slug snake_case del concepto principal (ej. listas, bucles_for, condicionales).
 - tema_nombre: etiqueta corta para el panel de logros (ej. «Listas en Woven»).
 - Solo sintaxis Woven; sin markdown fuera del JSON.
+"""
+
+EJERCICIO_CORRECCION_ESTABLISH_PROMPT = """
+VARIANTE: EJERCICIO DE CORRECCIÓN O RELLENO (tipo_ejercicio "correccion" o "relleno")
+El sistema validará codigo_solucion antes de mostrar el reto. Debe ejecutar sin errores y cumplir el enunciado.
+
+Campos OBLIGATORIOS además de los del ejercicio libre:
+- "tipo_ejercicio": "correccion" (líneas con error cercano al original) o "relleno" (líneas vacías para completar).
+- "codigo_solucion": programa Woven COMPLETO y CORRECTO (la referencia que tú validarías).
+- "lineas_edicion": lista de 1 a 4 objetos, cada uno:
+  {"linea": <número 1-based>, "modo": "vacio" | "incorrecto", "contenido_erroneo": "..."}
+  - modo "vacio": esa línea quedará en blanco para que el estudiante la complete (usa en relleno).
+  - modo "incorrecto": contenido_erroneo es una versión con error cercana a la línea correcta (usa en corrección).
+  - Elige líneas clave (asignaciones, condiciones, print, return), no comentarios ni class/init vacíos.
+- "codigo_plantilla": puede repetir codigo_solucion (el cliente generará la versión para el alumno).
+
+El enunciado debe decir explícitamente qué líneas puede editar (por número o descripción) y que el resto está bloqueado.
 """
 
 EXERCISE_ACTIVE_PROMPT = """
@@ -375,6 +394,11 @@ Reglas generales:
 - Usa niveles de ayuda del SYSTEM_PROMPT cuando haya errores.
 - Si pide explicación de una línea, explica solo esa parte en el marco del ejercicio.
 - No propongas otro ejercicio ni reescribas el enunciado.
+
+Si el enunciado indica tipo_ejercicio "correccion" o "relleno":
+- Solo el estudiante puede editar las líneas listadas en lineas_editables; el resto está bloqueado.
+- Compara su código con codigo_referencia (solución interna): las líneas editables deben quedar correctas.
+- No reveles codigo_referencia ni la solución completa; guía con preguntas sobre las líneas editables.
 
 Evaluación al revisar una ejecución (Run):
 - Compara código y salida de consola con TODOS los criterios del enunciado.
@@ -456,6 +480,20 @@ def _anexar_enunciado_ejercicio(contexto: str, enunciado_json: str) -> str:
             ct = str(c).strip()
             if ct:
                 bloques.append(f"  - {ct}")
+    tipo = str(data.get("tipo_ejercicio") or "libre").strip().lower()
+    if tipo in ("correccion", "relleno"):
+        bloques.append(f"Tipo de ejercicio: {tipo} (solo líneas indicadas son editables).")
+        lineas = data.get("lineas_editables") or []
+        if isinstance(lineas, list) and lineas:
+            nums = [str(int(x)) for x in lineas if str(x).strip().isdigit()]
+            if nums:
+                bloques.append("Líneas que el estudiante puede editar: " + ", ".join(nums))
+        ref = str(data.get("codigo_referencia") or "").strip()
+        if ref:
+            bloques.append(
+                "CÓDIGO DE REFERENCIA (interno — no lo copies ni lo muestres al estudiante):\n"
+                + ref
+            )
     return contexto + "\n\n" + "\n".join(bloques)
 
 
@@ -713,17 +751,35 @@ def construir_payload_ejercicio(
     modo: str,
     perfil_json: str = "{}",
     bloques_resumen: str = "",
+    tipo_ejercicio: str = "libre",
 ) -> str:
     contexto = construir_contexto(codigo, [], [], False, modo, bloques_resumen)
     preferencias = construir_preferencias_estudiante(perfil_json)
+    tipo = (tipo_ejercicio or "libre").strip().lower()
+    if tipo not in ("libre", "correccion", "relleno"):
+        tipo = "libre"
+
+    variante = ""
+    if tipo in ("correccion", "relleno"):
+        variante = f"\n\n{EJERCICIO_CORRECCION_ESTABLISH_PROMPT}"
+        turno = (
+            f"\n\nTURNO ACTUAL: ejercicio de {tipo}. "
+            'Responde con JSON type "ejercicio", tipo_ejercicio '
+            f'"{tipo}", codigo_solucion y lineas_edicion.'
+        )
+    else:
+        turno = (
+            "\n\nTURNO ACTUAL: el estudiante pidió un ejercicio de práctica. "
+            'Responde solo con JSON type "ejercicio" y tipo_ejercicio "libre".'
+        )
 
     system_completo = (
         SYSTEM_PROMPT
         + f"\n\n{EJERCICIO_ESTABLISH_PROMPT}"
+        + variante
         + f"\n\n{preferencias}"
         + f"\n\nCONTEXTO (referencia del editor; genera plantilla nueva):\n{contexto}"
-        + "\n\nTURNO ACTUAL: el estudiante pidió un ejercicio de práctica. "
-        'Responde solo con JSON type "ejercicio".'
+        + turno
     )
 
     payload = {
@@ -736,6 +792,30 @@ def construir_payload_ejercicio(
         },
     }
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _normalizar_lineas_edicion(raw) -> list:
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            linea = int(item.get("linea") or item.get("line") or 0)
+        except (TypeError, ValueError):
+            continue
+        if linea < 1:
+            continue
+        modo = str(item.get("modo") or "vacio").strip().lower()
+        if modo not in ("vacio", "incorrecto"):
+            modo = "vacio"
+        err = str(item.get("contenido_erroneo") or item.get("contenido") or "").strip()
+        entry = {"linea": linea, "modo": modo}
+        if modo == "incorrecto" and err:
+            entry["contenido_erroneo"] = err
+        out.append(entry)
+    return out
 
 
 def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
@@ -765,13 +845,34 @@ def normalizar_respuesta_ejercicio(texto_modelo: str) -> dict:
                 titulo = parrafos[0][:80]
             if not parrafos and titulo:
                 parrafos = [titulo]
-            if not codigo:
+            tipo_ejercicio = str(data.get("tipo_ejercicio") or "libre").strip().lower()
+            if tipo_ejercicio not in ("libre", "correccion", "relleno"):
+                tipo_ejercicio = "libre"
+            codigo_solucion = str(
+                data.get("codigo_solucion") or data.get("codigo_referencia") or ""
+            ).strip()
+            lineas_edicion = _normalizar_lineas_edicion(data.get("lineas_edicion"))
+            if tipo_ejercicio in ("correccion", "relleno"):
+                if not codigo_solucion and codigo:
+                    codigo_solucion = codigo
+                if not codigo_solucion:
+                    raise ValueError(
+                        "Ejercicio de corrección/relleno requiere codigo_solucion."
+                    )
+                if not lineas_edicion:
+                    raise ValueError(
+                        "Ejercicio de corrección/relleno requiere lineas_edicion."
+                    )
+            if not codigo and tipo_ejercicio == "libre":
                 raise ValueError("Falta codigo_plantilla en el ejercicio.")
             return {
                 "type": "ejercicio",
+                "tipo_ejercicio": tipo_ejercicio,
                 "titulo": titulo or "Ejercicio",
                 "enunciado": parrafos,
-                "codigo_plantilla": codigo,
+                "codigo_plantilla": codigo or codigo_solucion,
+                "codigo_solucion": codigo_solucion,
+                "lineas_edicion": lineas_edicion,
                 "criterios": criterios,
                 "resumen": resumen,
                 "tema_id": tema_id,
@@ -794,10 +895,16 @@ def hilo_establecer_ejercicio(
     modo,
     perfil_json="{}",
     bloques_resumen="",
+    tipo_ejercicio="libre",
 ):
     try:
         payload = construir_payload_ejercicio(
-            mensaje, codigo, modo, perfil_json, bloques_resumen
+            mensaje,
+            codigo,
+            modo,
+            perfil_json,
+            bloques_resumen,
+            tipo_ejercicio=tipo_ejercicio,
         )
         return json.dumps({"ok": True, "payload": payload})
     except Exception as e:

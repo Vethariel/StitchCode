@@ -23,6 +23,7 @@ import { createHiloAgentController } from "./hilo-agent-controller.js";
 import {
   deactivateExerciseMode,
   getActiveExercise,
+  isGuidedExerciseActive,
 } from "./hilo-exercise-mode.js";
 import { buildHiloContext } from "./hilo-context.js";
 import { createHiloFocusController } from "./hilo-focus.js";
@@ -210,8 +211,18 @@ function setExerciseModeUi(active) {
   if (active && exerciseContextText) {
     const ex = getActiveExercise();
     if (ex?.titulo) {
+      const tipo =
+        ex.tipo_ejercicio === "correccion"
+          ? "Corrección"
+          : ex.tipo_ejercicio === "relleno"
+            ? "Completar"
+            : "Ejercicio";
+      const lineas =
+        isGuidedExerciseActive() && ex.lineas_editables?.length
+          ? ` · líneas ${ex.lineas_editables.join(", ")}`
+          : "";
       exerciseContextText.innerHTML =
-        `<strong>Ejercicio:</strong> ${escapeExerciseBarText(ex.titulo)} — ` +
+        `<strong>${tipo}:</strong> ${escapeExerciseBarText(ex.titulo)}${lineas} — ` +
         "Hilo te guía con el enunciado del panel. Pulsa Run para recibir feedback.";
     } else {
       exerciseContextText.textContent =
@@ -407,7 +418,11 @@ hiloAgent = createHiloAgentController({
     onEnunciado: (data) => sidePanel.setEnunciado(data),
     onExerciseModeChange: (active) => {
       setExerciseModeUi(active);
-      if (active) stepMode?.exit();
+      if (active) {
+        stepMode?.exit();
+      } else {
+        editor.clearExerciseEditableLines();
+      }
     },
     onTopicMastery: (topic) => {
       try {
@@ -417,10 +432,44 @@ hiloAgent = createHiloAgentController({
         consoleCtl.appendLine(`Logro: ${msg}`, "info");
       }
     },
-    applyTemplate: async (code) => {
+    lintWoven: (code) => linter.runLintOnCode(code),
+    runWoven: async (code) => {
+      const prev = editor.getCode();
+      editor.setCode(code);
+      await linter.runLint();
+      if (linter.tieneErroresBloqueantes()) {
+        editor.setCode(prev);
+        return {
+          salida: [],
+          tiene_errores: true,
+          diagnosticos: linter.getDiagnosticos().map((d) => ({
+            mensaje: d.mensaje,
+          })),
+        };
+      }
+      const result = await runWoven(code);
+      editor.setCode(prev);
+      return {
+        salida: result.salida ?? [],
+        tiene_errores: Boolean(result.tiene_errores),
+        diagnosticos: result.diagnosticos,
+      };
+    },
+    applyTemplate: async (code, opts = {}) => {
+      if (opts.editableLines?.length) {
+        await editorMode.setMode("text");
+      }
       await applyCodeToEditor(code);
+      if (opts.editableLines?.length) {
+        editor.setExerciseEditableLines(opts.editableLines);
+      } else {
+        editor.clearExerciseEditableLines();
+      }
       consoleShowsLintErrors = false;
-      consoleCtl.showEmpty("// Ejercicio cargado. Pulsa Run cuando quieras probar tu solución…");
+      const hint = opts.editableLines?.length
+        ? `// Ejercicio: edita solo las líneas ${opts.editableLines.join(", ")}. Pulsa Run…`
+        : "// Ejercicio cargado. Pulsa Run cuando quieras probar tu solución…";
+      consoleCtl.showEmpty(hint);
       lastRunOutput = [];
       lastRunHadError = false;
       hiloAgent?.onExecutionContextChange();
@@ -553,6 +602,7 @@ exitExerciseBtn?.addEventListener("click", () => {
     hiloAgent.exitExerciseMode();
   } else {
     deactivateExerciseMode();
+    editor.clearExerciseEditableLines();
   }
   setExerciseModeUi(false);
 });

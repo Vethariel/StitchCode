@@ -1,6 +1,6 @@
 /** @typedef {{ nivel: string, linea: number, mensaje: string, texto?: string }} Diagnostico */
 
-import { createEditorKeydownHandler } from "./editor-editing.js";
+import { createEditorKeydownHandler, lineIndexAt } from "./editor-editing.js";
 import { highlightSourceLines } from "./woven-highlighter.js";
 
 /**
@@ -17,6 +17,8 @@ export function createEditorController({
   let diagnosticos = [];
   /** @type {number | null} Línea resaltada en modo paso a paso (1-based). */
   let stepHighlightLine = null;
+  /** @type {Set<number> | null} Líneas editables en ejercicio guiado (1-based). */
+  let exerciseEditableLines = null;
 
   function escapeHtml(text) {
     return text
@@ -56,7 +58,8 @@ export function createEditorController({
         const num = i + 1;
         const sev = severidadLinea(num, byLine);
         const stepMark = stepHighlightLine === num ? " hl-step-current" : "";
-        const lineCls = (sev ? `hl-line hl-${sev}` : "hl-line") + stepMark;
+        const exMark = exerciseLineClass(num);
+        const lineCls = (sev ? `hl-line hl-${sev}` : "hl-line") + stepMark + exMark;
         const inner = highlighted[i] ?? " ";
         return `<span class="${lineCls}" data-line="${num}">${inner}</span>`;
       })
@@ -70,7 +73,8 @@ export function createEditorController({
       const num = i + 1;
       const sev = severidadLinea(num, byLine);
       const stepMark = stepHighlightLine === num ? " ln-step-current" : "";
-      const cls = (sev ? ` lint-${sev}` : "") + stepMark;
+      const exMark = exerciseLineClass(num).replace(" hl-", " ln-");
+      const cls = (sev ? ` lint-${sev}` : "") + stepMark + exMark;
       return `<span id="ln${num}" class="${cls.trim()}" data-line="${num}">${num}</span>`;
     }).join("");
     updateActiveLine();
@@ -93,11 +97,38 @@ export function createEditorController({
     });
   }
 
+  /**
+   * @param {number} lineNum 1-based
+   */
+  function exerciseLineClass(lineNum) {
+    if (!exerciseEditableLines) return "";
+    return exerciseEditableLines.has(lineNum)
+      ? " hl-exercise-editable"
+      : " hl-exercise-locked";
+  }
+
+  /**
+   * @param {number} start
+   * @param {number} end
+   */
+  function guardEditRange(start, end) {
+    if (!exerciseEditableLines) return true;
+    const v = codeArea.value;
+    const s = Math.max(0, Math.min(start, v.length));
+    const e = Math.max(s, Math.min(end, v.length));
+    for (let pos = s; pos < e; pos++) {
+      const line = lineIndexAt(v, pos) + 1;
+      if (!exerciseEditableLines.has(line)) return false;
+    }
+    return true;
+  }
+
   const handleEditorKeydown = createEditorKeydownHandler(codeArea, {
     onEdit: () => {
       updateLines();
       onChange?.();
     },
+    guardEditRange,
   });
 
   function onInput() {
@@ -176,6 +207,17 @@ export function createEditorController({
     updateLines();
   }
 
+  /** @param {number[] | null} lines 1-based; null = sin restricción */
+  function setExerciseEditableLines(lines) {
+    exerciseEditableLines = lines?.length ? new Set(lines) : null;
+    updateLines();
+  }
+
+  function clearExerciseEditableLines() {
+    exerciseEditableLines = null;
+    updateLines();
+  }
+
   codeArea.addEventListener("input", onInput);
   codeArea.addEventListener("scroll", syncScroll);
   codeArea.addEventListener("click", updateActiveLine);
@@ -199,5 +241,7 @@ export function createEditorController({
     },
     setDiagnostics,
     setStepLineHighlight,
+    setExerciseEditableLines,
+    clearExerciseEditableLines,
   };
 }

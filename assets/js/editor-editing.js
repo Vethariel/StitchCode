@@ -145,10 +145,11 @@ export function isInStringAt(value, pos) {
 
 /**
  * @param {HTMLTextAreaElement} codeArea
- * @param {{ onEdit?: () => void }} opts
+ * @param {{ onEdit?: () => void, guardEditRange?: (start: number, end: number) => boolean }} opts
  */
-export function createEditorKeydownHandler(codeArea, { onEdit } = {}) {
+export function createEditorKeydownHandler(codeArea, { onEdit, guardEditRange } = {}) {
   function applyEdit(start, end, text, selStart, selEnd = selStart) {
+    if (guardEditRange && !guardEditRange(start, end)) return;
     const v = codeArea.value;
     codeArea.value = v.slice(0, start) + text + v.slice(end);
     codeArea.selectionStart = selStart;
@@ -305,7 +306,42 @@ export function createEditorKeydownHandler(codeArea, { onEdit } = {}) {
     return false;
   }
 
+  /**
+   * @param {number} start
+   * @param {number} end
+   */
+  function rangeAllowed(start, end) {
+    if (!guardEditRange) return true;
+    return guardEditRange(start, end);
+  }
+
+  function handleGuardedInput(event) {
+    if (!guardEditRange) return;
+    const start = codeArea.selectionStart;
+    const end = codeArea.selectionEnd;
+    if (!rangeAllowed(start, end)) {
+      event.preventDefault();
+    }
+  }
+
+  codeArea.addEventListener("beforeinput", handleGuardedInput);
+
   return function handleEditorKeydown(event) {
+    if (guardEditRange) {
+      const start = codeArea.selectionStart;
+      const end = codeArea.selectionEnd;
+      if (
+        event.key.length === 1 ||
+        event.key === "Backspace" ||
+        event.key === "Delete" ||
+        event.key === "Enter"
+      ) {
+        if (!rangeAllowed(start, end)) {
+          event.preventDefault();
+          return;
+        }
+      }
+    }
     if (handleTab(event)) return;
     if (handleSkipCloser(event)) return;
     if (handleBackspace(event)) return;

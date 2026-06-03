@@ -27,6 +27,8 @@ function foldAccents(text) {
 
 const EXERCISE_PATTERNS = [
   /\bmodo\s+ejercicio\b/i,
+  /\b(?:ejercicio|reto|pr[aá]ctica)\s+de\s+(?:correcci[oó]n|rellenar|completar)\b/i,
+  /\b(?:corregir|completar|rellenar)\s+(?:el\s+)?(?:c[oó]digo|programa|l[ií]neas?)\b/i,
   /\b(?:dame|pon(?:me)?|prop[oó]neme?|as[ií]gn(?:ame)?)\s+(?:un\s+)?(?:ejercicio|reto|pr[aá]ctica)\b/i,
   /\b(?:quiero|necesito)\s+(?:un\s+)?(?:ejercicio|reto|pr[aá]ctica)\b/i,
   /\bejercicio\s+(?:de|sobre|para|con)\b/i,

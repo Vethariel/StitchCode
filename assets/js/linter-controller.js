@@ -62,9 +62,32 @@ export function createLinterController({ getCode, isReady, lintFn, onUpdate }) {
     return state.diagnosticos;
   }
 
+  /** @param {string} code */
+  async function runLintOnCode(code) {
+    if (!isReady()) {
+      return {
+        parse_ok: false,
+        diagnosticos: [],
+        tiene_errores: true,
+        tiene_advertencias: false,
+      };
+    }
+    try {
+      return await lintFn(code);
+    } catch {
+      return {
+        parse_ok: false,
+        diagnosticos: [],
+        tiene_errores: true,
+        tiene_advertencias: false,
+      };
+    }
+  }
+
   return {
     scheduleLint,
     runLint,
+    runLintOnCode,
     tieneErroresBloqueantes,
     textosErrores,
     getState,
