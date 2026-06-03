@@ -1,4 +1,4 @@
-/** @typedef {'keyword'|'type'|'operator'|'string'|'number'|'comment'|'function'|'identifier'} TokenKind */
+/** @typedef {'keyword'|'type'|'operator'|'string'|'number'|'comment'|'function'|'identifier'|'interp-brace'|'interp-expr'} TokenKind */
 
 const KEYWORDS = new Set([
   "function",
@@ -57,6 +57,9 @@ const OPERATORS = [
   "}",
 ];
 
+/** Operadores dentro de `{expr}` (sin llaves de interpolación). */
+const INTERP_OPERATORS = OPERATORS.filter((op) => op !== "{" && op !== "}");
+
 /**
  * @param {string} text
  */
@@ -88,6 +91,128 @@ function classifyIdentifier(word, rest) {
   if (KEYWORDS.has(word)) return "keyword";
   if (TYPES.has(word)) return "type";
   return "identifier";
+}
+
+/**
+ * @param {string} expr
+ */
+function highlightInterpExpr(expr) {
+  const parts = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (ch === " " || ch === "\t") {
+      let j = i + 1;
+      while (j < expr.length && (expr[j] === " " || expr[j] === "\t")) j += 1;
+      parts.push(escapeHtml(expr.slice(i, j)));
+      i = j;
+      continue;
+    }
+    if (ch >= "0" && ch <= "9") {
+      let j = i + 1;
+      while (j < expr.length && /[0-9.eE+-]/.test(expr[j])) j += 1;
+      parts.push(span(expr.slice(i, j), "number"));
+      i = j;
+      continue;
+    }
+    if (/[a-zA-Z_]/.test(ch)) {
+      let j = i + 1;
+      while (j < expr.length && /[a-zA-Z0-9_]/.test(expr[j])) j += 1;
+      const word = expr.slice(i, j);
+      let kind = "interp-expr";
+      if (KEYWORDS.has(word)) kind = "keyword";
+      else if (TYPES.has(word)) kind = "type";
+      else if (word === "self" || word === "super") kind = "keyword";
+      parts.push(span(word, kind));
+      i = j;
+      continue;
+    }
+    let matched = false;
+    for (const op of INTERP_OPERATORS) {
+      if (expr.startsWith(op, i)) {
+        parts.push(span(op, "operator"));
+        i += op.length;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+    parts.push(escapeHtml(ch));
+    i += 1;
+  }
+  return parts.join("");
+}
+
+/**
+ * @param {string} line
+ * @param {number} start índice de la comilla de apertura
+ * @returns {{ html: string, end: number }}
+ */
+function highlightQuotedString(line, start) {
+  const quote = line[start];
+  if (quote !== '"') {
+    let j = start + 1;
+    while (j < line.length) {
+      if (line[j] === "\\" && j + 1 < line.length) {
+        j += 2;
+        continue;
+      }
+      if (line[j] === quote) {
+        j += 1;
+        break;
+      }
+      j += 1;
+    }
+    return { html: span(line.slice(start, j), "string"), end: j };
+  }
+
+  const parts = [span('"', "string")];
+  let i = start + 1;
+  while (i < line.length) {
+    if (line[i] === "\\" && i + 1 < line.length) {
+      parts.push(span(line.slice(i, i + 2), "string"));
+      i += 2;
+      continue;
+    }
+    if (line[i] === '"') {
+      parts.push(span('"', "string"));
+      return { html: parts.join(""), end: i + 1 };
+    }
+    if (line[i] === "{") {
+      parts.push(span("{", "interp-brace"));
+      i += 1;
+      let j = i;
+      while (j < line.length && line[j] !== "}") {
+        if (line[j] === "\\" && j + 1 < line.length) {
+          j += 2;
+          continue;
+        }
+        j += 1;
+      }
+      const inner = line.slice(i, j);
+      if (inner) parts.push(highlightInterpExpr(inner));
+      if (j < line.length && line[j] === "}") {
+        parts.push(span("}", "interp-brace"));
+        i = j + 1;
+      } else {
+        i = j;
+      }
+      continue;
+    }
+    let j = i;
+    while (
+      j < line.length &&
+      line[j] !== "{" &&
+      line[j] !== '"' &&
+      line[j] !== "\\"
+    ) {
+      j += 1;
+    }
+    if (j > i) parts.push(span(line.slice(i, j), "string"));
+    i = j;
+  }
+  parts.push(span(line.slice(start + 1), "string"));
+  return { html: parts.join(""), end: line.length };
 }
 
 /**
@@ -137,21 +262,9 @@ export function highlightLine(line, state) {
     }
 
     if (ch === '"' || ch === "'") {
-      const quote = ch;
-      let j = i + 1;
-      while (j < line.length) {
-        if (line[j] === "\\" && j + 1 < line.length) {
-          j += 2;
-          continue;
-        }
-        if (line[j] === quote) {
-          j += 1;
-          break;
-        }
-        j += 1;
-      }
-      parts.push(span(line.slice(i, j), "string"));
-      i = j;
+      const highlighted = highlightQuotedString(line, i);
+      parts.push(highlighted.html);
+      i = highlighted.end;
       continue;
     }
 

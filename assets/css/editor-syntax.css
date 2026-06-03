@@ -37,3 +37,11 @@
 .code-highlight .tok-identifier {
   color: var(--syntax-identifier);
 }
+
+.code-highlight .tok-interp-brace {
+  color: var(--syntax-interp-brace);
+}
+
+.code-highlight .tok-interp-expr {
+  color: var(--syntax-interp-expr);
+}

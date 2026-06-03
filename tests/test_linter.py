@@ -416,6 +416,20 @@ def test_linter_float_literal_and_comparison_valid():
     assert len(errores) == 0
 
 
+def test_linter_string_interp_marks_variable_used():
+    code = "\n".join([
+        "list<int> numeros = [10, 20, 30]",
+        "int primero = numeros[0]",
+        'print("El primer elemento es {primero}")',
+    ])
+    resultado = lint(code)
+    warnings = [d for d in resultado["diagnosticos"] if d["nivel"] == "warning"]
+    assert not any(
+        "primero" in d["mensaje"] and "nunca usada" in d["mensaje"]
+        for d in warnings
+    )
+
+
 def test_linter_power_expression_valid():
     code = "\n".join([
         "int y = 15",

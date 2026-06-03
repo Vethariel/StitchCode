@@ -1,7 +1,10 @@
 import json
+import re
 
+from antlr4 import CommonTokenStream, InputStream
 from antlr4.error.ErrorListener import ErrorListener
 
+from WovenLexer import WovenLexer
 from WovenVisitor import WovenVisitor
 from WovenParser import WovenParser
 
@@ -61,6 +64,22 @@ class LinterVisitor(WovenVisitor):
             if nombre in scope:
                 scope[nombre]["usado"] = True
                 return
+
+    def _visit_string_interp_usages(self, token_text):
+        """Marca variables usadas dentro de {…} en cadenas interpoladas."""
+        inner = token_text[1:-1]
+        for m in re.finditer(r"\{([^}]*)\}", inner):
+            expr_text = m.group(1).strip()
+            if not expr_text:
+                continue
+            try:
+                parser = WovenParser(
+                    CommonTokenStream(WovenLexer(InputStream(expr_text)))
+                )
+                self.visit(parser.expr())
+            except Exception:
+                if re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", expr_text):
+                    self._marcar_usado(expr_text)
 
     def _entrar_scope(self):
         self.scope_stack.append({})
@@ -734,7 +753,10 @@ class LinterVisitor(WovenVisitor):
             return "int"
         if ctx.FLOAT_LITERAL():
             return "float"
-        if ctx.STRING_LITERAL() or ctx.STRING_INTERP():
+        if ctx.STRING_INTERP():
+            self._visit_string_interp_usages(ctx.STRING_INTERP().getText())
+            return "string"
+        if ctx.STRING_LITERAL():
             return "string"
         if ctx.NULL():
             return "null"

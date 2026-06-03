@@ -147,6 +147,8 @@
   --syntax-comment: var(--palette-editor-muted);
   --syntax-function: var(--palette-accent-bright);
   --syntax-identifier: var(--palette-editor-text);
+  --syntax-interp-brace: var(--palette-accent);
+  --syntax-interp-expr: var(--palette-accent-bright);
 
   /* ── Semánticos · linter (diagnósticos en editor) ─────────────── */
 
