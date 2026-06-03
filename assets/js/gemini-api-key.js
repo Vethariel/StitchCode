@@ -22,13 +22,6 @@ export function validateGeminiKeyFormat(key) {
   if (!trimmed) {
     return { ok: false, message: "Introduce tu clave de la API de Gemini." };
   }
-  if (!/^AIza[0-9A-Za-z_-]{20,}$/.test(trimmed)) {
-    return {
-      ok: false,
-      message:
-        "Formato no reconocido. Las claves de Google suelen empezar por AIza…",
-    };
-  }
   return { ok: true, key: trimmed };
 }
 
