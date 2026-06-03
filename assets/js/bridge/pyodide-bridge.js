@@ -32,7 +32,11 @@ let inverseVerboseFn = null;
 /** @type {import("pyodide").PyProxy | null} */
 let hiloChatFn = null;
 /** @type {import("pyodide").PyProxy | null} */
+let hiloRedactFn = null;
+/** @type {import("pyodide").PyProxy | null} */
 let parseHiloResponseFn = null;
+/** @type {import("pyodide").PyProxy | null} */
+let parseHiloRedactFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -115,7 +119,7 @@ from pedagogical_lint import lint_woven_pedagogico
 from pedagogical_runtime import run_woven_pedagogico
 from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
-from gemini_agent import hilo_chat, parsear_respuesta_hilo
+from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion
 `);
 
     runWovenFn = pyodide.globals.get("run_woven_pedagogico");
@@ -123,7 +127,9 @@ from gemini_agent import hilo_chat, parsear_respuesta_hilo
     verboseWovenFn = pyodide.globals.get("verbose_woven");
     inverseVerboseFn = pyodide.globals.get("inverse_verbose");
     hiloChatFn = pyodide.globals.get("hilo_chat");
+    hiloRedactFn = pyodide.globals.get("hilo_redactar");
     parseHiloResponseFn = pyodide.globals.get("parsear_respuesta_hilo");
+    parseHiloRedactFn = pyodide.globals.get("parsear_respuesta_redaccion");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
@@ -132,7 +138,9 @@ from gemini_agent import hilo_chat, parsear_respuesta_hilo
     verboseWovenFn = null;
     inverseVerboseFn = null;
     hiloChatFn = null;
+    hiloRedactFn = null;
     parseHiloResponseFn = null;
+    parseHiloRedactFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
@@ -256,4 +264,39 @@ export async function hiloParseResponse(responseJson, ctx = {}) {
       ctx.modo ?? "texto"
     )
   );
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   codigo: string,
+ *   modo: string,
+ *   perfilJson: string,
+ *   objetivoRedaccion?: string,
+ *   bloquesResumen?: string,
+ * }} args
+ */
+export async function hiloPrepareRedaction(args) {
+  if (!hiloRedactFn) {
+    return { ok: false, error: "Hilo aún no está listo." };
+  }
+  const raw = pyResultToString(
+    hiloRedactFn(
+      args.mensaje,
+      args.codigo,
+      args.modo,
+      args.perfilJson ?? "{}",
+      args.objetivoRedaccion ?? "ejemplo_correcto",
+      args.bloquesResumen ?? ""
+    )
+  );
+  return JSON.parse(raw);
+}
+
+/** @param {object} responseJson Respuesta cruda de Gemini. */
+export async function hiloParseRedaction(responseJson) {
+  if (!parseHiloRedactFn) {
+    throw new Error("Hilo aún no está listo.");
+  }
+  return pyResultToString(parseHiloRedactFn(JSON.stringify(responseJson)));
 }

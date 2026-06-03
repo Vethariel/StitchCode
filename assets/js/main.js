@@ -3,6 +3,7 @@ import {
   isReady,
   lintWoven,
   runWoven,
+  parseBlocks,
   setBridgeHandlers,
 } from "./bridge/pyodide-bridge.js";
 import { createBlocksController } from "./blocks-controller.js";
@@ -200,6 +201,61 @@ hiloAgent = createHiloAgentController({
     if (action === "mode:text") await editorMode.setMode("text");
     else if (action === "mode:blocks") await editorMode.setMode("blocks");
     else if (action === "mode:verbose") await editorMode.setMode("verbose");
+  },
+  learning: {
+    lintWoven,
+    runWoven,
+    applyExample: async (code) => {
+      editor.setCode(code);
+      const vista = editorMode?.getMode() ?? "text";
+      if (vista === "blocks" || vista === "verbose") {
+        try {
+          const doc = await parseBlocks(code);
+          blocksCtl.setDocument(
+            doc.bloques,
+            vista === "verbose" ? "verbose" : "code"
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          consoleCtl.clear();
+          consoleCtl.appendLine(
+            `No pude convertir el ejemplo a bloques: ${msg}. Cambié a modo texto.`,
+            "error",
+            "!"
+          );
+          await editorMode.setMode("text");
+        }
+      }
+      await linter.runLint();
+      syncEditorDiagnostics();
+
+      if (!linter.tieneErroresBloqueantes()) {
+        consoleShowsLintErrors = false;
+        consoleCtl.clear();
+        const runningLine = consoleCtl.appendLine("▶ Ejecutando ejemplo…", "info");
+        try {
+          const result = await runWoven(code);
+          consoleCtl.removeLine(runningLine);
+          if (!result.salida.length) {
+            consoleCtl.appendLine("Ejemplo sin salida en consola.", "muted");
+          } else {
+            consoleCtl.appendOutputLines(result.salida);
+          }
+          lastRunOutput = result.salida ?? [];
+          lastRunHadError = !!result.tiene_errores;
+          if (result.tiene_errores) {
+            editor.setDiagnostics(result.diagnosticos);
+          }
+        } catch (err) {
+          consoleCtl.removeLine(runningLine);
+          const message = err instanceof Error ? err.message : String(err);
+          consoleCtl.appendLine(message, "error", "!");
+          lastRunHadError = true;
+          lastRunOutput = [];
+        }
+        hiloAgent?.onExecutionContextChange();
+      }
+    },
   },
   getContext: () =>
     buildHiloContext({

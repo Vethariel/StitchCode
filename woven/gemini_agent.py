@@ -228,6 +228,31 @@ Ejemplo (modo bloques):
 }
 """
 
+REDACTION_PROMPT = """
+PODER: REDACCIÓN
+Genera un programa Woven en texto plano según el pedido del estudiante.
+
+Responde SOLO con JSON válido:
+{
+  "type": "redaccion",
+  "codigo": "programa Woven completo",
+  "objetivo": "ejemplo_correcto",
+  "resumen": "frase breve del concepto que ilustra"
+}
+
+Campo objetivo (obligatorio):
+- "ejemplo_correcto": código que compila, ejecuta y demuestra bien el concepto (modo aprendizaje habitual).
+- "ejemplo_para_corregir": incluye errores deliberados y pedagógicos para que el estudiante practique corrección.
+
+Reglas del código:
+- Solo sintaxis Woven del SYSTEM_PROMPT (nunca Python, Java ni C++).
+- Programa corto, claro, acorde al perfil del estudiante.
+- Sin markdown ni texto fuera del JSON; codigo es texto plano con saltos de línea.
+- Debe ser ejecutable: evita errores de sintaxis y de tipos.
+"""
+
+OBJETIVOS_REDACCION_VALIDOS = frozenset({"ejemplo_correcto", "ejemplo_para_corregir"})
+
 
 def construir_contexto(
     codigo: str,
@@ -304,6 +329,104 @@ def construir_preferencias_estudiante(perfil_json: str) -> str:
 def _es_modo_explicacion(tipo_interaccion: str) -> bool:
     t = (tipo_interaccion or "").strip().lower()
     return t in ("explicacion", "explanation", "explain")
+
+
+def construir_payload_redaccion(
+    mensaje: str,
+    codigo: str,
+    modo: str,
+    perfil_json: str = "{}",
+    objetivo_redaccion: str = "ejemplo_correcto",
+    bloques_resumen: str = "",
+) -> str:
+    objetivo = (objetivo_redaccion or "ejemplo_correcto").strip().lower()
+    if objetivo not in OBJETIVOS_REDACCION_VALIDOS:
+        objetivo = "ejemplo_correcto"
+
+    contexto = construir_contexto(
+        codigo, [], [], False, modo, bloques_resumen
+    )
+    preferencias = construir_preferencias_estudiante(perfil_json)
+
+    system_completo = (
+        SYSTEM_PROMPT
+        + f"\n\n{REDACTION_PROMPT}"
+        + f"\n\n{preferencias}"
+        + f"\n\nCONTEXTO (referencia; genera un programa nuevo, no copies sin motivo):\n{contexto}"
+        + f"\n\nOBJETIVO DE REDACCIÓN PARA ESTE TURNO: {objetivo}"
+        + "\n\nTURNO ACTUAL: el estudiante pidió material para aprender un concepto. "
+        'Responde solo con JSON type "redaccion".'
+    )
+
+    payload = {
+        "system_instruction": {"parts": [{"text": system_completo}]},
+        "contents": [{"role": "user", "parts": [{"text": mensaje}]}],
+        "generationConfig": {
+            "temperature": 0.5,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def normalizar_respuesta_redaccion(texto_modelo: str) -> dict:
+    crudo = _limpiar_json_crudo(texto_modelo)
+    try:
+        data = json.loads(crudo)
+        if isinstance(data, dict):
+            codigo = str(data.get("codigo", "")).strip()
+            objetivo = str(data.get("objetivo", "ejemplo_correcto")).strip().lower()
+            if objetivo not in OBJETIVOS_REDACCION_VALIDOS:
+                objetivo = "ejemplo_correcto"
+            resumen = str(data.get("resumen", "")).strip()[:200]
+            if codigo:
+                return {
+                    "type": "redaccion",
+                    "codigo": codigo,
+                    "objetivo": objetivo,
+                    "resumen": resumen,
+                }
+    except json.JSONDecodeError:
+        pass
+
+    if crudo:
+        return {
+            "type": "redaccion",
+            "codigo": crudo.strip(),
+            "objetivo": "ejemplo_correcto",
+            "resumen": "",
+        }
+    raise ValueError("La redacción no incluyó código Woven.")
+
+
+def parsear_respuesta_redaccion(response_json: str) -> str:
+    data = json.loads(response_json)
+    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+    return json.dumps(normalizar_respuesta_redaccion(raw), ensure_ascii=False)
+
+
+def hilo_redactar(
+    mensaje,
+    codigo,
+    modo,
+    perfil_json="{}",
+    objetivo_redaccion="ejemplo_correcto",
+    bloques_resumen="",
+):
+    """Prepara payload Gemini para el poder Redacción (fase 1 de Aprendizaje)."""
+    try:
+        payload = construir_payload_redaccion(
+            mensaje,
+            codigo,
+            modo,
+            perfil_json,
+            objetivo_redaccion,
+            bloques_resumen,
+        )
+        return json.dumps({"ok": True, "payload": payload})
+    except Exception as e:
+        return json.dumps({"ok": False, "error": str(e)})
 
 
 def construir_payload_hilo(

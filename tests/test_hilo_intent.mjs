@@ -22,6 +22,12 @@ test("conversación normal", () => {
   assert.equal(detectHiloIntent("Ayúdame con el error"), "conversation");
 });
 
+test("detecta aprendizaje de concepto", () => {
+  assert.equal(detectHiloIntent("Enséñame qué es un bucle"), "learning");
+  assert.equal(detectHiloIntent("Quiero aprender variables en Woven"), "learning");
+  assert.equal(intentToApiTipo("learning"), "aprendizaje");
+});
+
 test("intentToApiTipo", () => {
   assert.equal(intentToApiTipo("explanation"), "explicacion");
   assert.equal(intentToApiTipo("conversation"), "conversacion");

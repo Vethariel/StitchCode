@@ -12,6 +12,7 @@ from gemini_agent import (  # noqa: E402
     construir_preferencias_estudiante,
     normalizar_perfil,
     normalizar_respuesta_hilo,
+    normalizar_respuesta_redaccion,
 )
 
 
@@ -167,6 +168,20 @@ def test_payload_explicacion_incluye_modo_foco():
     system_text = payload["system_instruction"]["parts"][0]["text"]
     assert "PODER: EXPLICACIÓN" in system_text
     assert 'type "explanation"' in system_text
+
+
+def test_normalizar_respuesta_redaccion():
+    raw = json.dumps(
+        {
+            "type": "redaccion",
+            "codigo": "int x = 1\nprint(x)",
+            "objetivo": "ejemplo_correcto",
+            "resumen": "variables y print",
+        }
+    )
+    out = normalizar_respuesta_redaccion(raw)
+    assert out["codigo"].startswith("int x")
+    assert out["objetivo"] == "ejemplo_correcto"
 
 
 def test_normalizar_fallback_texto_plano():

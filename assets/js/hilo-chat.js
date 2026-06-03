@@ -2,7 +2,12 @@ import {
   geminiGenerateContentUrl,
   geminiErrorMessage,
 } from "./gemini-api-key.js";
-import { hiloParseResponse, hiloPrepareMessage } from "./bridge/pyodide-bridge.js";
+import {
+  hiloParseRedaction,
+  hiloParseResponse,
+  hiloPrepareMessage,
+  hiloPrepareRedaction,
+} from "./bridge/pyodide-bridge.js";
 
 /**
  * @param {string} apiKey
@@ -68,4 +73,33 @@ export async function sendHiloMessage(ctx) {
     modo: ctx.modo,
   });
   return parsed;
+}
+
+/**
+ * @param {{
+ *   mensaje: string,
+ *   codigo: string,
+ *   modo: string,
+ *   apiKey: string,
+ *   perfilJson: string,
+ *   objetivoRedaccion?: string,
+ *   bloquesResumen?: string,
+ * }} ctx
+ */
+export async function sendHiloRedaction(ctx) {
+  const prep = await hiloPrepareRedaction({
+    mensaje: ctx.mensaje,
+    codigo: ctx.codigo,
+    modo: ctx.modo,
+    perfilJson: ctx.perfilJson,
+    objetivoRedaccion: ctx.objetivoRedaccion ?? "ejemplo_correcto",
+    bloquesResumen: ctx.bloquesResumen ?? "",
+  });
+
+  if (!prep.ok) {
+    throw new Error(prep.error ?? "No se pudo preparar la redacción.");
+  }
+
+  const responseJson = await callGeminiHilo(ctx.apiKey, prep.payload);
+  return hiloParseRedaction(responseJson);
 }

@@ -4,6 +4,7 @@ import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
 import { defaultExplanationPanel } from "./hilo-context.js";
 import { detectHiloIntent, intentToApiTipo } from "./hilo-intent.js";
+import { runHiloLearning } from "./hilo-learning.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
 import {
   getHiloTutorialScript,
@@ -53,6 +54,15 @@ import {
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
  *   onTutorialAction?: (action: string) => void | Promise<void>,
+ *   learning?: {
+ *     lintWoven: (code: string) => Promise<import("./linter-controller.js").LintResult>,
+ *     runWoven: (code: string) => Promise<{
+ *       salida: string[],
+ *       tiene_errores: boolean,
+ *       diagnosticos?: { mensaje: string }[],
+ *     }>,
+ *     applyExample: (code: string) => Promise<void>,
+ *   },
  * }} opts
  */
 export function createHiloAgentController({
@@ -71,6 +81,7 @@ export function createHiloAgentController({
   focus,
   highlight,
   onTutorialAction,
+  learning,
 }) {
   /** @type {{ role: string, content: string }[]} */
   let historial = [];
@@ -394,10 +405,65 @@ export function createHiloAgentController({
     setBusy(true);
     setEmotionState("thinking");
     activeTurn = null;
-    bubbleText.textContent =
-      intent === "explanation" ? "Preparo la explicación…" : "Déjame pensar…";
     bubbleHint.hidden = true;
     bubble.classList.add("show");
+
+    if (intent === "learning") {
+      if (!learning) {
+        showStaticMessage(
+          "El modo aprendizaje no está disponible todavía.",
+          "worried"
+        );
+        setBusy(false);
+        return;
+      }
+      bubbleText.textContent = "Preparo un ejemplo para enseñarte…";
+      try {
+        const { turn } = await runHiloLearning({
+          mensaje,
+          apiKey,
+          perfilJson: getPerfilJson(),
+          getContext,
+          lintWoven: learning.lintWoven,
+          runWoven: learning.runWoven,
+          applyExample: learning.applyExample,
+          onPhase: (phase) => {
+            if (phase === "redaccion") {
+              bubbleText.textContent = "Escribo un ejemplo en Woven…";
+            } else if (phase === "validacion") {
+              bubbleText.textContent = "Compruebo que el ejemplo funciona…";
+            } else if (phase === "explicacion") {
+              bubbleText.textContent = "Te explico el concepto…";
+              setEmotionState("explaining");
+            }
+          },
+        });
+
+        historial.push({ role: "user", content: mensaje });
+        historial.push({ role: "model", content: turn.texto_completo });
+
+        const defaultPanel = defaultExplanationPanel(getContext().vista);
+        queueTurn({
+          ...turn,
+          type: "explanation",
+          chunks: turn.chunks.map((c, i) => ({
+            ...c,
+            panel: c.panel ?? defaultPanel,
+            highlight: c.highlight ?? { line: i + 1 },
+          })),
+        });
+      } catch (err) {
+        setEmotionState("error");
+        const msg = err instanceof Error ? err.message : String(err);
+        showStaticMessage(msg, "worried");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    bubbleText.textContent =
+      intent === "explanation" ? "Preparo la explicación…" : "Déjame pensar…";
 
     try {
       const raw = await sendHiloMessage({

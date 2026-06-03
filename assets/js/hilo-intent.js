@@ -1,4 +1,4 @@
-/** @typedef {'conversation' | 'explanation'} HiloIntent */
+/** @typedef {'conversation' | 'explanation' | 'learning'} HiloIntent */
 
 const EXPLANATION_PATTERNS = [
   /\bexpl[ií]came\b/i,
@@ -14,14 +14,41 @@ const EXPLANATION_PATTERNS = [
   /\bmodo\s+foco\b/i,
 ];
 
+const LEARNING_PATTERNS = [
+  /\b(?:ens[eé]ñame|ens[eé]ñar(?:me)?)\b/i,
+  /\bmodo\s+aprendizaje\b/i,
+  /\bquiero\s+aprender\b/i,
+  /\bconcepto\s+de\b/i,
+  /\bqu[eé]\s+es\s+(?:un|una)\s+\w+/i,
+  /\baprendamos\b/i,
+];
+
 /**
- * Detecta si el estudiante pide una explicación (poder Explicación) o conversación.
+ * Aprendizaje: concepto nuevo con ejemplo generado + explicación (no el código actual del alumno).
+ * @param {string} message
+ */
+function detectLearning(message) {
+  const t = message.trim();
+  if (!t) return false;
+  if (/\b(?:mi|este|esta)\s+(?:c[oó]digo|programa|bloque)\b/i.test(t)) {
+    return false;
+  }
+  for (const re of LEARNING_PATTERNS) {
+    if (re.test(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * Detecta el poder de Hilo: aprendizaje, explicación o conversación.
  * @param {string} message
  * @returns {HiloIntent}
  */
 export function detectHiloIntent(message) {
   const t = message.trim();
   if (!t) return "conversation";
+
+  if (detectLearning(t)) return "learning";
 
   for (const re of EXPLANATION_PATTERNS) {
     if (re.test(t)) return "explanation";
@@ -46,5 +73,7 @@ export function detectHiloIntent(message) {
 
 /** @param {HiloIntent} intent */
 export function intentToApiTipo(intent) {
-  return intent === "explanation" ? "explicacion" : "conversacion";
+  if (intent === "learning") return "aprendizaje";
+  if (intent === "explanation") return "explicacion";
+  return "conversacion";
 }
