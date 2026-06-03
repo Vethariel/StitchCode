@@ -41,6 +41,29 @@ test("parseHiloTurn lee explicación con panel y highlight", () => {
   assert.equal(turn.chunks[1].panel, "console");
 });
 
+test("parseHiloTurn acepta paneles de traducción", () => {
+  const raw = JSON.stringify({
+    type: "explanation",
+    chunks: [
+      {
+        text: "En Python usa range.",
+        emotion: "smile",
+        panel: "python",
+        highlight: { line: 2 },
+      },
+      {
+        text: "En Java hay llaves.",
+        emotion: "wink",
+        panel: "java",
+        highlight: { line: 1 },
+      },
+    ],
+  });
+  const turn = parseHiloTurn(raw);
+  assert.equal(turn.chunks[0].panel, "python");
+  assert.equal(turn.chunks[1].panel, "java");
+});
+
 test("parseHiloTurn acepta panel blocks", () => {
   const raw = JSON.stringify({
     type: "explanation",

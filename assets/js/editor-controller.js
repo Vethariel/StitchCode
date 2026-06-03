@@ -55,7 +55,7 @@ export function createEditorController({
         const sev = severidadLinea(num, byLine);
         const lineCls = sev ? `hl-line hl-${sev}` : "hl-line";
         const inner = highlighted[i] ?? " ";
-        return `<span class="${lineCls}">${inner}</span>`;
+        return `<span class="${lineCls}" data-line="${num}">${inner}</span>`;
       })
       .join("");
   }

@@ -76,12 +76,20 @@ export function createHiloFocusController({
     dock.classList.remove("hilo-tutorial-center");
 
     const editorOn = panel === "editor" || panel === "blocks";
+    const rightOn = TRANSLATION_PANELS.has(panel);
     document
       .getElementById("editor-panel")
       ?.classList.toggle("hilo-focus-illuminated", editorOn);
     document
       .getElementById("console-panel")
       ?.classList.toggle("hilo-focus-illuminated", panel === "console");
+    document
+      .getElementById("right-panel")
+      ?.classList.toggle("hilo-focus-illuminated", rightOn);
+
+    if (rightOn && onTranslationPanel) {
+      onTranslationPanel(/** @type {'python' | 'java' | 'cpp'} */ (panel));
+    }
 
     positionAtPanelCorner(panel);
   }

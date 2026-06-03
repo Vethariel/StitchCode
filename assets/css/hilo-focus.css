@@ -24,6 +24,15 @@
   box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.2);
 }
 
+#right-panel.hilo-focus-illuminated {
+  z-index: 210 !important;
+}
+
+#right-panel.hilo-focus-illuminated .right-inner {
+  position: relative;
+  z-index: 1;
+}
+
 /* Dock fuera de app-shell: por encima del overlay (200) y del panel iluminado (210) */
 .floating-dock.hilo-focus-dock {
   z-index: 320;
@@ -38,45 +47,45 @@
 }
 
 .hilo-agent--explaining .hilo-avatar {
-  border-color: var(--palette-gold-soft);
-  box-shadow: 0 0 16px rgba(212, 168, 83, 0.3);
+  border-color: var(--hilo-highlight-fg);
+  box-shadow: 0 0 16px var(--hilo-highlight-glow);
 }
 
 .line-numbers span.hilo-highlight-line {
   opacity: 1;
-  color: var(--palette-gold-soft);
+  color: var(--hilo-highlight-fg);
   font-weight: 600;
 }
 
 .code-highlight .hl-line.hilo-highlight-line {
-  background: rgba(212, 168, 83, 0.14);
-  box-shadow: inset 3px 0 0 var(--palette-gold-soft);
+  background: var(--hilo-highlight-bg);
+  box-shadow: inset 3px 0 0 var(--hilo-highlight-bar);
 }
 
 .code-highlight .hilo-highlight-range {
-  background: rgba(212, 168, 83, 0.35);
+  background: var(--hilo-highlight-bg-strong);
   border-radius: 2px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
 
 .console-body .c-line.hilo-highlight-line {
-  background: rgba(212, 168, 83, 0.12);
-  box-shadow: inset 3px 0 0 var(--palette-gold-soft);
+  background: var(--hilo-highlight-bg-subtle);
+  box-shadow: inset 3px 0 0 var(--hilo-highlight-bar);
   border-radius: 4px;
 }
 
 .blocks-line-num.hilo-highlight-line,
 .blocks-line-type.hilo-highlight-line,
 .blocks-line-main.hilo-highlight-line {
-  background: rgba(212, 168, 83, 0.1);
+  background: var(--hilo-highlight-bg-subtle);
 }
 
 .blocks-line-num.hilo-highlight-line {
-  color: var(--palette-gold-soft);
+  color: var(--hilo-highlight-fg);
   font-weight: 700;
 }
 
 .blocks-line-main.hilo-highlight-line .woven-block {
-  box-shadow: 0 0 0 2px rgba(212, 168, 83, 0.45);
+  box-shadow: 0 0 0 2px var(--hilo-highlight-ring);
 }

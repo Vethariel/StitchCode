@@ -4,8 +4,12 @@
 import { esErrorWoven } from "./woven-errors.js";
 
 export function createConsoleController({ body }) {
+  /** Líneas de salida numeradas (solo output/error, sin info/muted). */
+  let outputLineCount = 0;
+
   function clear() {
     body.innerHTML = "";
+    outputLineCount = 0;
   }
 
   function showEmpty(message = "// Presiona Run para ver el resultado…") {
@@ -30,6 +34,10 @@ export function createConsoleController({ body }) {
 
     const row = document.createElement("div");
     row.className = `c-line ${type}`;
+    if (type === "output" || type === "error" || type === "stderr") {
+      outputLineCount += 1;
+      row.dataset.consoleLine = String(outputLineCount);
+    }
     if (prefix) {
       row.innerHTML = `<span class="c-prefix">${prefix}</span><span></span>`;
       row.querySelector("span:last-child").textContent = text;

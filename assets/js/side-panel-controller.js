@@ -119,7 +119,9 @@ export function createSidePanelController({
       btn.setAttribute("aria-selected", t === tab ? "true" : "false");
     });
     Object.entries(tabPanels).forEach(([key, el]) => {
-      el.classList.toggle("active", key === tab);
+      const isActive = key === tab;
+      el.classList.toggle("active", isActive);
+      el.hidden = !isActive;
     });
   }
 
@@ -144,18 +146,34 @@ export function createSidePanelController({
    */
   function applyTranslationHighlight(lang, line) {
     clearTranslationHighlights();
-    setActiveTab(lang);
     if (!open) setOpen(true);
-    const view =
+    setActiveTab(lang);
+    const rowsEl =
+      lang === "python"
+        ? transPython
+        : lang === "java"
+          ? transJava
+          : transCpp;
+    const scroll =
       lang === "python"
         ? panel.querySelector("#trans-python-view")
         : lang === "java"
           ? panel.querySelector("#trans-java-view")
           : panel.querySelector("#trans-cpp-view");
-    const ln = Math.max(1, line);
-    const row = view?.querySelector(`.trans-row[data-trans-line="${ln}"]`);
+    if (!rowsEl || !scroll) return;
+
+    const rows = rowsEl.querySelectorAll(".trans-row");
+    const ln = Math.max(1, Math.min(line, rows.length || 1));
+    const row = rowsEl.querySelector(`.trans-row[data-trans-line="${ln}"]`);
     row?.classList.add("hilo-highlight-line");
-    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+    if (row && scroll instanceof HTMLElement) {
+      const margin = scroll.clientHeight * 0.25;
+      const rowRect = row.getBoundingClientRect();
+      const scrollRect = scroll.getBoundingClientRect();
+      const delta = rowRect.top - scrollRect.top - margin;
+      scroll.scrollTop = Math.max(0, scroll.scrollTop + delta);
+    }
   }
 
   /**

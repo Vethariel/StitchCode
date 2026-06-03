@@ -223,10 +223,14 @@ def test_normalizar_explicacion_paneles_traduccion():
     assert out["chunks"][1]["highlight"]["line"] <= 3
 
 
-def test_payload_explicacion_lenguajes_incluye_prompt_traducciones():
+def test_payload_explicacion_aprendizaje_integrada():
+    trad = json.dumps(
+        {"python": "x = 1", "java": "int x = 1;", "cpp": "int x = 1;"},
+        ensure_ascii=False,
+    )
     payload = json.loads(
         construir_payload_hilo(
-            "compara lenguajes",
+            "explica el concepto",
             "[]",
             "int x = 1",
             "[]",
@@ -235,12 +239,38 @@ def test_payload_explicacion_lenguajes_incluye_prompt_traducciones():
             "woven",
             1,
             "{}",
-            "explicacion_lenguajes",
+            "explicacion_aprendizaje",
+            "",
+            trad,
         )
     )
     system_text = payload["system_instruction"]["parts"][0]["text"]
-    assert "COMPARACIÓN DE LENGUAJES" in system_text
-    assert '"python"' in system_text
+    assert "EXPLICACIÓN DE APRENDIZAJE" in system_text
+    assert "PYTHON:" in system_text
+    assert payload["generationConfig"]["maxOutputTokens"] == 3072
+
+
+def test_normalizar_json_truncado_recupera_chunks():
+    truncado = (
+        '{"type": "explanation", "chunks": ['
+        '{"text": "Primera idea del concepto.", "emotion": "smile", "panel": "editor", '
+        '"highlight": {"line": 1}}, '
+        '{"text": "Segunda línea del ejemplo.", "emotion": "wink", "panel": "editor", '
+        '"highlight": {"line": 2}}, '
+        '{"text": "En **Python** se ve así.", "emotion": "smile", "panel": "python", '
+        '"highlight": {"line": 1}}'
+    )
+    out = normalizar_respuesta_hilo(truncado, codigo="int x = 1\nprint(x)")
+    assert out["type"] == "explanation"
+    assert len(out["chunks"]) >= 2
+    assert out["chunks"][0]["text"].startswith("Primera")
+    assert "{" not in out["chunks"][0]["text"]
+
+
+def test_normalizar_fallback_no_devuelve_solo_llave():
+    out = normalizar_respuesta_hilo('{\n  "type": "explanation",\n  "chunks": [')
+    assert out["chunks"][0]["text"] != "{"
+    assert len(out["chunks"][0]["text"]) > 5
 
 
 def test_normalizar_fallback_texto_plano():

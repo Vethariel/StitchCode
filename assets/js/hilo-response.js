@@ -25,7 +25,14 @@ function normalizeChunk(c) {
     emotion: normalizeSpriteEmotion(c.emotion),
   };
   const panel = String(c.panel ?? "").toLowerCase();
-  if (panel === "editor" || panel === "blocks" || panel === "console") {
+  if (
+    panel === "editor" ||
+    panel === "blocks" ||
+    panel === "console" ||
+    panel === "python" ||
+    panel === "java" ||
+    panel === "cpp"
+  ) {
     chunk.panel = panel;
   }
   if (c.highlight && typeof c.highlight === "object") {
@@ -49,6 +56,13 @@ export function parseHiloTurn(raw) {
 
   if (!chunks.length) {
     throw new Error("La respuesta de Hilo no trajo fragmentos.");
+  }
+
+  const soloJson = chunks.every((c) => /^[\{\}\[\]\s":,]+$/.test(c.text));
+  if (soloJson || (chunks.length === 1 && chunks[0].text === "{")) {
+    throw new Error(
+      "La respuesta de Hilo llegó mal formateada. Intenta enviar el mensaje de nuevo."
+    );
   }
 
   const rawType = String(data.type ?? "conversation").toLowerCase();

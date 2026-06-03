@@ -64,8 +64,8 @@ export function createHiloHighlightController({
       ?.classList.add("hilo-highlight-line");
 
     codeHighlight
-      ?.querySelectorAll(".hl-line")
-      ?.[ln - 1]?.classList.add("hilo-highlight-line");
+      ?.querySelector(`[data-line="${ln}"]`)
+      ?.classList.add("hilo-highlight-line");
 
     scrollEditorToLine(ln);
   }
@@ -82,14 +82,18 @@ export function createHiloHighlightController({
       ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
-  /** @param {number} line 1-based entre filas .c-line */
+  /** @param {number} line 1-based entre filas de salida (data-console-line) */
   function applyConsole(line) {
     clear();
-    const rows = consoleBody.querySelectorAll(".c-line");
-    if (!rows.length) return;
-    const ln = Math.max(1, Math.min(line, rows.length));
-    rows[ln - 1].classList.add("hilo-highlight-line");
-    rows[ln - 1].scrollIntoView({ block: "nearest", behavior: "smooth" });
+    let row = consoleBody.querySelector(`[data-console-line="${line}"]`);
+    if (!row) {
+      const rows = consoleBody.querySelectorAll("[data-console-line]");
+      if (!rows.length) return;
+      const ln = Math.max(1, Math.min(line, rows.length));
+      row = rows[ln - 1];
+    }
+    row.classList.add("hilo-highlight-line");
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   /**

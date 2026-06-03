@@ -200,6 +200,11 @@ const hiloHighlight = createHiloHighlightController({
   clearTranslationHighlights: () => sidePanel.clearTranslationHighlights(),
 });
 
+const onFocusTranslationTab = (lang) => {
+  sidePanel.setOpen(true);
+  sidePanel.setActiveTab(lang);
+};
+
 hiloAgent = createHiloAgentController({
   root: document.getElementById("hilo-agent"),
   bubble: document.getElementById("hilo-bubble"),
@@ -214,6 +219,7 @@ hiloAgent = createHiloAgentController({
   getPerfilJson: () => profileJsonForGemini(),
   focus: hiloFocus,
   highlight: hiloHighlight,
+  onFocusTranslationTab,
   onTutorialAction: async (action) => {
     if (!editorMode) return;
     if (action === "mode:text") await editorMode.setMode("text");

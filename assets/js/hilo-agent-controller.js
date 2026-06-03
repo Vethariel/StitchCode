@@ -3,6 +3,7 @@ import { emotionForState } from "./hilo-emotions.js";
 import { createHiloFocusController } from "./hilo-focus.js";
 import { createHiloHighlightController } from "./hilo-highlight.js";
 import { defaultExplanationPanel } from "./hilo-context.js";
+import { resolveHighlightLine } from "./hilo-highlight-line.js";
 import { detectHiloIntent, intentToApiTipo } from "./hilo-intent.js";
 import { runHiloLearning } from "./hilo-learning.js";
 import { localHiloTurn, parseHiloTurn } from "./hilo-response.js";
@@ -54,6 +55,7 @@ import {
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
  *   onTutorialAction?: (action: string) => void | Promise<void>,
+ *   onFocusTranslationTab?: (lang: 'python' | 'java' | 'cpp') => void,
  *   learning?: {
  *     lintWoven: (code: string) => Promise<import("./linter-controller.js").LintResult>,
  *     runWoven: (code: string) => Promise<{
@@ -84,6 +86,7 @@ export function createHiloAgentController({
   focus,
   highlight,
   onTutorialAction,
+  onFocusTranslationTab,
   learning,
 }) {
   /** @type {{ role: string, content: string }[]} */
@@ -95,9 +98,6 @@ export function createHiloAgentController({
   let busy = false;
   let tutorialActive = false;
   let spriteReady = false;
-  /** @type {HiloTurn | null} */
-  let pendingFollowUpTurn = null;
-
   function formatBubbleHtml(text) {
     const safe = text
       .replace(/&/g, "&amp;")
@@ -172,12 +172,94 @@ export function createHiloAgentController({
     }
   }
 
+  const TRANSLATION_PANELS = new Set(["python", "java", "cpp"]);
+
+  /** @param {string | undefined} raw */
+  function resolveExplanationPanel(raw, text = "") {
+    const key = (raw ?? "").trim().toLowerCase();
+    const aliases = {
+      py: "python",
+      python3: "python",
+      "c++": "cpp",
+      cplusplus: "cpp",
+    };
+    let panel = aliases[key] ?? key;
+    if (!panel && text) {
+      const t = text.toLowerCase();
+      if (/\bjava\b/.test(t) && !/\bjavascript\b/.test(t)) panel = "java";
+      else if (/\bc\+\+|cpp\b/.test(t)) panel = "cpp";
+      else if (/\bpython\b/.test(t)) panel = "python";
+    }
+    if (!panel) {
+      panel = defaultExplanationPanel(getContext().vista);
+    }
+    if (!TRANSLATION_PANELS.has(panel)) {
+      const vista = getContext().vista;
+      if (vista !== "text" && panel === "editor") panel = "blocks";
+      if (vista === "text" && panel === "blocks") panel = "editor";
+    }
+    return panel;
+  }
+
   /** @param {ActiveTurn["chunks"][number]} chunk */
   function applyFocusForChunk(chunk) {
-    const panel = chunk.panel ?? defaultExplanationPanel(getContext().vista);
+    const panel = resolveExplanationPanel(chunk.panel, chunk.text);
+    const limits = highlightLimitsForPanel(panel);
+    const line = resolveHighlightLine(chunk, panel, limits);
+    const resolved = { ...chunk, panel, highlight: { line } };
+    if (TRANSLATION_PANELS.has(panel)) {
+      onFocusTranslationTab?.(/** @type {'python' | 'java' | 'cpp'} */ (panel));
+    }
     focus.enter(panel);
     focus.positionNear(panel);
-    highlight.applyForChunk(chunk);
+    highlight.applyForChunk(resolved);
+  }
+
+  function translationLineCount(lang) {
+    const id =
+      lang === "python"
+        ? "trans-python"
+        : lang === "java"
+          ? "trans-java"
+          : "trans-cpp";
+    return (
+      document.getElementById(id)?.querySelectorAll(".trans-row").length || 1
+    );
+  }
+
+  function consoleOutputLineCount() {
+    const domCount = document
+      .getElementById("console-body")
+      ?.querySelectorAll("[data-console-line]").length;
+    if (domCount && domCount > 0) return domCount;
+    return Math.max(0, getContext().output?.length ?? 0);
+  }
+
+  function highlightLimitsForPanel(panel) {
+    const ctx = getContext();
+    const codigoLineas = Math.max(1, (ctx.codigo || "").split("\n").length);
+    const consolaLineas = consoleOutputLineCount();
+    const bloquesMatches = (ctx.bloquesResumen || "").match(/^L\d+\b/gm);
+    const bloquesLineas = Math.max(1, bloquesMatches?.length ?? codigoLineas);
+    const limits = {
+      codigoLineas,
+      consolaLineas: Math.max(1, consolaLineas || 1),
+      bloquesLineas,
+      tradLineas: 1,
+    };
+    if (panel === "python" || panel === "java" || panel === "cpp") {
+      limits.tradLineas = translationLineCount(panel);
+    }
+    return limits;
+  }
+
+  /** @param {HiloTurn["chunks"]} chunks */
+  function normalizeExplanationChunks(chunks) {
+    return chunks.map((c) => {
+      const panel = resolveExplanationPanel(c.panel, c.text);
+      const line = resolveHighlightLine(c, panel, highlightLimitsForPanel(panel));
+      return { ...c, panel, highlight: { line } };
+    });
   }
 
   /** @param {number} index */
@@ -365,11 +447,6 @@ export function createHiloAgentController({
       endExplanationFocus();
       activeTurn.explanationComplete = true;
       updateBubbleHint();
-      if (pendingFollowUpTurn) {
-        const next = pendingFollowUpTurn;
-        pendingFollowUpTurn = null;
-        queueTurn(next);
-      }
       return;
     }
 
@@ -444,7 +521,7 @@ export function createHiloAgentController({
       }
       bubbleText.textContent = "Preparo un ejemplo para enseñarte…";
       try {
-        const { wovenTurn, languagesTurn } = await runHiloLearning({
+        const { turn } = await runHiloLearning({
           mensaje,
           apiKey,
           perfilJson: getPerfilJson(),
@@ -463,43 +540,19 @@ export function createHiloAgentController({
             } else if (phase === "traduccion") {
               bubbleText.textContent = "Genero traducciones a otros lenguajes…";
             } else if (phase === "explicacion") {
-              bubbleText.textContent = "Te explico el concepto en Woven…";
-              setEmotionState("explaining");
-            } else if (phase === "explicacion_lenguajes") {
-              bubbleText.textContent = "Comparo Python, Java y C++…";
+              bubbleText.textContent = "Te explico el concepto…";
               setEmotionState("explaining");
             }
           },
         });
 
         historial.push({ role: "user", content: mensaje });
-        historial.push({
-          role: "model",
-          content: `${wovenTurn.texto_completo} ${languagesTurn.texto_completo}`,
-        });
-
-        const defaultPanel = defaultExplanationPanel(getContext().vista);
-        const langDefault = (c, i) => ({
-          ...c,
-          panel: c.panel ?? defaultPanel,
-          highlight: c.highlight ?? { line: i + 1 },
-        });
-        const langChunks = languagesTurn.chunks.map((c, i) => ({
-          ...c,
-          panel: c.panel ?? "python",
-          highlight: c.highlight ?? { line: i + 1 },
-        }));
-
-        pendingFollowUpTurn = {
-          ...languagesTurn,
-          type: "explanation",
-          chunks: langChunks,
-        };
+        historial.push({ role: "model", content: turn.texto_completo });
 
         queueTurn({
-          ...wovenTurn,
+          ...turn,
           type: "explanation",
-          chunks: wovenTurn.chunks.map(langDefault),
+          chunks: normalizeExplanationChunks(turn.chunks),
         });
       } catch (err) {
         setEmotionState("error");
@@ -538,11 +591,7 @@ export function createHiloAgentController({
         turn = {
           ...turn,
           type: "explanation",
-          chunks: turn.chunks.map((c, i) => ({
-            ...c,
-            panel: c.panel ?? defaultPanel,
-            highlight: c.highlight ?? { line: i + 1 },
-          })),
+          chunks: normalizeExplanationChunks(turn.chunks),
         };
       }
 

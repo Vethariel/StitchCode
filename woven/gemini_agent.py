@@ -1,4 +1,5 @@
 import json
+import re
 
 SYSTEM_PROMPT = """
 Eres Hilo, tutor de programación de Stitch Code, una plataforma educativa
@@ -228,29 +229,33 @@ Ejemplo (modo bloques):
 }
 """
 
-EXPLANATION_LANGUAGES_PROMPT = """
-PODER: COMPARACIÓN DE LENGUAJES (panel lateral)
-El ejemplo Woven ya fue explicado. Ahora explica particularidades de Python, Java y C++
-respecto al MISMO concepto, usando las traducciones del contexto.
+EXPLANATION_LEARNING_PROMPT = """
+PODER: EXPLICACIÓN DE APRENDIZAJE (modo foco — un solo hilo narrativo)
+El estudiante aprende un concepto de programación con un ejemplo Woven en pantalla
+y traducciones equivalentes en Python, Java y C++ en el panel lateral.
 
-Responde con type: "explanation" y entre 2 y 6 chunks.
-Cada chunk DEBE usar panel: "python", "java" o "cpp" (no editor ni consola).
-- highlight: { "line": N } — línea en el código traducido de ese panel (1 = primera).
+Responde con UN solo JSON type: "explanation" y entre 7 y 14 chunks, en este orden:
 
-Reglas:
-- Una idea por fragmento; alterna lenguajes cuando compares.
-- Resalta diferencias reales (tipos, sintaxis, main, indentación, etc.) del concepto actual.
-- No repitas la explicación línea a línea del Woven; enfócate en lo distintivo de cada lenguaje.
-- El texto puede usar **negritas** para términos clave (se mostrarán resaltados).
+1) Presenta el concepto en una frase clara (panel "editor" o "blocks").
+2) Recorre el ejemplo Woven COMPLETO: explica TODAS las líneas del programa en el contexto,
+   en orden, sin saltarte ninguna línea significativa (varios chunks en editor/blocks;
+   highlight.line = número de línea real que comentas).
+3) DESPUÉS de terminar el código, explica la SALIDA DE CONSOLA del contexto:
+   si hay output, usa obligatoriamente panel "console" y comenta cada línea de salida
+   (qué imprimió, qué demuestra, relación con el concepto). No pases a lenguajes sin
+   explicar la consola cuando exista salida.
+4) Enlaza con Python, Java y C++ (paneles "python", "java", "cpp") usando las traducciones.
+5) Cierra con diferencias prácticas entre los tres lenguajes.
 
-Ejemplo:
-{
-  "type": "explanation",
-  "chunks": [
-    {"text": "En **Python** el bucle usa `range` y la indentación define el bloque.", "emotion": "smile", "panel": "python", "highlight": {"line": 2}},
-    {"text": "En **Java** hace falta tipo explícito en el `for` y llaves `{}`.", "emotion": "wink", "panel": "java", "highlight": {"line": 3}}
-  ]
-}
+Cada chunk DEBE incluir: text, emotion, panel, highlight: { "line": N }.
+
+Paneles válidos: "editor", "blocks", "console", "python", "java", "cpp"
+- Código Woven → "editor" (modo texto) o "blocks" (modo bloques/verboso).
+- Salida de ejecución → "console" (solo después de haber explicado el código).
+- Python / Java / C++ → panel que nombres en el fragmento.
+- No resumas el programa en un solo chunk: el estudiante debe entender cada parte del ejemplo.
+- **negritas** para términos clave.
+- Usa las TRADUCCIONES del contexto (no inventes código en otros lenguajes).
 """
 
 REDACTION_PROMPT = """
@@ -356,11 +361,40 @@ def _es_modo_explicacion(tipo_interaccion: str) -> bool:
     return t in ("explicacion", "explanation", "explain")
 
 
-def _es_modo_explicacion_lenguajes(tipo_interaccion: str) -> bool:
+def _es_modo_explicacion_aprendizaje(tipo_interaccion: str) -> bool:
     return (tipo_interaccion or "").strip().lower() in (
-        "explicacion_lenguajes",
-        "explicacion_lenguaje",
+        "explicacion_aprendizaje",
+        "aprendizaje_explicacion",
     )
+
+
+def _resaltar_consola_aprendizaje(contexto: str, output: list) -> str:
+    if not output:
+        return (
+            contexto
+            + "\n\nCONSOLA: el programa no produjo salida; no uses panel \"console\"."
+        )
+    lineas = "\n".join(f"  L{i}: {linea}" for i, linea in enumerate(output, 1))
+    return (
+        contexto
+        + f"\n\nCONSOLA ({len(output)} línea(s) — explicar DESPUÉS del código completo, "
+        f'panel "console", una idea por línea de salida):\n{lineas}'
+    )
+
+
+def _anexar_traducciones_contexto(contexto: str, traducciones_json: str) -> str:
+    try:
+        tr = json.loads(traducciones_json) if traducciones_json else {}
+    except json.JSONDecodeError:
+        tr = {}
+    if not isinstance(tr, dict) or not any(tr.get(k) for k in ("python", "java", "cpp")):
+        return contexto
+    bloques = ["TRADUCCIONES (panel lateral — usa estas líneas para highlight):"]
+    for lang in ("python", "java", "cpp"):
+        codigo = str(tr.get(lang) or "").strip()
+        if codigo:
+            bloques.append(f"\n{lang.upper()}:\n```\n{codigo}\n```")
+    return contexto + "\n\n" + "\n".join(bloques)
 
 
 def construir_payload_redaccion(
@@ -473,6 +507,7 @@ def construir_payload_hilo(
     perfil_json: str = "{}",
     tipo_interaccion: str = "conversacion",
     bloques_resumen: str = "",
+    traducciones_json: str = "{}",
 ) -> str:
     historial = json.loads(historial_json)
     output = json.loads(output_json)
@@ -481,6 +516,9 @@ def construir_payload_hilo(
     contexto = construir_contexto(
         codigo, output, errores, tiene_error, modo, bloques_resumen
     )
+    if _es_modo_explicacion_aprendizaje(tipo_interaccion):
+        contexto = _anexar_traducciones_contexto(contexto, traducciones_json)
+        contexto = _resaltar_consola_aprendizaje(contexto, output)
 
     if not tiene_error:
         nivel_instruccion = (
@@ -498,12 +536,12 @@ def construir_payload_hilo(
         }.get(nivel_ayuda, "")
 
     preferencias = construir_preferencias_estudiante(perfil_json)
-    modo_lenguajes = _es_modo_explicacion_lenguajes(tipo_interaccion)
-    modo_explicacion = _es_modo_explicacion(tipo_interaccion) and not modo_lenguajes
+    modo_aprendizaje = _es_modo_explicacion_aprendizaje(tipo_interaccion)
+    modo_explicacion = _es_modo_explicacion(tipo_interaccion) or modo_aprendizaje
 
     explicacion_extra = ""
-    if modo_lenguajes:
-        explicacion_extra = EXPLANATION_LANGUAGES_PROMPT
+    if modo_aprendizaje:
+        explicacion_extra = EXPLANATION_LEARNING_PROMPT
     elif modo_explicacion:
         explicacion_extra = EXPLANATION_PROMPT
 
@@ -514,7 +552,12 @@ def construir_payload_hilo(
         + f"\n\nCONTEXTO DEL PROGRAMA:\n{contexto}"
         + ("" if modo_explicacion else f"\n\nNIVEL ACTUAL: {nivel_instruccion}")
     )
-    if modo_explicacion:
+    if modo_aprendizaje:
+        system_completo += (
+            "\n\nTURNO ACTUAL: EXPLICACIÓN DE APRENDIZAJE integrada (Woven + lenguajes). "
+            'Un solo JSON type "explanation" con todos los chunks en orden.'
+        )
+    elif modo_explicacion:
         system_completo += (
             "\n\nTURNO ACTUAL: el estudiante pidió una EXPLICACIÓN. "
             'Responde solo con JSON type "explanation".'
@@ -531,12 +574,13 @@ def construir_payload_hilo(
         "parts": [{"text": mensaje}]
     })
 
+    max_tokens = 3072 if modo_aprendizaje else 1024
     payload = {
         "system_instruction": {"parts": [{"text": system_completo}]},
         "contents": mensajes,
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 1024,
+            "maxOutputTokens": max_tokens,
             "responseMimeType": "application/json",
         }
     }
@@ -597,7 +641,8 @@ def _normalizar_chunk(
     emo = str(item.get("emotion", "neutral")).strip().lower()
     if emo not in EMOCIONES_VALIDAS:
         emo = "neutral"
-    chunk = {"text": text[:120], "emotion": emo}
+    limite = 400 if tipo == "explanation" else 120
+    chunk = {"text": text[:limite], "emotion": emo}
     if tipo != "explanation":
         return chunk
 
@@ -636,25 +681,113 @@ def _limpiar_json_crudo(texto: str) -> str:
     return t.strip()
 
 
+def _decodificar_string_json(s: str) -> str:
+    try:
+        return json.loads(f'"{s}"')
+    except json.JSONDecodeError:
+        return s.replace("\\n", "\n").replace('\\"', '"').replace("\\\\", "\\")
+
+
+def _extraer_chunks_de_json_roto(crudo: str) -> list | None:
+    """Recupera fragmentos cuando Gemini devuelve JSON truncado o mal cerrado."""
+    if '"chunks"' not in crudo and '"text"' not in crudo:
+        return None
+
+    tipo = "explanation" if re.search(
+        r'"type"\s*:\s*"(?:explanation|explicacion)"', crudo
+    ) else "conversation"
+
+    items = []
+    patron = re.compile(
+        r'\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"emotion"\s*:\s*"([^"]*)"'
+        r'(?:\s*,\s*"panel"\s*:\s*"([^"]*)")?'
+        r'(?:\s*,\s*"highlight"\s*:\s*\{\s*"line"\s*:\s*(\d+)\s*\})?',
+        re.DOTALL,
+    )
+    for m in patron.finditer(crudo):
+        text = _decodificar_string_json(m.group(1)).strip()
+        if len(text) < 2 or text in ("{", "}", "[", "]"):
+            continue
+        item = {
+            "text": text,
+            "emotion": m.group(2) or "neutral",
+        }
+        if m.group(3):
+            item["panel"] = m.group(3).strip().lower()
+        if m.group(4):
+            item["highlight"] = {"line": int(m.group(4))}
+        items.append(item)
+
+    if items:
+        return items
+
+    solo_texto = []
+    for m in re.finditer(r'"text"\s*:\s*"((?:\\.|[^"\\])*)"', crudo):
+        text = _decodificar_string_json(m.group(1)).strip()
+        if len(text) >= 2 and text not in ("{", "}", "[", "]"):
+            solo_texto.append({"text": text, "emotion": "neutral"})
+
+    return solo_texto if solo_texto else None
+
+
+def _es_fragmento_json_basura(texto: str) -> bool:
+    t = texto.strip()
+    if len(t) < 2:
+        return True
+    if t in ("{", "}", "[", "]", ":", ",", '"'):
+        return True
+    if re.match(r'^[\s\{\}\[\]",:]+$', t):
+        return True
+    if t.startswith('"type"') or t.startswith('"chunks"'):
+        return True
+    return False
+
+
 def _fallback_chunks(texto: str) -> list:
-    import re
+    recuperados = _extraer_chunks_de_json_roto(texto)
+    if recuperados:
+        return recuperados[:14]
+
     partes = re.split(r"(?<=[.!?…])\s+|\n+", texto.strip())
     chunks = []
     for p in partes:
         p = p.strip()
-        if not p:
+        if not p or _es_fragmento_json_basura(p):
             continue
-        if len(p) > 120:
+        if len(p) > 280:
             sub = re.split(r"(?<=[,;])\s+", p)
             for s in sub:
                 s = s.strip()
-                if s:
-                    chunks.append({"text": s, "emotion": "neutral"})
+                if s and not _es_fragmento_json_basura(s):
+                    chunks.append({"text": s[:400], "emotion": "neutral"})
         else:
-            chunks.append({"text": p, "emotion": "neutral"})
+            chunks.append({"text": p[:400], "emotion": "neutral"})
     if not chunks:
-        chunks = [{"text": texto.strip() or "…", "emotion": "neutral"}]
-    return chunks[:6]
+        limpio = re.sub(r'[\{\}\[\]"]', " ", texto)
+        limpio = re.sub(
+            r"\b(type|chunks|explanation|explicacion|emotion|panel|highlight)\b",
+            " ",
+            limpio,
+            flags=re.I,
+        )
+        limpio = re.sub(r"\s+", " ", limpio).strip()
+        if len(limpio) >= 12 and not _es_fragmento_json_basura(limpio):
+            chunks = [{"text": limpio[:400], "emotion": "neutral"}]
+        else:
+            chunks = [
+                {
+                    "text": "No pude leer bien mi respuesta. Intenta de nuevo.",
+                    "emotion": "worried",
+                }
+            ]
+    elif _es_fragmento_json_basura(chunks[0].get("text", "")):
+        chunks = [
+            {
+                "text": "No pude leer bien mi respuesta. Intenta de nuevo.",
+                "emotion": "worried",
+            }
+        ]
+    return chunks[:14]
 
 
 def normalizar_respuesta_hilo(
@@ -709,7 +842,10 @@ def normalizar_respuesta_hilo(
 
     if not chunks:
         chunks = _fallback_chunks(crudo or texto_modelo)
-        tipo = "conversation"
+        if re.search(r'"type"\s*:\s*"(?:explanation|explicacion)"', crudo or ""):
+            tipo = "explanation"
+        else:
+            tipo = "conversation"
 
     if len(chunks) == 1:
         extra = _fallback_chunks(texto_modelo)
@@ -717,23 +853,13 @@ def normalizar_respuesta_hilo(
             chunks = extra
 
     if tipo == "explanation":
-        usa_traducciones = bool(traducciones) and any(
-            traducciones.get(k) for k in ("python", "java", "cpp")
-        )
-        if usa_traducciones:
-            default_panel = "python"
-            default_max = _lineas_traduccion(traducciones, "python")
-        else:
-            default_panel = "blocks" if modo_norm in ("bloques", "verboso") else "editor"
-            default_max = bloques_lineas if default_panel == "blocks" else codigo_lineas
-        for i, ch in enumerate(chunks):
+        default_panel = "blocks" if modo_norm in ("bloques", "verboso") else "editor"
+        default_max = bloques_lineas if default_panel == "blocks" else codigo_lineas
+        for ch in chunks:
             if "panel" not in ch:
                 ch["panel"] = default_panel
-                ch["highlight"] = {"line": min(i + 1, default_max)}
-            elif ch.get("panel") in PANELES_TRADUCCION and "highlight" not in ch:
-                ch["highlight"] = {
-                    "line": min(i + 1, _lineas_traduccion(traducciones, ch["panel"]))
-                }
+            if "highlight" not in ch:
+                ch["highlight"] = {"line": 1}
 
     texto_completo = " ".join(c["text"] for c in chunks)
     return {"type": tipo, "chunks": chunks, "texto_completo": texto_completo}
@@ -774,11 +900,13 @@ def hilo_chat(
     perfil_json="{}",
     tipo_interaccion="conversacion",
     bloques_resumen="",
+    traducciones_json="{}",
 ):
     """
     Prepara el payload de Gemini. perfil_json: tono, estilo, objetivos.
-    tipo_interaccion: "conversacion" | "explicacion" (poder Explicación / modo foco).
+    tipo_interaccion: "conversacion" | "explicacion" | "explicacion_aprendizaje".
     bloques_resumen: programa L1… cuando modo es bloques o verboso.
+    traducciones_json: {python, java, cpp} para explicación de aprendizaje.
     """
     try:
         payload = construir_payload_hilo(
@@ -793,6 +921,7 @@ def hilo_chat(
             perfil_json,
             tipo_interaccion,
             bloques_resumen,
+            traducciones_json,
         )
         return json.dumps({
             "ok": True,

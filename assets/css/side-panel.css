@@ -230,13 +230,13 @@
 
 .trans-row.hilo-highlight-line .trans-ln {
   opacity: 1;
-  color: var(--palette-gold-soft);
+  color: var(--hilo-highlight-fg);
   font-weight: 600;
 }
 
 .trans-row.hilo-highlight-line .trans-line {
-  background: rgba(212, 168, 83, 0.14);
-  box-shadow: inset 3px 0 0 var(--palette-gold-soft);
+  background: var(--hilo-highlight-bg);
+  box-shadow: inset 3px 0 0 var(--hilo-highlight-bar);
 }
 
 .logros-heading {
@@ -356,8 +356,6 @@
   color: var(--palette-gold-soft);
 }
 
-.right-panel.hilo-focus-illuminated {
-  position: relative;
-  z-index: 210 !important;
-  box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.2);
+.right-panel.hilo-focus-illuminated.open {
+  box-shadow: 0 0 0 1px rgba(var(--rgb-accent), 0.25);
 }

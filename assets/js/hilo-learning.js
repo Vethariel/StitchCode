@@ -3,8 +3,8 @@ import { sendHiloMessage, sendHiloRedaction } from "./hilo-chat.js";
 import { parseHiloTurn } from "./hilo-response.js";
 
 /**
- * Poder Aprendizaje: redacción validada → traducciones → reemplazar editor →
- * explicación Woven → explicación comparativa Python/Java/C++.
+ * Poder Aprendizaje: redacción validada → traducciones → ejemplo en editor →
+ * una sola explicación integrada (Woven + Python/Java/C++).
  * @param {{
  *   mensaje: string,
  *   apiKey: string,
@@ -24,7 +24,7 @@ import { parseHiloTurn } from "./hilo-response.js";
  *   translateAll: (code: string) => Promise<{ python: string, java: string, cpp: string }>,
  *   onEnunciado?: (data: { tag: string, title: string, paragraphs: string[] }) => void,
  *   onTranslations?: (trans: { python: string, java: string, cpp: string }) => void,
- *   onPhase?: (phase: 'redaccion' | 'validacion' | 'traduccion' | 'explicacion' | 'explicacion_lenguajes', detail?: string) => void,
+ *   onPhase?: (phase: 'redaccion' | 'validacion' | 'traduccion' | 'explicacion', detail?: string) => void,
  * }} opts
  */
 export async function runHiloLearning({
@@ -97,7 +97,7 @@ export async function runHiloLearning({
     paragraphs: [
       draft.resumen ||
         "Estudia el ejemplo en el editor y compáralo con otras sintaxis.",
-      "Revisa las pestañas Python, Java y C++ en el panel lateral cuando termine la explicación de Woven.",
+      "Sigue la explicación de Hilo: primero el ejemplo Woven y luego Python, Java y C++ en el panel lateral.",
     ],
   });
 
@@ -106,10 +106,22 @@ export async function runHiloLearning({
   onPhase?.("explicacion");
 
   const ctx1 = getContext();
+  const traduccionesJson = JSON.stringify(translations);
+  const tieneSalida = ctx1.output.length > 0;
+  const lineasCodigo = ctx1.codigo.split("\n").length;
   const promptExplicacion =
     `El estudiante quiere aprender: ${mensaje}. ` +
-    `Ya hay un ejemplo validado en pantalla${draft.resumen ? ` (${draft.resumen})` : ""}. ` +
-    "Explica el concepto paso a paso usando ese ejemplo (modo foco).";
+    `Hay un ejemplo Woven validado en pantalla (${lineasCodigo} líneas de código` +
+    `${draft.resumen ? `; ${draft.resumen}` : ""}). ` +
+    `Traducciones a Python, Java y C++ en el panel lateral. ` +
+    "Da UNA explicación continua en este orden: " +
+    "(1) concepto breve, " +
+    "(2) recorre TODO el código del ejemplo línea a línea sin omitir partes, " +
+    (tieneSalida
+      ? "(3) explica DESPUÉS cada línea de la salida en consola (panel console), "
+      : "") +
+    "(4) comparación con Python, Java y C++. " +
+    "Usa highlight.line acorde a la línea que comentas. **negritas** en términos clave.";
 
   const rawExplain = await sendHiloMessage({
     mensaje: promptExplicacion,
@@ -122,57 +134,22 @@ export async function runHiloLearning({
     nivelAyuda: 1,
     apiKey,
     perfilJson,
-    tipoInteraccion: "explicacion",
-    bloquesResumen: ctx1.bloquesResumen,
-    codigoForParse: ctx1.codigo,
-    outputJsonForParse: JSON.stringify(ctx1.output),
-  });
-
-  const wovenTurn = parseHiloTurn(rawExplain);
-
-  onPhase?.("explicacion_lenguajes");
-
-  const traduccionesJson = JSON.stringify(translations);
-  const promptLenguajes =
-    `El estudiante aprendió: ${mensaje}. ` +
-    `Ya vio el ejemplo en Woven y su explicación. ` +
-    "Explica particularidades del mismo concepto en Python, Java y C++ " +
-    "usando las traducciones del contexto (panel lateral). " +
-    "Resalta términos clave con **negritas**.\n\n" +
-    `PYTHON:\n${translations.python}\n\n` +
-    `JAVA:\n${translations.java}\n\n` +
-    `C++:\n${translations.cpp}`;
-
-  const rawLang = await sendHiloMessage({
-    mensaje: promptLenguajes,
-    historial: [],
-    codigo: ctx1.codigo,
-    output: ctx1.output,
-    errores: [],
-    tieneError: false,
-    modo: ctx1.modo,
-    nivelAyuda: 1,
-    apiKey,
-    perfilJson,
-    tipoInteraccion: "explicacion_lenguajes",
+    tipoInteraccion: "explicacion_aprendizaje",
     bloquesResumen: ctx1.bloquesResumen,
     codigoForParse: ctx1.codigo,
     outputJsonForParse: JSON.stringify(ctx1.output),
     traduccionesJsonForParse: traduccionesJson,
+    traduccionesJsonForPrepare: traduccionesJson,
   });
 
-  const languagesTurn = parseHiloTurn(rawLang);
+  const turn = parseHiloTurn(rawExplain);
 
   return {
     draft,
     validation,
     translations,
-    wovenTurn: {
-      ...wovenTurn,
-      type: "explanation",
-    },
-    languagesTurn: {
-      ...languagesTurn,
+    turn: {
+      ...turn,
       type: "explanation",
     },
   };

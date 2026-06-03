@@ -170,6 +170,16 @@
   --console-muted: var(--palette-console-muted);
   --console-empty: var(--palette-console-empty);
 
+  /* ── Semánticos · resaltado Hilo (modo foco / explicación) ───── */
+
+  --hilo-highlight-fg: var(--palette-accent-bright);
+  --hilo-highlight-bar: var(--palette-accent);
+  --hilo-highlight-bg: rgba(var(--rgb-accent), 0.14);
+  --hilo-highlight-bg-subtle: rgba(var(--rgb-accent), 0.1);
+  --hilo-highlight-bg-strong: rgba(var(--rgb-accent), 0.32);
+  --hilo-highlight-ring: rgba(var(--rgb-accent), 0.42);
+  --hilo-highlight-glow: rgba(var(--rgb-accent), 0.28);
+
   /* ── Semánticos · panel derecho (reservado) ───────────────────── */
 
   --right-bg: var(--palette-right-bg);
