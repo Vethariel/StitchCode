@@ -263,7 +263,8 @@ export const CODE_INLINE = /** @type {Record<string, InlinePart[]>} */ ({
     { kind: "field", key: "tipo_elemento" },
     { kind: "text", value: "> " },
     { kind: "field", key: "nombre" },
-    { kind: "text", value: " = []" },
+    { kind: "text", value: " = " },
+    { kind: "field", key: "valor_raw" },
   ],
   assignment: [
     { kind: "field", key: "nombre" },
@@ -394,7 +395,8 @@ export function inlinePartsFor(tipo, texto) {
 
 export const CODE_TEMPLATES = {
   var_decl: (p) => `${p.tipo} ${p.nombre} = ${p.valor}`,
-  list_decl: (p) => `list<${p.tipo_elemento}> ${p.nombre} = []`,
+  list_decl: (p) =>
+    `list<${p.tipo_elemento}> ${p.nombre} = ${p.valor_raw ?? "[]"}`,
   assignment: (p) => `${p.nombre} = ${p.valor}`,
   print_stmt: (p) => `print(${p.valor})`,
   return_stmt: (p) => `return ${p.valor}`,

@@ -52,6 +52,14 @@ class VerboseVisitor(WovenVisitor):
     def _line(self, ctx):
         return getattr(ctx.start, "line", None)
 
+    def _expr_raw(self, ctx) -> str:
+        if ctx is None:
+            return ""
+        stream = ctx.start.getInputStream()
+        if stream is not None and ctx.stop is not None:
+            return stream.getText(ctx.start.start, ctx.stop.stop)
+        return ctx.getText()
+
     def _tipo_legible(self, type_name):
         t = type_name or ""
         mapping = {
@@ -322,6 +330,7 @@ class VerboseVisitor(WovenVisitor):
 
         if type_name.startswith("list<") and type_name.endswith(">"):
             inner = type_name[5:-1]
+            valor_raw = self._expr_raw(ctx.expr()) if ctx.expr() else "[]"
             bloque = self._bloque(
                 "list_decl",
                 "guardar una coleccion de objetos {tipo_elemento} llamada {nombre}",
@@ -329,21 +338,26 @@ class VerboseVisitor(WovenVisitor):
                     "tipo_elemento": inner,
                     "tipo_elemento_legible": self._tipo_legible(inner),
                     "nombre": name,
+                    "valor_raw": valor_raw,
                 },
                 line,
                 hijos=expr_blocks,
             )
             return self._add(bloque)
 
+        placeholders = {
+            "tipo": type_name,
+            "tipo_legible": self._tipo_legible(type_name),
+            "nombre": name,
+            "valor": expr_text,
+        }
+        if ctx.expr():
+            placeholders["valor_raw"] = self._expr_raw(ctx.expr())
+
         bloque = self._bloque(
             "var_decl",
             "guardar el valor {valor} en una variable {tipo_legible} llamada {nombre}",
-            {
-                "tipo": type_name,
-                "tipo_legible": self._tipo_legible(type_name),
-                "nombre": name,
-                "valor": expr_text,
-            },
+            placeholders,
             line,
             hijos=expr_blocks,
         )
@@ -359,6 +373,7 @@ class VerboseVisitor(WovenVisitor):
             {
                 "nombre": name,
                 "valor": expr_text,
+                "valor_raw": self._expr_raw(ctx.expr()),
             },
             self._line(ctx),
             hijos=expr_blocks,
@@ -484,7 +499,10 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "if_stmt",
             "si se cumple que {condicion}",
-            {"condicion": condicion},
+            {
+                "condicion": condicion,
+                "condicion_raw": self._expr_raw(ctx.expr()),
+            },
             self._line(ctx),
             hijos=hijos,
         )
@@ -496,7 +514,10 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "while_stmt",
             "repetir mientras {condicion}",
-            {"condicion": self._texto_expr(ctx.expr())},
+            {
+                "condicion": self._texto_expr(ctx.expr()),
+                "condicion_raw": self._expr_raw(ctx.expr()),
+            },
             self._line(ctx),
             hijos=self._collect_block(ctx.block()),
         )
@@ -507,21 +528,28 @@ class VerboseVisitor(WovenVisitor):
         f_type = ""
         var = ""
         inicio = ""
+        inicio_raw = "0"
         if init and init.typeName():
             f_type = init.typeName().getText()
             var = init.IDENTIFIER().getText()
             inicio = self._texto_expr(init.expr()) if init.expr() else ""
+            inicio_raw = self._expr_raw(init.expr()) if init.expr() else "0"
         elif init and init.assignment():
             var = init.assignment().IDENTIFIER().getText()
             inicio = self._texto_expr(init.assignment().expr())
+            inicio_raw = self._expr_raw(init.assignment().expr())
 
         condicion = self._texto_expr(ctx.expr()) if ctx.expr() else "true"
+        condicion_raw = self._expr_raw(ctx.expr()) if ctx.expr() else "true"
         paso = "sin cambio"
+        paso_raw = "sin cambio"
         if ctx.forUpdate():
             if ctx.forUpdate().assignment():
                 paso = self._texto_expr(ctx.forUpdate().assignment().expr())
+                paso_raw = self._expr_raw(ctx.forUpdate().assignment().expr())
             elif ctx.forUpdate().expr():
                 paso = self._texto_expr(ctx.forUpdate().expr())
+                paso_raw = self._expr_raw(ctx.forUpdate().expr())
 
         bloque = self._bloque(
             "for_stmt",
@@ -531,8 +559,11 @@ class VerboseVisitor(WovenVisitor):
                 "tipo_legible": self._tipo_legible(f_type) if f_type else "auto",
                 "variable": var or "iterador",
                 "inicio": inicio or "0",
+                "inicio_raw": inicio_raw,
                 "condicion": condicion,
+                "condicion_raw": condicion_raw,
                 "paso": paso,
+                "paso_raw": paso_raw,
             },
             self._line(ctx),
             hijos=self._collect_block(ctx.block()),
@@ -560,7 +591,10 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "return_stmt",
             "el resultado es {valor}",
-            {"valor": expr_text},
+            {
+                "valor": expr_text,
+                "valor_raw": self._expr_raw(ctx.expr()) if ctx.expr() else "",
+            },
             self._line(ctx),
             hijos=expr_blocks,
         )
@@ -571,18 +605,23 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "throw_stmt",
             "lanzar el error {mensaje}",
-            {"mensaje": expr_text},
+            {
+                "mensaje": expr_text,
+                "mensaje_raw": self._expr_raw(ctx.expr()),
+            },
             self._line(ctx),
         )
         return self._add(bloque)
 
     def visitPrintStmt(self, ctx: WovenParser.PrintStmtContext):
+        value_raw = ""
         if not ctx.argList():
             value_text = ""
             expr_blocks = []
         else:
             exprs = list(ctx.argList().expr())
             value_text = ", ".join(self._texto_expr(e) for e in exprs)
+            value_raw = ", ".join(self._expr_raw(e) for e in exprs)
             prev = self._suppress_method_call_blocks
             self._suppress_method_call_blocks = True
             try:
@@ -592,7 +631,10 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "print_stmt",
             "imprimir {valor}",
-            {"valor": value_text},
+            {
+                "valor": value_text,
+                "valor_raw": value_raw if ctx.argList() else "",
+            },
             self._line(ctx),
             hijos=expr_blocks,
         )
@@ -625,7 +667,11 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "self_assignment",
             "guardar {valor} en el campo {campo} de este objeto",
-            {"campo": campo, "valor": expr_text},
+            {
+                "campo": campo,
+                "valor": expr_text,
+                "valor_raw": self._expr_raw(ctx.expr()),
+            },
             self._line(ctx),
         )
         return self._add(bloque)
@@ -637,7 +683,13 @@ class VerboseVisitor(WovenVisitor):
         bloque = self._bloque(
             "index_assignment",
             "guardar {valor} en la posicion {indice} de {nombre}",
-            {"nombre": nombre, "indice": idx_text, "valor": val_text},
+            {
+                "nombre": nombre,
+                "indice": idx_text,
+                "indice_raw": self._expr_raw(ctx.expr(0)),
+                "valor": val_text,
+                "valor_raw": self._expr_raw(ctx.expr(1)),
+            },
             self._line(ctx),
         )
         return self._add(bloque)
@@ -662,8 +714,10 @@ class VerboseVisitor(WovenVisitor):
         objeto = ctx.atom().getText()
         metodo = ctx.IDENTIFIER().getText()
         args = ""
+        args_raw = ""
         if ctx.argList():
             args = ", ".join(self._texto_expr(e) for e in ctx.argList().expr())
+            args_raw = ", ".join(self._expr_raw(e) for e in ctx.argList().expr())
         if metodo == "append":
             texto = "agregar {args} a {objeto}"
         elif metodo == "remove":
@@ -677,6 +731,7 @@ class VerboseVisitor(WovenVisitor):
                 "objeto": objeto,
                 "metodo": metodo,
                 "args": args or "ningun argumento",
+                "args_raw": args_raw,
             },
             self._line(ctx),
         )
@@ -687,8 +742,10 @@ class VerboseVisitor(WovenVisitor):
             return self.visitChildren(ctx)
         metodo = ctx.IDENTIFIER().getText()
         args = ""
+        args_raw = ""
         if ctx.argList():
             args = ", ".join(self._texto_expr(e) for e in ctx.argList().expr())
+            args_raw = ", ".join(self._expr_raw(e) for e in ctx.argList().expr())
         if metodo == "append":
             texto = "agregar {args} a {objeto}"
         elif metodo == "remove":
@@ -702,6 +759,7 @@ class VerboseVisitor(WovenVisitor):
                 "objeto": "self",
                 "metodo": metodo,
                 "args": args or "ningun argumento",
+                "args_raw": args_raw,
             },
             self._line(ctx),
         )

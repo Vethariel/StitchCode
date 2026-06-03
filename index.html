@@ -280,12 +280,45 @@
                   spellcheck="false"
                   aria-label="Código Woven"
                   disabled
-                >// Stitch Code · Woven
-int x = 5
-print(x)
+                >// Stitch Code · Woven — generalidades del lenguaje
 
-int y = x + 10
-print(y)</textarea>
+// Tipos, variables y salida
+int entero = 10
+float pi = 3.14
+string nombre = "Woven"
+bool activo = true
+print(entero)
+print("Interpolación: hola {nombre}")
+
+// Condicional
+if activo:
+    print("Condición verdadera")
+else:
+    print("Condición falsa")
+
+// Ciclo for
+for (int i = 0; i < 3; i = i + 1):
+    print("Paso {i}")
+
+// Función
+function int doble(int n):
+    return n * n
+print(doble(4))
+
+// Lista
+list<int> nums = [1, 2, 3]
+print("nums[0] = {nums[0]}, length = {nums.length}")
+
+// Clase y objeto (new obligatorio)
+class Punto:
+    int x
+    init(int x):
+        self.x = x
+    function void mostrar():
+        print("x = {self.x}")
+
+Punto p = new Punto(7)
+p.mostrar()</textarea>
                 <div class="lint-tooltip" id="lint-tooltip" hidden role="tooltip"></div>
               </div>
             </div>

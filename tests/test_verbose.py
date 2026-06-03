@@ -290,3 +290,37 @@ def test_verbose_power_operator_en_texto_expr():
     b = bloques(code)
     print_block = next(blk for blk in b if blk["tipo"] == "print_stmt")
     assert print_block["placeholders"]["valor"] == "y ** 2"
+
+
+def test_inverse_list_decl_preserves_literal():
+    code = "list<int> nums = [1, 2, 3]\n"
+    data = json.loads(verbose_woven(code))
+    regenerado = inverse_verbose(json.dumps(data))
+    assert "list<int> nums = [1, 2, 3]" in regenerado
+
+
+def test_inverse_var_decl_new_object_and_method_call():
+    code = "\n".join([
+        "class Punto:",
+        "    int x",
+        "    init(int x):",
+        "        self.x = x",
+        "    function void mostrar():",
+        '        print("ok")',
+        "Punto p = new Punto(7)",
+        "p.mostrar()",
+    ])
+    regenerado = inverse_verbose(verbose_woven(code))
+    assert "Punto p = new Punto(7)" in regenerado
+    assert "p.mostrar()" in regenerado
+    assert "nuevo" not in regenerado
+
+
+def test_inverse_print_call_expression():
+    code = "\n".join([
+        "function int doble(int n):",
+        "    return n * n",
+        "print(doble(4))",
+    ])
+    regenerado = inverse_verbose(verbose_woven(code))
+    assert "print(doble(4))" in regenerado

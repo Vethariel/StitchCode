@@ -66,8 +66,8 @@ export function getHiloTutorialScript() {
     {
       presentation: "focus",
       panel: "editor",
-      highlight: { line: 2 },
-      text: "Woven usa tipos, condicionales, bucles y funciones. Tu programa de ejemplo declara variables y las muestra.",
+      highlight: { line: 4 },
+      text: "El ejemplo inicial recorre lo esencial: tipos, condicionales, bucle for, funciones, listas y clases con new.",
       emotion: "neutral",
     },
     {
