@@ -366,10 +366,79 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
       ...b,
       id: b.id || `${b.tipo}_${Math.random().toString(36).slice(2, 9)}`,
       placeholders: { ...(b.placeholders || {}) },
+      linea_fuente: b.linea_fuente ?? undefined,
       hijos: b.hijos ? normalizeBlocks(b.hijos) : [],
       hijos_else: b.hijos_else ? normalizeBlocks(b.hijos_else) : undefined,
       hijos_catch: b.hijos_catch ? normalizeBlocks(b.hijos_catch) : undefined,
     }));
+  }
+
+  function clearStepHighlight() {
+    documentEl
+      .querySelectorAll(".step-highlight-line")
+      .forEach((el) => el.classList.remove("step-highlight-line"));
+  }
+
+  /**
+   * @param {number} wovenLine Línea 1-based del fuente Woven (traza / verbose)
+   * @returns {string | null} Línea de bloque L1, L2… en la cuadrícula
+   */
+  function findDisplayLineForWovenLine(wovenLine) {
+    if (!wovenLine || !Number.isFinite(wovenLine)) return null;
+    const n = Math.floor(wovenLine);
+    let el = documentEl.querySelector(`[data-woven-line="${n}"]`);
+    if (!el) {
+      const all = [...documentEl.querySelectorAll("[data-woven-line]")];
+      let best = null;
+      let bestWl = -1;
+      for (const node of all) {
+        const wl = Number(node.dataset.wovenLine);
+        if (!Number.isFinite(wl) || wl > n) continue;
+        if (wl > bestWl) {
+          bestWl = wl;
+          best = node;
+        }
+      }
+      el = best;
+    }
+    return el?.dataset?.hiloLine ?? null;
+  }
+
+  /**
+   * @param {number | null} wovenLine
+   */
+  function highlightByWovenLine(wovenLine) {
+    clearStepHighlight();
+    if (wovenLine == null || !Number.isFinite(wovenLine)) return;
+    const n = Math.floor(wovenLine);
+    let nodes = documentEl.querySelectorAll(`[data-woven-line="${n}"]`);
+    if (!nodes.length) {
+      const all = [...documentEl.querySelectorAll("[data-woven-line]")];
+      let best = null;
+      let bestWl = -1;
+      for (const el of all) {
+        const wl = Number(el.dataset.wovenLine);
+        if (!Number.isFinite(wl) || wl > n) continue;
+        if (wl > bestWl) {
+          bestWl = wl;
+          best = el;
+        }
+      }
+      if (best?.dataset?.wovenLine) {
+        nodes = documentEl.querySelectorAll(
+          `[data-woven-line="${best.dataset.wovenLine}"]`
+        );
+      }
+    }
+    nodes.forEach((el) => el.classList.add("step-highlight-line"));
+    const scrollKey =
+      nodes[0]?.dataset?.wovenLine ??
+      (nodes.length ? String(n) : null);
+    if (scrollKey) {
+      documentEl
+        .querySelector(`.blocks-line-num[data-woven-line="${scrollKey}"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   }
 
   function render() {
@@ -654,23 +723,30 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
    */
   function renderBlockLine(bloque, parentList, index, lineCounter, rowCtx, container) {
     const schema = BLOCK_SCHEMAS[bloque.tipo];
-    const line = lineCounter.n++;
-    bloque.linea = line;
+    if (bloque.linea_fuente == null && bloque.linea > 0) {
+      bloque.linea_fuente = bloque.linea;
+    }
+    const displayLine = lineCounter.n++;
+    bloque.linea = displayLine;
+    const wovenLine = bloque.linea_fuente;
 
     const num = document.createElement("div");
     num.className = "blocks-line-num";
-    num.textContent = String(line);
-    num.setAttribute("aria-label", `Línea ${line}`);
-    num.dataset.hiloLine = String(line);
+    num.textContent = String(displayLine);
+    num.setAttribute("aria-label", `Línea ${displayLine}`);
+    num.dataset.hiloLine = String(displayLine);
+    if (wovenLine != null) num.dataset.wovenLine = String(wovenLine);
 
     const kind = document.createElement("div");
     kind.className = "blocks-line-type";
     kind.textContent = schema?.label || bloque.tipo;
-    kind.dataset.hiloLine = String(line);
+    kind.dataset.hiloLine = String(displayLine);
+    if (wovenLine != null) kind.dataset.wovenLine = String(wovenLine);
 
     const main = document.createElement("div");
     main.className = "blocks-line-main";
-    main.dataset.hiloLine = String(line);
+    main.dataset.hiloLine = String(displayLine);
+    if (wovenLine != null) main.dataset.wovenLine = String(wovenLine);
     main.style.setProperty("--block-depth", String(rowCtx.indent));
     main.appendChild(renderBlockCard(bloque, parentList, index));
 
@@ -927,5 +1003,8 @@ export function createBlocksController({ paletteEl, documentEl, onChange }) {
     getProgramSummary,
     getBlockLineCount,
     render,
+    highlightByWovenLine,
+    clearStepHighlight,
+    findDisplayLineForWovenLine,
   };
 }

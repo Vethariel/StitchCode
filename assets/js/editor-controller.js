@@ -15,6 +15,8 @@ export function createEditorController({
 }) {
   /** @type {Diagnostico[]} */
   let diagnosticos = [];
+  /** @type {number | null} Línea resaltada en modo paso a paso (1-based). */
+  let stepHighlightLine = null;
 
   function escapeHtml(text) {
     return text
@@ -53,7 +55,8 @@ export function createEditorController({
       .map((_, i) => {
         const num = i + 1;
         const sev = severidadLinea(num, byLine);
-        const lineCls = sev ? `hl-line hl-${sev}` : "hl-line";
+        const stepMark = stepHighlightLine === num ? " hl-step-current" : "";
+        const lineCls = (sev ? `hl-line hl-${sev}` : "hl-line") + stepMark;
         const inner = highlighted[i] ?? " ";
         return `<span class="${lineCls}" data-line="${num}">${inner}</span>`;
       })
@@ -66,7 +69,8 @@ export function createEditorController({
     lineNumbers.innerHTML = Array.from({ length: n }, (_, i) => {
       const num = i + 1;
       const sev = severidadLinea(num, byLine);
-      const cls = sev ? ` lint-${sev}` : "";
+      const stepMark = stepHighlightLine === num ? " ln-step-current" : "";
+      const cls = (sev ? ` lint-${sev}` : "") + stepMark;
       return `<span id="ln${num}" class="${cls.trim()}" data-line="${num}">${num}</span>`;
     }).join("");
     updateActiveLine();
@@ -163,6 +167,15 @@ export function createEditorController({
     updateLines();
   }
 
+  /** @param {number | null} lineNum */
+  function setStepLineHighlight(lineNum) {
+    stepHighlightLine =
+      lineNum != null && Number.isFinite(lineNum) && lineNum >= 1
+        ? Math.floor(lineNum)
+        : null;
+    updateLines();
+  }
+
   codeArea.addEventListener("input", onInput);
   codeArea.addEventListener("scroll", syncScroll);
   codeArea.addEventListener("click", updateActiveLine);
@@ -185,5 +198,6 @@ export function createEditorController({
       updateLines();
     },
     setDiagnostics,
+    setStepLineHighlight,
   };
 }

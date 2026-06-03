@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="assets/css/loading-screen.css">
   <link rel="stylesheet" href="assets/css/layout.css">
   <link rel="stylesheet" href="assets/css/exercise-context.css">
+  <link rel="stylesheet" href="assets/css/step-context.css">
   <link rel="stylesheet" href="assets/css/editor.css">
   <link rel="stylesheet" href="assets/css/editor-diagnostics.css">
   <link rel="stylesheet" href="assets/css/editor-syntax.css">
@@ -226,6 +227,15 @@
       <div class="nav-side-actions">
         <button
           type="button"
+          class="nav-btn step-mode-toggle"
+          id="step-mode-btn"
+          disabled
+          title="Ejecución paso a paso con variables y contexto"
+        >
+          Paso a paso
+        </button>
+        <button
+          type="button"
           class="nav-btn"
           id="generate-translations-btn"
           disabled
@@ -266,6 +276,37 @@
           title="Desactivar modo ejercicio"
         >
           Salir del ejercicio
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="step-context-bar"
+      class="step-context-bar"
+      role="region"
+      aria-label="Modo paso a paso"
+      hidden
+    >
+      <div class="step-context-bar-inner">
+        <span class="step-context-indicator" aria-hidden="true"></span>
+        <p class="step-context-text" id="step-context-text">
+          Ejecución paso a paso
+        </p>
+        <div class="step-context-nav" role="group" aria-label="Navegación de pasos">
+          <button type="button" class="step-context-nav-btn" id="step-prev-btn" disabled>
+            ← Anterior
+          </button>
+          <button type="button" class="step-context-nav-btn" id="step-next-btn" disabled>
+            Siguiente →
+          </button>
+        </div>
+        <button
+          type="button"
+          class="step-context-exit"
+          id="exit-step-btn"
+          title="Salir del modo paso a paso"
+        >
+          Salir del modo paso a paso
         </button>
       </div>
     </div>
@@ -392,6 +433,10 @@ p.mostrar()</textarea>
               <span class="r-tab-dot" style="background:var(--pastel-yellow)"></span>
               Logros
             </button>
+            <button type="button" class="r-tab" data-tab="paso" role="tab" aria-selected="false" hidden>
+              <span class="r-tab-dot" style="background:var(--pastel-blue)"></span>
+              Paso a paso
+            </button>
           </div>
           <div class="right-tab-panels">
             <div class="right-content active" data-tab-panel="enunciado" role="tabpanel">
@@ -431,6 +476,25 @@ p.mostrar()</textarea>
             <div class="right-content" data-tab-panel="logros" role="tabpanel" hidden>
               <div class="logros-heading">Logros de aprendizaje</div>
               <div id="logros-list"></div>
+            </div>
+            <div class="right-content" data-tab-panel="paso" role="tabpanel" hidden>
+              <div class="step-panel-heading">Ejecución paso a paso</div>
+              <div class="step-panel-step-label" id="step-panel-step-label">—</div>
+              <section class="step-panel-section">
+                <div class="step-panel-section-title">Evento actual</div>
+                <div id="step-panel-event"></div>
+              </section>
+              <section class="step-panel-section">
+                <div class="step-panel-section-title">Contexto de ejecución</div>
+                <div class="step-context-value" id="step-panel-context">—</div>
+              </section>
+              <section class="step-panel-section">
+                <div class="step-panel-section-title">Variables visibles</div>
+                <p class="step-panel-empty" id="step-panel-empty" hidden>
+                  No hay variables en este paso.
+                </p>
+                <div id="step-panel-vars"></div>
+              </section>
             </div>
           </div>
         </div>

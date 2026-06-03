@@ -18,6 +18,7 @@ const INTERPRETER_FILES = [
   "verbose_inverse.py",
   "gemini_agent.py",
   "translator_visitor.py",
+  "tracing_visitor.py",
 ];
 
 /** @type {import("pyodide").PyodideInterface | null} */
@@ -44,6 +45,8 @@ let hiloEstablishExerciseFn = null;
 let parseHiloExerciseFn = null;
 /** @type {((source: string, language: string) => import("pyodide").PyProxy) | null} */
 let translateWovenFn = null;
+/** @type {((source: string) => import("pyodide").PyProxy) | null} */
+let traceWovenFn = null;
 /** @type {RuntimeStatus} */
 let status = "idle";
 
@@ -128,6 +131,7 @@ from verbose_visitor import verbose_woven
 from verbose_inverse import inverse_verbose
 from gemini_agent import hilo_chat, hilo_redactar, parsear_respuesta_hilo, parsear_respuesta_redaccion, hilo_establecer_ejercicio, parsear_respuesta_ejercicio
 from translator_visitor import translate_woven
+from tracing_visitor import trace_woven
 `);
 
     runWovenFn = pyodide.globals.get("run_woven_pedagogico");
@@ -141,6 +145,7 @@ from translator_visitor import translate_woven
     hiloEstablishExerciseFn = pyodide.globals.get("hilo_establecer_ejercicio");
     parseHiloExerciseFn = pyodide.globals.get("parsear_respuesta_ejercicio");
     translateWovenFn = pyodide.globals.get("translate_woven");
+    traceWovenFn = pyodide.globals.get("trace_woven");
     setStatus("ready", "Listo");
   } catch (err) {
     pyodide = null;
@@ -155,6 +160,7 @@ from translator_visitor import translate_woven
     hiloEstablishExerciseFn = null;
     parseHiloExerciseFn = null;
     translateWovenFn = null;
+    traceWovenFn = null;
     const message = err instanceof Error ? err.message : String(err);
     setStatus("error", "Error al cargar el motor");
     throw new Error(message);
@@ -362,6 +368,18 @@ export async function translateWoven(source, language) {
     throw new Error("El traductor aún no está listo.");
   }
   return pyResultToString(translateWovenFn(source, language));
+}
+
+/**
+ * @param {string} source
+ * @returns {Promise<import("../step-trace.js").WovenTrace>}
+ */
+export async function traceWoven(source) {
+  if (!traceWovenFn) {
+    throw new Error("El tracer Woven aún no está listo.");
+  }
+  const raw = pyResultToString(traceWovenFn(source));
+  return JSON.parse(raw);
 }
 
 /** @param {string} source */

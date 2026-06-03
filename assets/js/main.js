@@ -6,7 +6,9 @@ import {
   parseBlocks,
   setBridgeHandlers,
   translateWovenAll,
+  traceWoven,
 } from "./bridge/pyodide-bridge.js";
+import { createStepModeController } from "./step-mode-controller.js";
 import { createSidePanelController } from "./side-panel-controller.js";
 import { createBlocksController } from "./blocks-controller.js";
 import { createEditorController } from "./editor-controller.js";
@@ -130,6 +132,7 @@ const editor = createEditorController({
       linter?.scheduleLint();
     }
     hiloAgent?.onExecutionContextChange();
+    if (stepMode?.isActive()) stepMode.exit();
   },
 });
 
@@ -172,6 +175,11 @@ editorMode = createEditorModeController({
 const consoleCtl = createConsoleController({
   body: document.getElementById("console-body"),
 });
+
+const stepModeBtn = document.getElementById("step-mode-btn");
+
+/** @type {ReturnType<typeof createStepModeController> | undefined} */
+let stepMode;
 
 const sidePanel = createSidePanelController({
   panel: document.getElementById("right-panel"),
@@ -395,7 +403,44 @@ function updateRunButton() {
   runBtn.title = blockedByLint
     ? "Corrige los errores semánticos antes de ejecutar"
     : "Ejecutar (Ctrl+Enter)";
+  if (stepModeBtn) {
+    stepModeBtn.disabled = !isReady() || blockedByLint || stepMode?.isActive();
+  }
 }
+
+stepMode = createStepModeController({
+  getCode: () => editor.getCode(),
+  traceWoven,
+  hasLintErrors: () => linter.tieneErroresBloqueantes(),
+  syncBlocksToText: () => editorMode.syncBlocksToText(),
+  isBlockMode: () => editorMode.isBlockMode(),
+  getVista: () => editorMode.getMode(),
+  refreshBlocksFromCode: async () => {
+    const vista = editorMode.getMode();
+    const doc = await parseBlocks(editor.getCode());
+    blocksCtl.setDocument(
+      doc.bloques,
+      vista === "verbose" ? "verbose" : "code"
+    );
+  },
+  blocks: blocksCtl,
+  editor,
+  sidePanel,
+  elements: {
+    navBtn: stepModeBtn,
+    contextBar: document.getElementById("step-context-bar"),
+    contextText: document.getElementById("step-context-text"),
+    btnPrev: document.getElementById("step-prev-btn"),
+    btnNext: document.getElementById("step-next-btn"),
+    btnExit: document.getElementById("exit-step-btn"),
+    panelRoot: document.querySelector('[data-tab-panel="paso"]'),
+    panelStepLabel: document.getElementById("step-panel-step-label"),
+    panelEvent: document.getElementById("step-panel-event"),
+    panelContext: document.getElementById("step-panel-context"),
+    panelVars: document.getElementById("step-panel-vars"),
+    panelEmpty: document.getElementById("step-panel-empty"),
+  },
+});
 
 async function handleRun() {
   if (!isReady() || isRunning) return;

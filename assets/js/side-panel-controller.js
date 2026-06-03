@@ -4,7 +4,7 @@ import {
   loadLearningAchievements,
 } from "./learning-achievements.js";
 
-/** @typedef {'enunciado' | 'python' | 'java' | 'cpp' | 'logros'} SidePanelTab */
+/** @typedef {'enunciado' | 'python' | 'java' | 'cpp' | 'logros' | 'paso'} SidePanelTab */
 
 /**
  * @param {string} text
@@ -135,6 +135,17 @@ export function createSidePanelController({
     }
     activeTab = tab;
     updateTabButtons(tab);
+  }
+
+  /** @param {boolean} on */
+  function enableStepTab(on) {
+    const pasoTab = /** @type {HTMLButtonElement | null} */ (
+      panel.querySelector('.r-tab[data-tab="paso"]')
+    );
+    if (pasoTab) pasoTab.hidden = !on;
+    if (!on && activeTab === "paso") {
+      setActiveTab("enunciado");
+    }
   }
 
   function clearTranslationHighlights() {
@@ -312,6 +323,7 @@ export function createSidePanelController({
     toggleOpen,
     isOpen: () => open,
     setActiveTab,
+    enableStepTab,
     setEnunciado,
     setTranslations,
     recordTopicMastery,

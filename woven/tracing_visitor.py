@@ -14,8 +14,8 @@ from interpreter_visitor import (
 
 
 class TracingInterpreterVisitor(InterpreterVisitor):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, source: str = ""):
+        super().__init__(source)
         self.eventos = []
         self.paso_actual = 0
         self.call_stack = []
@@ -231,7 +231,7 @@ def trace_woven(source: str) -> str:
     parser = WovenParser(stream)
     tree = parser.program()
 
-    visitor = TracingInterpreterVisitor()
+    visitor = TracingInterpreterVisitor(source)
     try:
         visitor.visit(tree)
     except Exception as e:
