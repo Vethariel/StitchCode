@@ -41,7 +41,10 @@ import {
   createOnboardingController,
   createSettingsModalController,
 } from "./setup-form.js";
-import { isHiloTutorialComplete } from "./hilo-tutorial.js";
+import {
+  getTutorialDemoEnunciado,
+  isHiloTutorialComplete,
+} from "./hilo-tutorial.js";
 import {
   isOnboardingComplete,
   profileJsonForGemini,
@@ -88,8 +91,27 @@ function unlockApp() {
   updateRunButton();
 }
 
+async function prepareTutorialDemoContent() {
+  sidePanel.setEnunciado(getTutorialDemoEnunciado());
+  sidePanel.setOpen(true);
+  if (!isReady()) return;
+  try {
+    const snippet = editor
+      .getCode()
+      .split("\n")
+      .slice(0, 10)
+      .join("\n");
+    if (snippet.trim()) {
+      sidePanel.setTranslations(await translateWovenAll(snippet));
+    }
+  } catch {
+    /* traducciones opcionales si el motor aún no está listo */
+  }
+}
+
 async function maybeStartHiloTutorial() {
   if (isHiloTutorialComplete() || !hiloAgent) return;
+  await prepareTutorialDemoContent();
   await hiloAgent.startTutorial();
 }
 
@@ -424,11 +446,23 @@ hiloAgent = createHiloAgentController({
   highlight: hiloHighlight,
   onFocusTranslationTab,
   onTutorialAction: async (action) => {
-    if (!editorMode) return;
     if (isExerciseModeActive() || isPlanModeActive()) return;
+    if (action === "open:panel") {
+      sidePanel.setOpen(true);
+      return;
+    }
+    if (action === "demo:translations") {
+      await prepareTutorialDemoContent();
+      return;
+    }
+    if (!editorMode) return;
     if (action === "mode:text") await editorMode.setMode("text");
     else if (action === "mode:blocks") await editorMode.setMode("blocks");
     else if (action === "mode:verbose") await editorMode.setMode("verbose");
+  },
+  onTutorialTab: async (tab) => {
+    sidePanel.setOpen(true);
+    sidePanel.setActiveTab(tab);
   },
   learning: {
     lintWoven,

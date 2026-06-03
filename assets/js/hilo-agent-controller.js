@@ -99,6 +99,7 @@ import {
  *   focus: ReturnType<typeof createHiloFocusController>,
  *   highlight: ReturnType<typeof createHiloHighlightController>,
  *   onTutorialAction?: (action: string) => void | Promise<void>,
+ *   onTutorialTab?: (tab: 'enunciado' | 'logros' | 'python' | 'java' | 'cpp') => void | Promise<void>,
  *   onFocusTranslationTab?: (lang: 'python' | 'java' | 'cpp') => void,
  *   learning?: {
  *     lintWoven: (code: string) => Promise<import("./linter-controller.js").LintResult>,
@@ -157,6 +158,7 @@ export function createHiloAgentController({
   focus,
   highlight,
   onTutorialAction,
+  onTutorialTab,
   onFocusTranslationTab,
   learning,
   exercise,
@@ -257,6 +259,10 @@ export function createHiloAgentController({
       python3: "python",
       "c++": "cpp",
       cplusplus: "cpp",
+      enunciado: "enunciado",
+      logros: "logros",
+      sidepanel: "enunciado",
+      panel: "enunciado",
     };
     let panel = aliases[key] ?? key;
     if (!panel && text) {
@@ -284,6 +290,8 @@ export function createHiloAgentController({
     const resolved = { ...chunk, panel, highlight: { line } };
     if (TRANSLATION_PANELS.has(panel)) {
       onFocusTranslationTab?.(/** @type {'python' | 'java' | 'cpp'} */ (panel));
+    } else if (panel === "enunciado" || panel === "logros") {
+      onTutorialTab?.(panel);
     }
     focus.enter(panel);
     focus.positionNear(panel);
@@ -343,6 +351,9 @@ export function createHiloAgentController({
     const chunk = activeTurn.chunks[index];
     if (!chunk) return;
 
+    if (chunk.tab && onTutorialTab) {
+      await onTutorialTab(chunk.tab);
+    }
     if (chunk.action && onTutorialAction) {
       await onTutorialAction(chunk.action);
     }
@@ -424,8 +435,12 @@ export function createHiloAgentController({
     queueTurn(
       localHiloTurn([
         {
-          text: "Cuando quieras, pregúntame o pídeme que te explique tu código.",
-          emotion: "wink",
+          text: "Ya conoces la plataforma. Pídeme un plan, un ejercicio, que te explique tu código o «paso a paso» para la traza.",
+          emotion: "happy",
+        },
+        {
+          text: "Escribe en el cuadro de abajo o pulsa Enter en cada mensaje mío. ¡Buen aprendizaje!",
+          emotion: "smile",
         },
       ])
     );

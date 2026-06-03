@@ -1,4 +1,4 @@
-/** @typedef {'editor' | 'blocks' | 'console' | 'python' | 'java' | 'cpp' | 'presentation'} HiloFocusPanel */
+/** @typedef {'editor' | 'blocks' | 'console' | 'python' | 'java' | 'cpp' | 'enunciado' | 'logros' | 'presentation'} HiloFocusPanel */
 
 /** Panel DOM iluminado (editor-panel agrupa texto, bloques y verboso). */
 const PANEL_DOM_ID = {
@@ -8,6 +8,8 @@ const PANEL_DOM_ID = {
   python: "right-panel",
   java: "right-panel",
   cpp: "right-panel",
+  enunciado: "right-panel",
+  logros: "right-panel",
 };
 
 const TRANSLATION_PANELS = new Set(["python", "java", "cpp"]);
@@ -76,7 +78,8 @@ export function createHiloFocusController({
     dock.classList.remove("hilo-tutorial-center");
 
     const editorOn = panel === "editor" || panel === "blocks";
-    const rightOn = TRANSLATION_PANELS.has(panel);
+    const rightOn =
+      TRANSLATION_PANELS.has(panel) || panel === "enunciado" || panel === "logros";
     document
       .getElementById("editor-panel")
       ?.classList.toggle("hilo-focus-illuminated", editorOn);

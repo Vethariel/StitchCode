@@ -2,21 +2,35 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getHiloTutorialScript,
+  getTutorialDemoEnunciado,
   isHiloTutorialComplete,
   markHiloTutorialComplete,
   TUTORIAL_STORAGE_KEY,
 } from "../assets/js/hilo-tutorial.js";
 
-test("tutorial tiene presentación centrada y recorrido con foco", () => {
+test("tutorial cubre plataforma completa", () => {
   const script = getHiloTutorialScript();
-  assert.ok(script.length >= 8);
+  assert.ok(script.length >= 18);
   const intro = script.filter((c) => c.presentation === "center");
   const tour = script.filter((c) => c.presentation === "focus");
-  assert.ok(intro.length >= 4);
-  assert.ok(tour.length >= 4);
+  assert.ok(intro.length >= 8);
+  assert.ok(tour.length >= 8);
   assert.ok(tour.some((c) => c.action === "mode:blocks"));
   assert.ok(tour.some((c) => c.action === "mode:verbose"));
   assert.ok(tour.some((c) => c.panel === "console"));
+  assert.ok(tour.some((c) => c.tab === "logros"));
+  assert.ok(tour.some((c) => c.tab === "python"));
+  const text = script.map((c) => c.text).join(" ");
+  assert.match(text, /Plan/i);
+  assert.match(text, /Ejercicio/i);
+  assert.match(text, /Paso a paso/i);
+  assert.match(text, /Logros/i);
+});
+
+test("demo enunciado para tutorial", () => {
+  const demo = getTutorialDemoEnunciado();
+  assert.ok(demo.paragraphs.length >= 1);
+  assert.equal(demo.tag, "Tutorial");
 });
 
 test("marcar tutorial completo en storage", () => {

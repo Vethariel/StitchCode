@@ -16,11 +16,6 @@
  * }} DraftValidation */
 
 /**
- * Objetivo de redacción según el pedido (extensible a más usos).
- * @param {string} mensaje
- * @returns {RedaccionObjetivo}
- */
-/**
  * Extrae código Woven plano desde respuestas del modelo (fences, \\n literales).
  * @param {string} raw
  * @returns {string}
